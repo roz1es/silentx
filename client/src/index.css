@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --tg-bg: 239 244 248;
+  --tg-panel: 255 255 255;
+  --tg-bubble: 255 255 255;
+  --tg-mine: 227 242 253;
+  --tg-accent: 51 144 236;
+  --tg-muted: 112 124 135;
+  --tg-border: 220 227 235;
+  --tg-hover: 241 246 250;
+}
+
+.dark {
+  --tg-bg: 15 23 30;
+  --tg-panel: 23 33 43;
+  --tg-bubble: 34 46 58;
+  --tg-mine: 43 82 120;
+  --tg-accent: 82 168 255;
+  --tg-muted: 113 127 144;
+  --tg-border: 40 54 68;
+  --tg-hover: 32 44 56;
+}
+
+body {
+  font-family: Inter, system-ui, sans-serif;
+  @apply bg-tg-bg text-slate-900 dark:text-slate-100 min-h-screen;
+}
+
+/* subtle chat background pattern (Telegram-like) */
+.chat-bg {
+  background-color: rgb(var(--tg-bg));
+  background-image: radial-gradient(
+      circle at 20% 20%,
+      rgba(82, 168, 255, 0.06) 0%,
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 80% 60%,
+      rgba(51, 144, 236, 0.05) 0%,
+      transparent 40%
+    );
+}
+
+.dark .chat-bg {
+  background-image: radial-gradient(
+      circle at 15% 25%,
+      rgba(82, 168, 255, 0.08) 0%,
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 85% 70%,
+      rgba(82, 168, 255, 0.05) 0%,
+      transparent 42%
+    );
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--tg-border)) transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  @apply rounded-full bg-tg-border;
+}

@@ -42,7 +42,7 @@ function publicUser(u: User) {
   };
 }
 
-const PORT = Number(process.env.PORT) || 3001;
+const PORT = Number(process.env.PORT) || 3002;
 const HOST = process.env.HOST ?? '0.0.0.0';
 
 function lanIPv4Addresses(): string[] {
@@ -472,8 +472,8 @@ app.post('/api/push/unsubscribe', requireAuth, (req, res) => {
 });
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// Поднимаемся на 2 уровня вверх из server/dist -> корень проекта
-const projectRoot = path.join(__dirname, '..');
+// Поднимаемся на 3 уровня вверх из server/dist/src -> server/dist -> server -> корень проекта
+const projectRoot = path.join(__dirname, '../..');
 const clientDist = path.join(projectRoot, 'client/dist');
 console.log('Путь к client/dist:', clientDist);
 console.log('Существует:', fs.existsSync(clientDist));

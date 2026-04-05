@@ -5,3 +5,4 @@ dist
 .env
 .env.*
 server/data/
+cloudflared.exe

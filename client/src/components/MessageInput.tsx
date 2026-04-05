@@ -1,5 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import type { MessageMedia } from '@/types';
+import { EmojiPicker } from '@/components/EmojiPicker';
+import {
+  IconClose,
+  IconMic,
+  IconPaperclip,
+  IconSend,
+  IconVideoCircle,
+} from '@/components/icons';
+import { useAuth } from '@/contexts/AuthContext';
 import { useMessenger } from '@/contexts/MessengerContext';
 
 const MAX_BYTES = 12 * 1024 * 1024;
@@ -43,6 +58,7 @@ function pickVideoMime(): string {
 }
 
 export function MessageInput() {
+  const { user } = useAuth();
   const { sendPayload, notifyTyping, activeChat } = useMessenger();
   const [text, setText] = useState('');
   const [dragOver, setDragOver] = useState(false);
@@ -53,6 +69,7 @@ export function MessageInput() {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const startedAtRef = useRef(0);
 
   const stopStreams = useCallback(() => {
@@ -63,6 +80,16 @@ export function MessageInput() {
   }, []);
 
   useEffect(() => () => stopStreams(), [stopStreams]);
+
+  const INPUT_MAX_PX = 92;
+
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    const next = Math.min(el.scrollHeight, INPUT_MAX_PX);
+    el.style.height = `${Math.max(next, 44)}px`;
+  }, [text, activeChat?.id]);
 
   const flushTyping = useCallback(() => {
     if (typingSent.current) {
@@ -94,6 +121,22 @@ export function MessageInput() {
     }
     if (v.length === 0) flushTyping();
   };
+
+  const insertEmoji = useCallback((emoji: string) => {
+    const el = textareaRef.current;
+    if (!el) {
+      setText((t) => t + emoji);
+      return;
+    }
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    setText((t) => t.slice(0, start) + emoji + t.slice(end));
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + emoji.length;
+      el.setSelectionRange(pos, pos);
+    });
+  }, []);
 
   const sendFile = useCallback(
     async (file: File) => {
@@ -215,10 +258,42 @@ export function MessageInput() {
     else if (rec === 'video') void finishRecording('video_note');
   };
 
+  const cancelRecording = useCallback(() => {
+    const recObj = recorderRef.current;
+    if (recObj && recObj.state !== 'inactive') {
+      try {
+        recObj.onstop = () => {};
+        recObj.stop();
+      } catch {
+        /* noop */
+      }
+    }
+    if (videoPreviewRef.current) {
+      videoPreviewRef.current.srcObject = null;
+    }
+    stopStreams();
+    setRec('idle');
+    setRecError(null);
+    flushTyping();
+  }, [stopStreams, flushTyping]);
+
   if (!activeChat) {
     return (
       <div className="border-t border-tg-border bg-tg-panel px-4 py-6 text-center text-sm text-tg-muted">
         Выберите чат
+      </div>
+    );
+  }
+
+  const channelReadOnly =
+    activeChat.type === 'channel' &&
+    (!user || user.id !== activeChat.channelOwnerId);
+
+  if (channelReadOnly) {
+    return (
+      <div className="border-t border-tg-border bg-tg-panel px-4 py-6 text-center text-sm text-tg-muted">
+        В этом канале писать может только владелец. Вы подписаны и получаете
+        сообщения.
       </div>
     );
   }
@@ -253,17 +328,36 @@ export function MessageInput() {
       </div>
 
       {rec !== 'idle' ? (
-        <div className="mb-2 flex items-center justify-center gap-3">
-          <span className="text-sm font-medium text-red-500">
-            {rec === 'voice' ? '🎤 Запись…' : '🎬 Кружок…'}
-          </span>
-          <button
-            type="button"
-            onClick={stopRecording}
-            className="rounded-full bg-red-500 px-4 py-1.5 text-sm font-semibold text-white"
-          >
-            Стоп и отправить
-          </button>
+        <div className="mb-2 flex flex-col items-center gap-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300">
+            {rec === 'voice' ? (
+              <IconMic className="h-4 w-4 shrink-0 text-tg-accent" />
+            ) : (
+              <IconVideoCircle className="h-4 w-4 shrink-0 text-tg-accent" />
+            )}
+            <span>
+              {rec === 'voice'
+                ? 'Запись голосового…'
+                : 'Запись видеокружка…'}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={stopRecording}
+              className="rounded-full bg-tg-accent px-5 py-2 text-sm font-semibold text-white shadow-md transition hover:brightness-105"
+            >
+              Отправить
+            </button>
+            <button
+              type="button"
+              onClick={cancelRecording}
+              className="btn-cancel-media"
+            >
+              <IconClose className="h-4 w-4 shrink-0" />
+              Отмена
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -271,51 +365,58 @@ export function MessageInput() {
         <p className="mb-2 text-center text-xs text-red-500">{recError}</p>
       ) : null}
 
-      <div className="mx-auto flex max-w-4xl flex-wrap items-end gap-2">
-        <label className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-tg-hover text-lg transition hover:bg-tg-border/80">
-          <span aria-hidden>📎</span>
-          <input
-            type="file"
-            className="hidden"
-            onChange={(e) => void onFiles(e.target.files)}
+      <div className="mx-auto max-w-[min(96vw,58rem)] px-1 pb-2 sm:px-2 sm:pb-3">
+        <div className="flex min-h-[44px] items-end gap-0.5 overflow-visible rounded-[1.85rem] border border-tg-border/90 bg-white px-1 py-1 shadow-[0_2px_12px_rgba(0,0,0,0.06)] dark:border-slate-600/80 dark:bg-slate-900/90 dark:shadow-[0_2px_16px_rgba(0,0,0,0.35)] sm:min-h-[52px] sm:px-1.5 sm:py-1">
+          <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-tg-muted transition hover:bg-tg-hover hover:text-slate-800 sm:h-11 sm:w-10 dark:hover:text-slate-100">
+            <IconPaperclip className="h-4 w-4 sm:h-[1.15rem] sm:w-[1.15rem]" aria-hidden />
+            <input
+              type="file"
+              className="hidden"
+              onChange={(e) => void onFiles(e.target.files)}
+            />
+          </label>
+          <button
+            type="button"
+            title="Голосовое"
+            disabled={rec !== 'idle'}
+            onClick={() => void startVoice()}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-tg-muted transition hover:bg-tg-hover disabled:opacity-40 sm:h-11 sm:w-10"
+          >
+            <IconMic className="h-4 w-4 sm:h-[1.15rem] sm:w-[1.15rem]" />
+          </button>
+          <button
+            type="button"
+            title="Кружок"
+            disabled={rec !== 'idle'}
+            onClick={() => void startVideo()}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-tg-muted transition hover:bg-tg-hover disabled:opacity-40 sm:h-11 sm:w-10"
+          >
+            <IconVideoCircle className="h-4 w-4 sm:h-[1.15rem] sm:w-[1.15rem]" />
+          </button>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-visible sm:h-11 sm:w-11">
+            <EmojiPicker onPick={insertEmoji} disabled={rec !== 'idle'} />
+          </div>
+          <textarea
+            ref={textareaRef}
+            rows={1}
+            value={text}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={onKeyDown}
+            onBlur={flushTyping}
+            placeholder="Сообщение"
+            disabled={rec !== 'idle'}
+            className="tg-soft-scrollbar min-h-[36px] min-w-0 flex-1 resize-none overflow-y-auto border-0 bg-transparent py-2 pl-1 pr-1 text-sm leading-snug text-slate-900 outline-none ring-0 placeholder:text-tg-muted disabled:opacity-50 dark:text-slate-100 sm:min-h-[44px] sm:py-3 sm:pr-2 sm:text-[15px]"
           />
-        </label>
-        <button
-          type="button"
-          title="Голосовое"
-          disabled={rec !== 'idle'}
-          onClick={() => void startVoice()}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-tg-hover text-lg transition hover:bg-tg-border/80 disabled:opacity-40"
-        >
-          🎤
-        </button>
-        <button
-          type="button"
-          title="Видеокружок"
-          disabled={rec !== 'idle'}
-          onClick={() => void startVideo()}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-tg-hover text-lg transition hover:bg-tg-border/80 disabled:opacity-40"
-        >
-          ⭕
-        </button>
-        <textarea
-          rows={1}
-          value={text}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={onKeyDown}
-          onBlur={flushTyping}
-          placeholder="Сообщение..."
-          disabled={rec !== 'idle'}
-          className="max-h-36 min-h-[44px] flex-1 resize-y rounded-2xl border border-tg-border bg-white px-4 py-2.5 text-[15px] text-slate-900 shadow-inner outline-none transition focus:border-tg-accent disabled:opacity-50 dark:bg-slate-900/40 dark:text-slate-100"
-        />
-        <button
-          type="button"
-          onClick={onSend}
-          disabled={!text.trim() || rec !== 'idle'}
-          className="flex h-11 shrink-0 items-center justify-center rounded-full bg-tg-accent px-5 text-sm font-semibold text-white shadow-md transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          Отпр.
-        </button>
+          <button
+            type="button"
+            onClick={onSend}
+            disabled={!text.trim() || rec !== 'idle'}
+            title="Отправить"
+            className="mb-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-tg-accent text-white shadow-md transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-35 sm:h-11 sm:w-11"
+          >
+            <IconSend className="h-4 w-4 sm:h-5 sm:w-5" />
+          </button>
+        </div>
       </div>
       {dragOver ? (
         <p className="mt-2 text-center text-xs text-tg-accent">

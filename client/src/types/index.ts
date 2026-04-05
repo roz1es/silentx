@@ -1,4 +1,4 @@
-export type ChatType = 'direct' | 'group';
+export type ChatType = 'direct' | 'group' | 'channel';
 
 export type MessageMediaKind = 'image' | 'file' | 'voice' | 'video_note';
 
@@ -16,6 +16,11 @@ export interface User {
   avatarUrl?: string;
   displayName?: string;
   bio?: string;
+  phone?: string;
+  /** YYYY-MM-DD */
+  birthDate?: string;
+  /** Только у служебной учётки администратора */
+  isAdmin?: boolean;
 }
 
 export interface ChatParticipant {
@@ -29,6 +34,7 @@ export interface Chat {
   id: string;
   type: ChatType;
   name: string;
+  avatarUrl?: string;
   participantIds: string[];
   participants?: ChatParticipant[];
   displayName?: string;
@@ -39,6 +45,12 @@ export interface Chat {
   };
   unread: Record<string, number>;
   lastReadAt?: Record<string, number>;
+  pinnedMessageId?: string;
+  /** Канал: id владельца (единственный, кто пишет) */
+  channelOwnerId?: string;
+  /** Локально для пользователя */
+  muted?: boolean;
+  pinnedToTop?: boolean;
 }
 
 export interface Message {
@@ -50,6 +62,7 @@ export interface Message {
   media?: MessageMedia;
   createdAt: number;
   deleted?: boolean;
+  editedAt?: number;
 }
 
 export interface TypingState {

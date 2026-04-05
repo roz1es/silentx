@@ -1,4 +1,4 @@
-export type ChatType = 'direct' | 'group';
+export type ChatType = 'direct' | 'group' | 'channel';
 
 export type MessageMediaKind = 'image' | 'file' | 'voice' | 'video_note';
 
@@ -18,6 +18,11 @@ export interface User {
   /** Отображаемое имя в чатах; если пусто — username */
   displayName?: string;
   bio?: string;
+  phone?: string;
+  /** YYYY-MM-DD */
+  birthDate?: string;
+  /** Доступ к /api/admin и админ-панели */
+  isAdmin?: boolean;
 }
 
 export interface LastMessagePreview {
@@ -30,11 +35,17 @@ export interface Chat {
   id: string;
   type: ChatType;
   name: string;
+  /** Аватар группы / канала (data URL) */
+  avatarUrl?: string;
   participantIds: string[];
   lastMessage?: LastMessagePreview;
   unread: Record<string, number>;
   /** Время последнего просмотренного сообщения (createdAt) для пользователя */
   lastReadAt?: Record<string, number>;
+  /** Закреплённое для всех сообщение в чате */
+  pinnedMessageId?: string;
+  /** Канал: только этот пользователь может писать */
+  channelOwnerId?: string;
 }
 
 export interface Message {
@@ -46,4 +57,6 @@ export interface Message {
   media?: MessageMedia;
   createdAt: number;
   deleted?: boolean;
+  /** Время последнего редактирования текста */
+  editedAt?: number;
 }

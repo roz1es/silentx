@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -11,6 +12,7 @@ import * as api from '@/lib/api';
 import type { ProfilePatch } from '@/lib/api';
 import {
   clearAuth,
+  loadToken,
   loadUser,
   saveAuth,
   updateStoredUser,
@@ -70,6 +72,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     updateStoredUser(u);
     setUser(u);
   }, []);
+
+  useEffect(() => {
+    if (!loadToken()) return;
+    refreshUser().catch(() => {});
+  }, [refreshUser]);
 
   const value = useMemo(
     () => ({

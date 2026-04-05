@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import * as api from '@/lib/api';
 import type { User } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
 import { participantLabel } from '@/lib/userDisplay';
 import { UserAvatar } from '@/components/UserAvatar';
 
@@ -10,6 +11,7 @@ type Props = {
 };
 
 export function PeerProfileModal({ userId, onClose }: Props) {
+  const { user: viewer } = useAuth();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,14 +76,40 @@ export function PeerProfileModal({ userId, onClose }: Props) {
               </p>
               <p className="text-sm text-tg-muted">@{user.username}</p>
             </div>
-            <div className="w-full rounded-xl bg-tg-hover px-3 py-2 text-left">
-              <p className="text-[11px] uppercase tracking-wide text-tg-muted">
-                ID
-              </p>
-              <p className="break-all font-mono text-xs text-slate-800 dark:text-slate-200">
-                {user.id}
-              </p>
-            </div>
+            {viewer?.isAdmin ? (
+              <div className="w-full rounded-xl bg-tg-hover px-3 py-2 text-left">
+                <p className="text-[11px] uppercase tracking-wide text-tg-muted">
+                  ID
+                </p>
+                <p className="break-all font-mono text-xs text-slate-800 dark:text-slate-200">
+                  {user.id}
+                </p>
+              </div>
+            ) : null}
+            {user.phone?.trim() ? (
+              <div className="w-full rounded-xl bg-tg-hover px-3 py-2 text-left">
+                <p className="text-[11px] uppercase tracking-wide text-tg-muted">
+                  Телефон
+                </p>
+                <p className="text-sm text-slate-800 dark:text-slate-100">
+                  {user.phone}
+                </p>
+              </div>
+            ) : null}
+            {user.birthDate ? (
+              <div className="w-full rounded-xl bg-tg-hover px-3 py-2 text-left">
+                <p className="text-[11px] uppercase tracking-wide text-tg-muted">
+                  Дата рождения
+                </p>
+                <p className="text-sm text-slate-800 dark:text-slate-100">
+                  {new Intl.DateTimeFormat('ru', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                  }).format(new Date(user.birthDate + 'T12:00:00'))}
+                </p>
+              </div>
+            ) : null}
             {user.bio?.trim() ? (
               <p className="w-full text-left text-sm text-slate-700 dark:text-slate-200">
                 {user.bio}

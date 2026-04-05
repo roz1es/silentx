@@ -1,19 +1,17 @@
-import { useCallback, useEffect, useRef, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 
 export function useScrollToBottom<T extends HTMLElement>(
   deps: unknown[]
 ): RefObject<T> {
   const ref = useRef<T>(null);
 
-  const scroll = useCallback(() => {
+  useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-  }, []);
-
-  useEffect(() => {
-    scroll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+    
+    // С flex-col-reverse scrollTop = 0 означает низ (новые сообщения)
+    // Используем instant для мгновенной прокрутки
+    el.scrollTop = 0;
   }, deps);
 
   return ref;

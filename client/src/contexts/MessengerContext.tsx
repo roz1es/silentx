@@ -8,7 +8,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { io, type Socket } from 'socket.io-client';
+import { io } from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
 import type { Chat, Message, MessageMedia, User } from '@/types';
 import * as api from '@/lib/api';
 import { loadToken } from '@/lib/storage';
@@ -24,18 +25,35 @@ type MessengerContextValue = {
   chats: Chat[];
   activeChat: Chat | null;
   messages: Message[];
+  /** Сообщения активного чата с учётом поиска в чате */
+  displayMessages: Message[];
   onlineUserIds: string[];
   /** userId -> username для активного чата */
   typingNames: Record<string, string>;
   chatSearch: string;
   setChatSearch: (q: string) => void;
+  messageSearch: string;
+  setMessageSearch: (q: string) => void;
   selectChat: (id: string | null) => void;
   sendPayload: (p: SendPayload) => void;
   deleteMessage: (messageId: string) => void;
+  editMessage: (messageId: string, text: string) => void;
+  patchChat: (chatId: string, patch: api.ChatProfilePatch) => Promise<void>;
+  addChatMembers: (chatId: string, memberIds: string[]) => Promise<void>;
   notifyTyping: (isTyping: boolean) => void;
   refreshChats: () => Promise<void>;
-  createDirect: (username: string) => Promise<void>;
-  createGroup: (name: string, members: string[]) => Promise<void>;
+  createDirect: (target: {
+    username?: string;
+    userId?: string;
+  }) => Promise<void>;
+  createGroup: (name: string, memberIds: string[]) => Promise<void>;
+  createChannel: (name: string, subscriberIds: string[]) => Promise<void>;
+  deleteChat: (chatId: string) => Promise<void>;
+  setMuted: (chatId: string, muted: boolean) => Promise<void>;
+  setPinnedTop: (chatId: string, pinned: boolean) => Promise<void>;
+  pinMessage: (messageId: string | null) => Promise<void>;
+  clearChat: (chatId: string) => Promise<void>;
+  getSocket: () => Socket | null;
   socketConnected: boolean;
 };
 
@@ -49,27 +67,34 @@ function playIncomingMessageSound() {
         .webkitAudioContext;
     if (!AC) return;
     const ctx = new AC();
-    const go = () => {
+    const play = () => {
+      const now = ctx.currentTime;
+      
+      // Мягкий мелодичный звук "пинг"
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, ctx.currentTime);
-      gain.gain.setValueAtTime(0.1, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+      osc.frequency.setValueAtTime(880, now); // A5
+      osc.frequency.setValueAtTime(1109, now + 0.05); // C#6
+      osc.frequency.setValueAtTime(1319, now + 0.1); // E6
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.12, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.18);
-      osc.onended = () => {
+      osc.start(now);
+      osc.stop(now + 0.3);
+      
+      setTimeout(() => {
         try {
           void ctx.close();
         } catch {
           /* noop */
         }
-      };
+      }, 400);
     };
-    if (ctx.state === 'suspended') void ctx.resume().then(go).catch(() => {});
-    else go();
+    if (ctx.state === 'suspended') void ctx.resume().then(play).catch(() => {});
+    else play();
   } catch {
     /* autoplay / API */
   }
@@ -104,6 +129,7 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
   const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
   const [typingNames, setTypingNames] = useState<Record<string, string>>({});
   const [chatSearch, setChatSearch] = useState('');
+  const [messageSearch, setMessageSearch] = useState('');
   const [socketConnected, setSocketConnected] = useState(false);
 
   const socketRef = useRef<Socket | null>(null);
@@ -125,6 +151,21 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
   );
 
   const messages = activeChatId ? messagesByChat[activeChatId] ?? [] : [];
+
+  const displayMessages = useMemo(() => {
+    const q = messageSearch.trim().toLowerCase();
+    if (!q) return messages;
+    return messages.filter((m) => {
+      if (m.deleted) return false;
+      if (m.text.toLowerCase().includes(q)) return true;
+      if (
+        m.media?.kind === 'file' &&
+        m.media.fileName?.toLowerCase().includes(q)
+      )
+        return true;
+      return false;
+    });
+  }, [messages, messageSearch]);
 
   const joinAllChats = useCallback((list: Chat[]) => {
     const s = socketRef.current;
@@ -210,22 +251,26 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
       const viewingThisChat =
         message.chatId === activeChatIdRef.current && !document.hidden;
       if (fromOther && !viewingThisChat) {
-        playIncomingMessageSound();
-        if (
-          typeof Notification !== 'undefined' &&
-          Notification.permission === 'granted'
-        ) {
-          const c =
-            chatsRef.current.find((x) => x.id === message.chatId) ?? null;
-          const title =
-            c?.displayName ??
-            (c?.type === 'group' ? c.name : c?.name) ??
-            'Silentix';
-          new Notification(title, {
-            body: notificationBody(message),
-            silent: true,
-            tag: `chat-${message.chatId}`,
-          });
+        const c =
+          chatsRef.current.find((x) => x.id === message.chatId) ?? null;
+        if (!c?.muted) {
+          playIncomingMessageSound();
+          if (
+            typeof Notification !== 'undefined' &&
+            Notification.permission === 'granted'
+          ) {
+            const title =
+              c?.displayName ??
+              (c?.type === 'group' || c?.type === 'channel'
+                ? c.name
+                : c?.name) ??
+              'SilentX';
+            new Notification(title, {
+              body: notificationBody(message),
+              silent: true,
+              tag: `chat-${message.chatId}`,
+            });
+          }
         }
       }
     });
@@ -235,9 +280,53 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
         const idx = prev.findIndex((c) => c.id === payload.chat.id);
         if (idx === -1) return [...prev, payload.chat];
         const next = [...prev];
-        next[idx] = { ...next[idx], ...payload.chat };
+        const cur = next[idx];
+        const incoming = payload.chat;
+        next[idx] = {
+          ...cur,
+          ...incoming,
+          displayName: incoming.displayName ?? cur.displayName,
+          participants: incoming.participants ?? cur.participants,
+          channelOwnerId:
+            incoming.channelOwnerId !== undefined
+              ? incoming.channelOwnerId
+              : cur.channelOwnerId,
+          avatarUrl:
+            incoming.avatarUrl === null
+              ? undefined
+              : incoming.avatarUrl !== undefined
+                ? incoming.avatarUrl
+                : cur.avatarUrl,
+          muted: incoming.muted ?? cur.muted,
+          pinnedToTop: incoming.pinnedToTop ?? cur.pinnedToTop,
+          pinnedMessageId:
+            incoming.pinnedMessageId === null
+              ? undefined
+              : incoming.pinnedMessageId !== undefined
+                ? incoming.pinnedMessageId
+                : cur.pinnedMessageId,
+        };
         return next;
       });
+    });
+
+    socket.on('chat_deleted', (payload: { chatId: string }) => {
+      const { chatId } = payload;
+      setChats((prev) => prev.filter((c) => c.id !== chatId));
+      setMessagesByChat((prev) => {
+        if (!(chatId in prev)) return prev;
+        const next = { ...prev };
+        delete next[chatId];
+        return next;
+      });
+      if (activeChatIdRef.current === chatId) {
+        setActiveChatId(null);
+      }
+    });
+
+    socket.on('messages_cleared', (payload: { chatId: string }) => {
+      const { chatId } = payload;
+      setMessagesByChat((prev) => ({ ...prev, [chatId]: [] }));
     });
 
     socket.on('message_deleted', (payload: { chatId: string; messageId: string }) => {
@@ -253,6 +342,20 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
       });
     });
 
+    socket.on('message_edited', (payload: { message: Message }) => {
+      const { message } = payload;
+      setMessagesByChat((prev) => {
+        const list = prev[message.chatId];
+        if (!list) return prev;
+        return {
+          ...prev,
+          [message.chatId]: list.map((m) =>
+            m.id === message.id ? message : m
+          ),
+        };
+      });
+    });
+
     return () => {
       socket.disconnect();
       socketRef.current = null;
@@ -263,6 +366,7 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
     async (id: string | null) => {
       setActiveChatId(id);
       setTypingNames({});
+      setMessageSearch('');
       if (!id) return;
       const socket = socketRef.current;
       socket?.emit('join_chat', id);
@@ -303,12 +407,84 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
   const deleteMessage = useCallback(
     (messageId: string) => {
       if (!activeChatId) return;
+      setMessagesByChat((prev) => {
+        const list = prev[activeChatId];
+        if (!list) return prev;
+        return {
+          ...prev,
+          [activeChatId]: list.map((m) =>
+            m.id === messageId ? { ...m, deleted: true } : m
+          ),
+        };
+      });
       socketRef.current?.emit('delete_message', {
         chatId: activeChatId,
         messageId,
       });
     },
     [activeChatId]
+  );
+
+  const editMessage = useCallback(
+    (messageId: string, text: string) => {
+      if (!activeChatId) return;
+      const t = text.trim();
+      if (!t) return;
+      setMessagesByChat((prev) => {
+        const list = prev[activeChatId];
+        if (!list) return prev;
+        return {
+          ...prev,
+          [activeChatId]: list.map((m) =>
+            m.id === messageId
+              ? { ...m, text: t, editedAt: Date.now() }
+              : m
+          ),
+        };
+      });
+      socketRef.current?.emit('edit_message', {
+        chatId: activeChatId,
+        messageId,
+        text: t,
+      });
+    },
+    [activeChatId]
+  );
+
+  const patchChat = useCallback(async (chatId: string, patch: api.ChatProfilePatch) => {
+    const { chat } = await api.patchChat(chatId, patch);
+    setChats((prev) => {
+      const idx = prev.findIndex((c) => c.id === chat.id);
+      if (idx === -1) return [...prev, chat];
+      const next = [...prev];
+      const cur = next[idx];
+      next[idx] = {
+        ...cur,
+        ...chat,
+        participants: chat.participants ?? cur.participants,
+      };
+      return next;
+    });
+  }, []);
+
+  const addChatMembers = useCallback(
+    async (chatId: string, memberIds: string[]) => {
+      const { chat } = await api.addChatMembersApi(chatId, memberIds);
+      setChats((prev) => {
+        const idx = prev.findIndex((c) => c.id === chat.id);
+        if (idx === -1) return [...prev, chat];
+        const next = [...prev];
+        const cur = next[idx];
+        next[idx] = {
+          ...cur,
+          ...chat,
+          participants: chat.participants ?? cur.participants,
+        };
+        return next;
+      });
+      joinAllChats([chat]);
+    },
+    [joinAllChats]
   );
 
   const notifyTyping = useCallback(
@@ -332,8 +508,11 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
   );
 
   const createDirect = useCallback(
-    async (username: string) => {
-      const { chat } = await api.createDirectChat(username);
+    async (target: { username?: string; userId?: string }) => {
+      const { chat } = await api.createDirectChat({
+        targetUsername: target.username,
+        targetUserId: target.userId,
+      });
       await refreshChats();
       await selectChat(chat.id);
     },
@@ -341,46 +520,140 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
   );
 
   const createGroup = useCallback(
-    async (name: string, members: string[]) => {
-      const { chat } = await api.createGroupChat(name, members);
+    async (name: string, memberIds: string[]) => {
+      const { chat } = await api.createGroupChat(name, memberIds);
       await refreshChats();
       await selectChat(chat.id);
     },
     [refreshChats, selectChat]
   );
 
+  const createChannel = useCallback(
+    async (name: string, subscriberIds: string[]) => {
+      const { chat } = await api.createChannelChat(name, subscriberIds);
+      await refreshChats();
+      await selectChat(chat.id);
+    },
+    [refreshChats, selectChat]
+  );
+
+  const deleteChat = useCallback(
+    async (chatId: string) => {
+      await api.deleteChat(chatId);
+      setChats((prev) => prev.filter((c) => c.id !== chatId));
+      setMessagesByChat((prev) => {
+        if (!(chatId in prev)) return prev;
+        const next = { ...prev };
+        delete next[chatId];
+        return next;
+      });
+      if (activeChatIdRef.current === chatId) {
+        setActiveChatId(null);
+      }
+    },
+    []
+  );
+
+  const setMuted = useCallback(async (chatId: string, muted: boolean) => {
+    await api.setChatMuted(chatId, muted);
+    setChats((prev) =>
+      prev.map((c) => (c.id === chatId ? { ...c, muted } : c))
+    );
+  }, []);
+
+  const setPinnedTop = useCallback(async (chatId: string, pinned: boolean) => {
+    await api.setChatPinnedTop(chatId, pinned);
+    setChats((prev) =>
+      prev.map((c) => (c.id === chatId ? { ...c, pinnedToTop: pinned } : c))
+    );
+  }, []);
+
+  const pinMessage = useCallback(
+    async (messageId: string | null) => {
+      if (!activeChatId) return;
+      await api.setPinnedMessage(activeChatId, messageId);
+      setChats((prev) =>
+        prev.map((c) =>
+          c.id === activeChatId
+            ? {
+                ...c,
+                pinnedMessageId:
+                  messageId === null ? undefined : messageId,
+              }
+            : c
+        )
+      );
+    },
+    [activeChatId]
+  );
+
+  const clearChat = useCallback(
+    async (chatId: string) => {
+      await api.clearChatMessages(chatId);
+      setMessagesByChat((prev) => ({ ...prev, [chatId]: [] }));
+    },
+    []
+  );
+
+  const getSocket = useCallback(() => socketRef.current, []);
+
   const value = useMemo(
     () => ({
       chats,
       activeChat,
       messages,
+      displayMessages,
       onlineUserIds,
       typingNames,
       chatSearch,
       setChatSearch,
+      messageSearch,
+      setMessageSearch,
       selectChat,
       sendPayload,
       deleteMessage,
+      editMessage,
+      patchChat,
+      addChatMembers,
       notifyTyping,
       refreshChats,
       createDirect,
       createGroup,
+      createChannel,
+      deleteChat,
+      setMuted,
+      setPinnedTop,
+      pinMessage,
+      clearChat,
+      getSocket,
       socketConnected,
     }),
     [
       chats,
       activeChat,
       messages,
+      displayMessages,
       onlineUserIds,
       typingNames,
       chatSearch,
+      messageSearch,
       selectChat,
       sendPayload,
       deleteMessage,
+      editMessage,
+      patchChat,
+      addChatMembers,
       notifyTyping,
       refreshChats,
       createDirect,
       createGroup,
+      createChannel,
+      deleteChat,
+      setMuted,
+      setPinnedTop,
+      pinMessage,
+      clearChat,
+      getSocket,
       socketConnected,
     ]
   );

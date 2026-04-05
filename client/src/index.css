@@ -2,60 +2,139 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Палитра в духе Telegram: светлый фон, голубые акценты */
 :root {
-  --tg-bg: 239 244 248;
+  --tg-bg: 225 232 237;
   --tg-panel: 255 255 255;
   --tg-bubble: 255 255 255;
-  --tg-mine: 227 242 253;
-  --tg-accent: 51 144 236;
-  --tg-muted: 112 124 135;
-  --tg-border: 220 227 235;
-  --tg-hover: 241 246 250;
+  --tg-mine: 218 239 255;
+  --tg-accent: 42 171 238;
+  --tg-muted: 112 124 137;
+  --tg-border: 210 220 230;
+  --tg-hover: 236 242 248;
 }
 
 .dark {
-  --tg-bg: 15 23 30;
-  --tg-panel: 23 33 43;
-  --tg-bubble: 34 46 58;
-  --tg-mine: 43 82 120;
-  --tg-accent: 82 168 255;
-  --tg-muted: 113 127 144;
-  --tg-border: 40 54 68;
-  --tg-hover: 32 44 56;
+  --tg-bg: 14 18 24;
+  --tg-panel: 24 32 40;
+  --tg-bubble: 34 44 54;
+  --tg-mine: 38 82 120;
+  --tg-accent: 51 163 240;
+  --tg-muted: 130 145 163;
+  --tg-border: 48 58 70;
+  --tg-hover: 32 42 54;
+}
+
+html {
+  transition:
+    background-color 0.55s ease,
+    color 0.55s ease;
 }
 
 body {
-  font-family: Inter, system-ui, sans-serif;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    sans-serif;
+  transition:
+    background-color 0.55s ease,
+    color 0.55s ease;
   @apply bg-tg-bg text-slate-900 dark:text-slate-100 min-h-screen;
 }
 
-/* subtle chat background pattern (Telegram-like) */
-.chat-bg {
+/* Классические узоры (как в Telegram) */
+.chat-bg,
+.chat-wallpaper-classic {
   background-color: rgb(var(--tg-bg));
-  background-image: radial-gradient(
-      circle at 20% 20%,
-      rgba(82, 168, 255, 0.06) 0%,
-      transparent 45%
-    ),
-    radial-gradient(
-      circle at 80% 60%,
-      rgba(51, 144, 236, 0.05) 0%,
-      transparent 40%
-    );
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%232aabee' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
 }
 
-.dark .chat-bg {
+.dark .chat-bg,
+.dark .chat-wallpaper-classic {
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2333a3f0' fill-opacity='0.06'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+.chat-wallpaper-plain {
+  background-color: rgb(var(--tg-bg));
+  background-image: none;
+}
+
+.chat-wallpaper-bubbles {
+  background-color: rgb(var(--tg-bg));
   background-image: radial-gradient(
-      circle at 15% 25%,
-      rgba(82, 168, 255, 0.08) 0%,
+      circle at 20% 30%,
+      rgba(42, 171, 238, 0.07) 0%,
       transparent 45%
     ),
-    radial-gradient(
-      circle at 85% 70%,
-      rgba(82, 168, 255, 0.05) 0%,
-      transparent 42%
-    );
+    radial-gradient(circle at 80% 70%, rgba(42, 171, 238, 0.06) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(42, 171, 238, 0.04) 0%, transparent 55%);
 }
+
+.dark .chat-wallpaper-bubbles {
+  background-image: radial-gradient(
+      circle at 25% 25%,
+      rgba(51, 163, 240, 0.12) 0%,
+      transparent 45%
+    ),
+    radial-gradient(circle at 75% 75%, rgba(51, 163, 240, 0.08) 0%, transparent 40%);
+}
+
+.chat-wallpaper-ocean {
+  background-color: #cfe8f5;
+  background-image: linear-gradient(
+    165deg,
+    rgba(125, 211, 252, 0.45) 0%,
+    transparent 42%,
+    rgba(14, 165, 233, 0.12) 100%
+  );
+}
+
+.dark .chat-wallpaper-ocean {
+  background-color: #0c1929;
+  background-image: linear-gradient(
+    165deg,
+    rgba(14, 116, 144, 0.35) 0%,
+    transparent 50%,
+    rgba(8, 47, 73, 0.8) 100%
+  );
+}
+
+.chat-wallpaper-dusk {
+  background-color: #e8e0f4;
+  background-image: linear-gradient(
+    180deg,
+    rgba(167, 139, 250, 0.35) 0%,
+    rgba(199, 210, 254, 0.25) 45%,
+    transparent 100%
+  );
+}
+
+.dark .chat-wallpaper-dusk {
+  background-color: #1a1528;
+  background-image: linear-gradient(
+    180deg,
+    rgba(91, 33, 182, 0.25) 0%,
+    rgba(30, 27, 45, 0.9) 100%
+  );
+}
+
+.chat-wallpaper-mint {
+  background-color: #dff5ec;
+  background-image: linear-gradient(
+    135deg,
+    rgba(52, 211, 153, 0.25) 0%,
+    transparent 50%,
+    rgba(45, 212, 191, 0.15) 100%
+  );
+}
+
+.dark .chat-wallpaper-mint {
+  background-color: #0f1f1c;
+  background-image: linear-gradient(
+    135deg,
+    rgba(16, 185, 129, 0.12) 0%,
+    rgba(15, 31, 28, 0.95) 100%
+  );
+}
+
 
 .scrollbar-thin {
   scrollbar-width: thin;
@@ -69,4 +148,46 @@ body {
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
   @apply rounded-full bg-tg-border;
+}
+
+/* Отмена записи: красная окантовка и символ при наведении */
+.btn-cancel-media {
+  @apply inline-flex items-center justify-center gap-1.5 rounded-full border-2 border-transparent px-4 py-2 text-sm font-semibold text-slate-600 transition-colors dark:text-slate-300;
+}
+.btn-cancel-media:hover {
+  @apply border-red-500 text-red-600 dark:text-red-400;
+}
+.btn-cancel-media:focus-visible {
+  @apply outline-none ring-2 ring-red-500/40;
+}
+
+/* Ползунок прокрутки в тон палитры (профиль, дата рождения, поле сообщения) */
+.tg-soft-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(42, 171, 238, 0.42) transparent;
+}
+.dark .tg-soft-scrollbar {
+  scrollbar-color: rgba(51, 163, 240, 0.38) transparent;
+}
+.tg-soft-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.tg-soft-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: rgba(42, 171, 238, 0.38);
+}
+.tg-soft-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.dark .tg-soft-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(51, 163, 240, 0.35);
+}
+
+/* Выпадающие списки даты: меньше «белого» в тёмной теме */
+.birth-date-fields select {
+  color-scheme: light;
+}
+.dark .birth-date-fields select {
+  color-scheme: dark;
 }

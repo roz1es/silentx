@@ -53,6 +53,24 @@ export function requireAuth(
   next();
 }
 
+export function requireAdmin(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void {
+  const userId = req.userId;
+  if (!userId) {
+    res.status(401).json({ error: 'Требуется авторизация' });
+    return;
+  }
+  const u = store.getUser(userId);
+  if (!u?.isAdmin) {
+    res.status(403).json({ error: 'Недостаточно прав' });
+    return;
+  }
+  next();
+}
+
 declare global {
   namespace Express {
     interface Request {

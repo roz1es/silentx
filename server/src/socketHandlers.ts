@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid';
 import type { Message, MessageMedia } from './types.js';
 import { verifyUserToken } from './auth.js';
 import * as store from './store.js';
+import { notifyChatParticipants } from './pushNotifications.js';
 
 const typingTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -64,6 +65,12 @@ export function registerSocketHandlers(io: IOServer): void {
       }) => {
         const chat = store.getChat(payload.chatId);
         if (!chat?.participantIds.includes(userId)) return;
+        if (
+          chat.type === 'channel' &&
+          chat.channelOwnerId !== userId
+        ) {
+          return;
+        }
 
         const text = (payload.text ?? '').trim();
         let media = payload.media;
@@ -90,9 +97,66 @@ export function registerSocketHandlers(io: IOServer): void {
         };
         store.addMessage(msg);
         const updated = store.getChat(payload.chatId);
+        
+        // Отправляем WebSocket всем участникам
         chat.participantIds.forEach((pid) => {
           io.to(`user:${pid}`).emit('message', { message: msg });
-          if (updated) io.to(`user:${pid}`).emit('chat_updated', { chat: updated });
+          if (updated) {
+            io.to(`user:${pid}`).emit('chat_updated', {
+              chat: store.serializeChatForViewer(updated, pid),
+            });
+          }
+        });
+        
+        // Отправляем push-уведомления
+        const sender = store.getUser(userId);
+        const senderName = sender?.displayName?.trim() || sender?.username || 'User';
+        const chatName = chat.type === 'direct' ? senderName : chat.name;
+        
+        let notificationBody = '';
+        if (msg.media) {
+          switch (msg.media.kind) {
+            case 'image': notificationBody = '📷 Фото'; break;
+            case 'file': notificationBody = `📎 ${msg.media.fileName ?? 'Файл'}`; break;
+            case 'voice': notificationBody = '🎤 Голосовое сообщение'; break;
+            case 'video_note': notificationBody = '🎬 Видеокружок'; break;
+            default: notificationBody = 'Сообщение';
+          }
+        } else if (msg.imageUrl) {
+          notificationBody = '📷 Фото';
+        } else {
+          notificationBody = msg.text.slice(0, 100) || 'Сообщение';
+        }
+        
+        void notifyChatParticipants(payload.chatId, userId, chatName, notificationBody);
+      }
+    );
+
+    socket.on(
+      'edit_message',
+      (payload: { chatId?: string; messageId?: string; text?: string }) => {
+        const chatId = String(payload?.chatId ?? '');
+        const messageId = String(payload?.messageId ?? '');
+        const text = String(payload?.text ?? '');
+        const chat = store.getChat(chatId);
+        if (!chat?.participantIds.includes(userId)) return;
+        if (
+          chat.type === 'channel' &&
+          chat.channelOwnerId !== userId
+        ) {
+          return;
+        }
+        const result = store.editMessageText(chatId, messageId, userId, text);
+        if (!result) return;
+        chat.participantIds.forEach((pid) => {
+          io.to(`user:${pid}`).emit('message_edited', {
+            message: result.message,
+          });
+          if (result.chat) {
+            io.to(`user:${pid}`).emit('chat_updated', {
+              chat: store.serializeChatForViewer(result.chat, pid),
+            });
+          }
         });
       }
     );
@@ -101,7 +165,9 @@ export function registerSocketHandlers(io: IOServer): void {
       const chat = store.markChatRead(chatId, userId);
       if (chat) {
         chat.participantIds.forEach((pid) => {
-          io.to(`user:${pid}`).emit('chat_updated', { chat });
+          io.to(`user:${pid}`).emit('chat_updated', {
+            chat: store.serializeChatForViewer(chat, pid),
+          });
         });
       }
     });
@@ -111,6 +177,12 @@ export function registerSocketHandlers(io: IOServer): void {
       (payload: { chatId: string; isTyping: boolean }) => {
         const chat = store.getChat(payload.chatId);
         if (!chat?.participantIds.includes(userId)) return;
+        if (
+          chat.type === 'channel' &&
+          chat.channelOwnerId !== userId
+        ) {
+          return;
+        }
 
         const uTyping = store.getUser(userId);
         const username =
@@ -159,10 +231,36 @@ export function registerSocketHandlers(io: IOServer): void {
               chatId: payload.chatId,
               messageId: payload.messageId,
             });
-            if (chat)
-              io.to(`user:${pid}`).emit('chat_updated', { chat });
+            if (chat) {
+              io.to(`user:${pid}`).emit('chat_updated', {
+                chat: store.serializeChatForViewer(chat, pid),
+              });
+            }
           });
         }
+      }
+    );
+
+    socket.on(
+      'call_signal',
+      (payload: {
+        toUserId?: string;
+        kind?: 'offer' | 'answer' | 'ice' | 'end';
+        callType?: 'audio' | 'video';
+        sdp?: string;
+        candidate?: RTCIceCandidateInit;
+      }) => {
+        const toUserId = payload?.toUserId;
+        const kind = payload?.kind;
+        if (typeof toUserId !== 'string' || typeof kind !== 'string') return;
+        if (!store.usersShareChat(userId, toUserId)) return;
+        io.to(`user:${toUserId}`).emit('call_signal', {
+          fromUserId: userId,
+          kind,
+          callType: payload.callType,
+          sdp: payload.sdp,
+          candidate: payload.candidate,
+        });
       }
     );
 

@@ -25,7 +25,7 @@ on:
 jobs:
   build:
     name: Build Flutter Windows installer
-    runs-on: windows-latest
+    runs-on: windows-2022
     env:
       API_URL: ${{ github.event.inputs.api_url || 'https://silentx.ru' }}
       UPDATE_URL: ${{ github.event.inputs.update_url || 'https://silentx.ru/desktop/windows/latest.json' }}

@@ -49,6 +49,15 @@ class ApiClient {
 
   Uri _uri(String path) => Uri.parse('$baseUrl$path');
 
+  String? resolveUrl(String? value) {
+    final raw = value?.trim();
+    if (raw == null || raw.isEmpty || raw.startsWith('data:')) return raw;
+    final uri = Uri.tryParse(raw);
+    if (uri == null) return raw;
+    if (uri.hasScheme) return raw;
+    return Uri.parse(baseUrl).resolve(raw).toString();
+  }
+
   Future<Map<String, dynamic>> _request(
     String path, {
     String method = 'GET',
@@ -66,6 +75,9 @@ class ApiClient {
         'POST' => _http
             .post(_uri(path), headers: headers, body: encodedBody)
             .timeout(const Duration(seconds: 20)),
+        'DELETE' => _http
+            .delete(_uri(path), headers: headers, body: encodedBody)
+            .timeout(const Duration(seconds: 20)),
         _ => _http
             .get(_uri(path), headers: headers)
             .timeout(const Duration(seconds: 20)),
@@ -76,9 +88,16 @@ class ApiClient {
       throw ApiException('Не удалось подключиться к серверу: $err');
     }
 
-    final parsed = response.body.isEmpty
-        ? <String, dynamic>{}
-        : (jsonDecode(response.body) as Map).cast<String, dynamic>();
+    Map<String, dynamic> parsed;
+    try {
+      parsed = response.body.isEmpty
+          ? <String, dynamic>{}
+          : (jsonDecode(response.body) as Map).cast<String, dynamic>();
+    } on Object {
+      parsed = <String, dynamic>{
+        'error': 'Сервер вернул неожиданный ответ.',
+      };
+    }
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw ApiException(

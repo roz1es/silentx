@@ -454,6 +454,7 @@ class _MessengerScreenState extends State<MessengerScreen> {
       final result = await showDialog<_NewChatResult>(
         context: context,
         builder: (_) => _NewChatDialog(
+          serverUrl: widget.serverUrl,
           users: users.where((item) => item.id != widget.user.id).toList(),
         ),
       );
@@ -548,6 +549,7 @@ class _MessengerScreenState extends State<MessengerScreen> {
     showDialog<void>(
       context: context,
       builder: (_) => _ChatProfileDialog(
+        serverUrl: widget.serverUrl,
         chat: chat,
         onlineUserIds: _onlineUserIds,
       ),
@@ -608,6 +610,7 @@ class _MessengerScreenState extends State<MessengerScreen> {
             width: 384,
             child: _Sidebar(
               user: widget.user,
+              serverUrl: widget.serverUrl,
               chats: visibleChats,
               activeChatId: _activeChatId,
               loading: _loadingChats,
@@ -626,6 +629,7 @@ class _MessengerScreenState extends State<MessengerScreen> {
           Expanded(
             child: _ChatPane(
               chat: _activeChat,
+              serverUrl: widget.serverUrl,
               user: widget.user,
               messages: _messages,
               pinnedMessage: _pinnedMessage,
@@ -684,6 +688,7 @@ class _MessengerScreenState extends State<MessengerScreen> {
 class _Sidebar extends StatelessWidget {
   const _Sidebar({
     required this.user,
+    required this.serverUrl,
     required this.chats,
     required this.activeChatId,
     required this.loading,
@@ -699,6 +704,7 @@ class _Sidebar extends StatelessWidget {
   });
 
   final User user;
+  final String serverUrl;
   final List<Chat> chats;
   final String? activeChatId;
   final bool loading;
@@ -728,6 +734,7 @@ class _Sidebar extends StatelessWidget {
                   child: BrenksAvatar(
                     title: user.title,
                     imageUrl: user.avatarUrl,
+                    baseUrl: serverUrl,
                     size: 58,
                   ),
                 ),
@@ -818,6 +825,7 @@ class _Sidebar extends StatelessWidget {
                           final chat = chats[index];
                           return _ChatTile(
                             chat: chat,
+                            serverUrl: serverUrl,
                             selected: chat.id == activeChatId,
                             onlineUserIds: onlineUserIds,
                             currentUserId: user.id,
@@ -837,6 +845,7 @@ class _Sidebar extends StatelessWidget {
 class _ChatTile extends StatelessWidget {
   const _ChatTile({
     required this.chat,
+    required this.serverUrl,
     required this.selected,
     required this.onlineUserIds,
     required this.currentUserId,
@@ -844,6 +853,7 @@ class _ChatTile extends StatelessWidget {
   });
 
   final Chat chat;
+  final String serverUrl;
   final bool selected;
   final Set<String> onlineUserIds;
   final String currentUserId;
@@ -879,6 +889,7 @@ class _ChatTile extends StatelessWidget {
                   BrenksAvatar(
                     title: chat.title,
                     imageUrl: chat.avatarUrl,
+                    baseUrl: serverUrl,
                     size: 52,
                   ),
                   if (peerOnline)
@@ -978,6 +989,7 @@ class _ChatTile extends StatelessWidget {
 class _ChatPane extends StatelessWidget {
   const _ChatPane({
     required this.chat,
+    required this.serverUrl,
     required this.user,
     required this.messages,
     required this.pinnedMessage,
@@ -1013,6 +1025,7 @@ class _ChatPane extends StatelessWidget {
   });
 
   final Chat? chat;
+  final String serverUrl;
   final User user;
   final List<Message> messages;
   final Message? pinnedMessage;
@@ -1052,7 +1065,7 @@ class _ChatPane extends StatelessWidget {
     if (chat == null) {
       return const EmptyState(
         title: 'Выберите чат',
-        subtitle: 'БренксЧат уже подключён к серверу.',
+        subtitle: 'Откройте переписку или найдите собеседника слева.',
       );
     }
 
@@ -1065,6 +1078,7 @@ class _ChatPane extends StatelessWidget {
             children: [
               _ChatHeader(
                 chat: chat,
+                serverUrl: serverUrl,
                 onOpenProfile: () => onOpenProfile(chat),
                 onToggleMute: () => onToggleMute(chat),
                 onTogglePinTop: () => onTogglePinTop(chat),
@@ -1100,6 +1114,7 @@ class _ChatPane extends StatelessWidget {
                               final message = messages[index];
                               return _MessageBubble(
                                 message: message,
+                                serverUrl: serverUrl,
                                 own: message.senderId == user.id,
                                 onReply: () => onReply(message),
                                 onEdit: () => onEdit(message),
@@ -1149,6 +1164,7 @@ class _ChatPane extends StatelessWidget {
 class _ChatHeader extends StatelessWidget {
   const _ChatHeader({
     required this.chat,
+    required this.serverUrl,
     required this.onOpenProfile,
     required this.onToggleMute,
     required this.onTogglePinTop,
@@ -1157,6 +1173,7 @@ class _ChatHeader extends StatelessWidget {
   });
 
   final Chat chat;
+  final String serverUrl;
   final VoidCallback onOpenProfile;
   final VoidCallback onToggleMute;
   final VoidCallback onTogglePinTop;
@@ -1179,7 +1196,11 @@ class _ChatHeader extends StatelessWidget {
           InkWell(
             onTap: onOpenProfile,
             customBorder: const CircleBorder(),
-            child: BrenksAvatar(title: chat.title, imageUrl: chat.avatarUrl),
+            child: BrenksAvatar(
+              title: chat.title,
+              imageUrl: chat.avatarUrl,
+              baseUrl: serverUrl,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -1485,6 +1506,7 @@ class _Composer extends StatelessWidget {
 class _MessageBubble extends StatelessWidget {
   const _MessageBubble({
     required this.message,
+    required this.serverUrl,
     required this.own,
     required this.onReply,
     required this.onEdit,
@@ -1495,6 +1517,7 @@ class _MessageBubble extends StatelessWidget {
   });
 
   final Message message;
+  final String serverUrl;
   final bool own;
   final VoidCallback onReply;
   final VoidCallback onEdit;
@@ -1540,6 +1563,7 @@ class _MessageBubble extends StatelessWidget {
                   children: [
                     _MessageContent(
                       message: message,
+                      serverUrl: serverUrl,
                       onPlayVoice: onPlayVoice,
                     ),
                     const SizedBox(height: 6),
@@ -1646,10 +1670,12 @@ class _MessageBubble extends StatelessWidget {
 class _MessageContent extends StatelessWidget {
   const _MessageContent({
     required this.message,
+    required this.serverUrl,
     required this.onPlayVoice,
   });
 
   final Message message;
+  final String serverUrl;
   final ValueChanged<MessageMedia> onPlayVoice;
 
   @override
@@ -1671,9 +1697,13 @@ class _MessageContent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (media != null)
-          _MediaPreview(media: media, onPlayVoice: onPlayVoice),
+          _MediaPreview(
+            media: media,
+            serverUrl: serverUrl,
+            onPlayVoice: onPlayVoice,
+          ),
         if (message.imageUrl?.isNotEmpty == true)
-          _LegacyImagePreview(dataUrl: message.imageUrl!),
+          _LegacyImagePreview(dataUrl: message.imageUrl!, serverUrl: serverUrl),
         if (text.isNotEmpty) ...[
           if (media != null || message.imageUrl?.isNotEmpty == true)
             const SizedBox(height: 8),
@@ -1696,16 +1726,18 @@ const textColorAlias = text;
 class _MediaPreview extends StatelessWidget {
   const _MediaPreview({
     required this.media,
+    required this.serverUrl,
     required this.onPlayVoice,
   });
 
   final MessageMedia media;
+  final String serverUrl;
   final ValueChanged<MessageMedia> onPlayVoice;
 
   @override
   Widget build(BuildContext context) {
     if (media.kind == 'image') {
-      return _DataUrlImage(dataUrl: media.dataUrl);
+      return _ImagePreview(source: media.dataUrl, serverUrl: serverUrl);
     }
     if (media.kind == 'voice') {
       return _VoicePreview(
@@ -1878,44 +1910,65 @@ class _VideoNotePreview extends StatelessWidget {
 }
 
 class _LegacyImagePreview extends StatelessWidget {
-  const _LegacyImagePreview({required this.dataUrl});
+  const _LegacyImagePreview({required this.dataUrl, required this.serverUrl});
 
   final String dataUrl;
+  final String serverUrl;
 
   @override
   Widget build(BuildContext context) {
-    return _DataUrlImage(dataUrl: dataUrl);
+    return _ImagePreview(source: dataUrl, serverUrl: serverUrl);
   }
 }
 
-class _DataUrlImage extends StatelessWidget {
-  const _DataUrlImage({required this.dataUrl});
+class _ImagePreview extends StatelessWidget {
+  const _ImagePreview({required this.source, required this.serverUrl});
 
-  final String dataUrl;
+  final String source;
+  final String serverUrl;
 
   @override
   Widget build(BuildContext context) {
-    final bytes = _bytesFromDataUrl(dataUrl);
-    if (bytes == null) {
+    final bytes = _bytesFromDataUrl(source);
+    final url = bytes == null ? _resolveMediaUrl(source, serverUrl) : null;
+    if (bytes == null && (url == null || url.isEmpty)) {
       return const Text('Фото не удалось открыть');
     }
     return GestureDetector(
-      onTap: () => _openImageViewer(context, bytes),
+      onTap: () {
+        if (bytes != null) {
+          _openImageViewer(context, bytes);
+        } else {
+          _openNetworkImageViewer(context, url!);
+        }
+      },
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: Image.memory(
-          bytes,
-          width: 320,
-          fit: BoxFit.cover,
-        ),
+        child: bytes != null
+            ? Image.memory(
+                bytes,
+                width: 320,
+                fit: BoxFit.cover,
+              )
+            : Image.network(
+                url!,
+                width: 320,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    const Text('Фото не удалось загрузить'),
+              ),
       ),
     );
   }
 }
 
 class _NewChatDialog extends StatefulWidget {
-  const _NewChatDialog({required this.users});
+  const _NewChatDialog({
+    required this.serverUrl,
+    required this.users,
+  });
 
+  final String serverUrl;
   final List<DirectoryUser> users;
 
   @override
@@ -1944,118 +1997,198 @@ class _NewChatDialogState extends State<_NewChatDialog> {
             .where((user) => user.title.toLowerCase().contains(query))
             .toList(growable: false);
 
-    return AlertDialog(
-      title: const Text('Новый чат'),
-      content: SizedBox(
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+      child: Container(
         width: 560,
-        height: 560,
+        height: 620,
+        decoration: BoxDecoration(
+          color: panel.withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(32),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.42),
+              blurRadius: 36,
+              offset: const Offset(0, 22),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
           children: [
-            SegmentedButton<ChatType>(
-              segments: const [
-                ButtonSegment(
-                  value: ChatType.direct,
-                  label: Text('Личный'),
-                  icon: Icon(Icons.person_rounded),
-                ),
-                ButtonSegment(
-                  value: ChatType.group,
-                  label: Text('Группа'),
-                  icon: Icon(Icons.groups_rounded),
-                ),
-                ButtonSegment(
-                  value: ChatType.channel,
-                  label: Text('Канал'),
-                  icon: Icon(Icons.campaign_rounded),
-                ),
-              ],
-              selected: {_type},
-              onSelectionChanged: (value) {
-                setState(() {
-                  _type = value.first;
-                  _selected = {};
-                });
-              },
-            ),
-            if (_type != ChatType.direct) ...[
-              const SizedBox(height: 14),
-              TextField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  labelText: _type == ChatType.group
-                      ? 'Название группы'
-                      : 'Название канала',
-                ),
-              ),
-            ],
-            const SizedBox(height: 14),
-            TextField(
-              controller: _searchController,
-              onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(
-                hintText: 'Поиск людей...',
-                prefixIcon: Icon(Icons.search_rounded),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: ListView.separated(
-                itemCount: users.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final user = users[index];
-                  final selected = _selected.contains(user.id);
-                  return ListTile(
-                    leading: BrenksAvatar(
-                      title: user.title,
-                      imageUrl: user.avatarUrl,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(26, 24, 18, 18),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Новый чат',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Выберите формат и собеседников',
+                          style: TextStyle(color: muted),
+                        ),
+                      ],
                     ),
-                    title: Text(user.title),
-                    subtitle: Text('@${user.username}'),
-                    trailing: selected
-                        ? const Icon(Icons.check_circle_rounded, color: accent)
-                        : const Icon(Icons.chevron_right_rounded),
-                    onTap: () {
-                      setState(() {
-                        if (_type == ChatType.direct) {
-                          _selected = {user.id};
-                        } else if (selected) {
-                          _selected = {..._selected}..remove(user.id);
-                        } else {
-                          _selected = {..._selected, user.id};
-                        }
-                      });
-                    },
-                  );
+                  ),
+                  IconButton.filledTonal(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 26),
+              child: SegmentedButton<ChatType>(
+                segments: const [
+                  ButtonSegment(
+                    value: ChatType.direct,
+                    label: Text('Личный'),
+                    icon: Icon(Icons.person_rounded),
+                  ),
+                  ButtonSegment(
+                    value: ChatType.group,
+                    label: Text('Группа'),
+                    icon: Icon(Icons.groups_rounded),
+                  ),
+                  ButtonSegment(
+                    value: ChatType.channel,
+                    label: Text('Канал'),
+                    icon: Icon(Icons.campaign_rounded),
+                  ),
+                ],
+                selected: {_type},
+                onSelectionChanged: (value) {
+                  setState(() {
+                    _type = value.first;
+                    _selected = {};
+                  });
                 },
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(26, 18, 26, 8),
+                child: Column(
+                  children: [
+                    if (_type != ChatType.direct) ...[
+                      TextField(
+                        controller: _nameController,
+                        decoration: InputDecoration(
+                          labelText: _type == ChatType.group
+                              ? 'Название группы'
+                              : 'Название канала',
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+                    TextField(
+                      controller: _searchController,
+                      onChanged: (_) => setState(() {}),
+                      decoration: const InputDecoration(
+                        hintText: 'Поиск людей...',
+                        prefixIcon: Icon(Icons.search_rounded),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Expanded(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(color: border),
+                        ),
+                        child: ListView.separated(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          itemCount: users.length,
+                          separatorBuilder: (_, __) =>
+                              Divider(height: 1, color: border),
+                          itemBuilder: (context, index) {
+                            final user = users[index];
+                            final selected = _selected.contains(user.id);
+                            return ListTile(
+                              leading: BrenksAvatar(
+                                title: user.title,
+                                imageUrl: user.avatarUrl,
+                                baseUrl: widget.serverUrl,
+                              ),
+                              title: Text(user.title),
+                              subtitle: Text('@${user.username}'),
+                              trailing: selected
+                                  ? const Icon(
+                                      Icons.check_circle_rounded,
+                                      color: accent,
+                                    )
+                                  : const Icon(Icons.chevron_right_rounded),
+                              onTap: () {
+                                setState(() {
+                                  if (_type == ChatType.direct) {
+                                    _selected = {user.id};
+                                  } else if (selected) {
+                                    _selected = {..._selected}..remove(user.id);
+                                  } else {
+                                    _selected = {..._selected, user.id};
+                                  }
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(26, 10, 26, 24),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Отмена'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _selected.isEmpty
+                          ? null
+                          : () {
+                              final name = _nameController.text.trim();
+                              if (_type != ChatType.direct && name.isEmpty) {
+                                return;
+                              }
+                              Navigator.pop(
+                                context,
+                                _NewChatResult(
+                                  type: _type,
+                                  name: name,
+                                  memberIds: _selected.toList(growable: false),
+                                ),
+                              );
+                            },
+                      child: const Text('Создать'),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Отмена'),
-        ),
-        FilledButton(
-          onPressed: _selected.isEmpty
-              ? null
-              : () {
-                  final name = _nameController.text.trim();
-                  if (_type != ChatType.direct && name.isEmpty) return;
-                  Navigator.pop(
-                    context,
-                    _NewChatResult(
-                      type: _type,
-                      name: name,
-                      memberIds: _selected.toList(growable: false),
-                    ),
-                  );
-                },
-          child: const Text('Создать'),
-        ),
-      ],
     );
   }
 }
@@ -2089,25 +2222,40 @@ class _AccountDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      contentPadding: EdgeInsets.zero,
-      content: SizedBox(
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+      child: Container(
         width: 500,
+        decoration: BoxDecoration(
+          color: panel.withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(32),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.42),
+              blurRadius: 36,
+              offset: const Offset(0, 22),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(26),
-              decoration: const BoxDecoration(
-                color: panelSoft,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              decoration: BoxDecoration(
+                color: panelSoft.withValues(alpha: 0.68),
+                border: Border(bottom: BorderSide(color: border)),
               ),
               child: Row(
                 children: [
                   BrenksAvatar(
                     title: user.title,
                     imageUrl: user.avatarUrl,
+                    baseUrl: serverUrl,
                     size: 78,
                   ),
                   const SizedBox(width: 18),
@@ -2144,16 +2292,10 @@ class _AccountDialog extends StatelessWidget {
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-                  _SettingsRow(
-                    icon: Icons.dns_rounded,
-                    title: 'Сервер',
-                    subtitle: serverUrl,
-                  ),
-                  const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: panelSoft,
+                      color: panelSoft.withValues(alpha: 0.64),
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(color: border),
                     ),
@@ -2230,81 +2372,54 @@ class _AccountDialog extends StatelessWidget {
   }
 }
 
-class _SettingsRow extends StatelessWidget {
-  const _SettingsRow({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: panelSoft,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: border),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: accent),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(fontWeight: FontWeight.w800)),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: muted, fontSize: 13),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _ChatProfileDialog extends StatelessWidget {
   const _ChatProfileDialog({
+    required this.serverUrl,
     required this.chat,
     required this.onlineUserIds,
   });
 
+  final String serverUrl;
   final Chat chat;
   final Set<String> onlineUserIds;
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      contentPadding: EdgeInsets.zero,
-      content: SizedBox(
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+      child: Container(
         width: 520,
+        constraints: const BoxConstraints(maxHeight: 680),
+        decoration: BoxDecoration(
+          color: panel.withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(32),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.42),
+              blurRadius: 36,
+              offset: const Offset(0, 22),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(26),
-              decoration: const BoxDecoration(
-                color: panelSoft,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              decoration: BoxDecoration(
+                color: panelSoft.withValues(alpha: 0.68),
+                border: Border(bottom: BorderSide(color: border)),
               ),
               child: Column(
                 children: [
                   BrenksAvatar(
                     title: chat.title,
                     imageUrl: chat.avatarUrl,
+                    baseUrl: serverUrl,
                     size: 92,
                   ),
                   const SizedBox(height: 14),
@@ -2336,6 +2451,7 @@ class _ChatProfileDialog extends StatelessWidget {
                       leading: BrenksAvatar(
                         title: participant.title,
                         imageUrl: participant.avatarUrl,
+                        baseUrl: serverUrl,
                       ),
                       title: Text(participant.title),
                       subtitle: Text(
@@ -2421,6 +2537,14 @@ Uint8List? _bytesFromDataUrl(String dataUrl) {
   }
 }
 
+String? _resolveMediaUrl(String? value, String baseUrl) {
+  final raw = value?.trim();
+  if (raw == null || raw.isEmpty || raw.startsWith('data:')) return raw;
+  final uri = Uri.tryParse(raw);
+  if (uri == null || uri.hasScheme) return raw;
+  return Uri.parse(baseUrl).resolve(raw).toString();
+}
+
 void _openImageViewer(BuildContext context, Uint8List bytes) {
   showDialog<void>(
     context: context,
@@ -2436,6 +2560,39 @@ void _openImageViewer(BuildContext context, Uint8List bytes) {
                 maxScale: 5,
                 child: Center(
                   child: Image.memory(bytes, fit: BoxFit.contain),
+                ),
+              ),
+            ),
+            Positioned(
+              right: 24,
+              top: 24,
+              child: IconButton.filledTonal(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+void _openNetworkImageViewer(BuildContext context, String url) {
+  showDialog<void>(
+    context: context,
+    barrierColor: Colors.black.withValues(alpha: 0.78),
+    builder: (context) {
+      return Dialog.fullscreen(
+        backgroundColor: Colors.transparent,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: InteractiveViewer(
+                minScale: 0.6,
+                maxScale: 5,
+                child: Center(
+                  child: Image.network(url, fit: BoxFit.contain),
                 ),
               ),
             ),

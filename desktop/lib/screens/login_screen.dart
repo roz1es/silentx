@@ -32,7 +32,6 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  late final TextEditingController _serverController;
   final _loginController = TextEditingController();
   final _passwordController = TextEditingController();
   final _codeController = TextEditingController();
@@ -44,20 +43,20 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _serverController = TextEditingController(text: widget.initialServerUrl);
   }
 
   @override
   void dispose() {
-    _serverController.dispose();
     _loginController.dispose();
     _passwordController.dispose();
     _codeController.dispose();
     super.dispose();
   }
 
+  String get _serverUrl => normalizeServerUrl(widget.initialServerUrl);
+
   Future<void> _submitLogin() async {
-    final serverUrl = normalizeServerUrl(_serverController.text);
+    final serverUrl = _serverUrl;
     final username = _loginController.text.trim();
     final password = _passwordController.text;
     if (username.isEmpty || password.isEmpty) {
@@ -99,7 +98,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submitCode() async {
-    final serverUrl = normalizeServerUrl(_serverController.text);
+    final serverUrl = _serverUrl;
     final ticket = _ticket;
     final code = _codeController.text.trim();
     if (ticket == null || code.isEmpty) return;
@@ -206,14 +205,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                   const SizedBox(height: 28),
-                  TextField(
-                    controller: _serverController,
-                    decoration: const InputDecoration(
-                      labelText: 'Сервер',
-                      hintText: defaultApiUrl,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 180),
                     child: _ticket == null

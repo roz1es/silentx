@@ -69,6 +69,8 @@ export function GroupMembersModal({
   const [pickIds, setPickIds] = useState<Set<string>>(new Set());
   const [dirLoading, setDirLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const addListRef = useRef<HTMLDivElement | null>(null);
+  const addBtnRefById = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const canManage = useMemo(() => {
     if (!chat) return false;
@@ -88,7 +90,7 @@ export function GroupMembersModal({
   const loadDir = useCallback(async () => {
     setDirLoading(true);
     try {
-      const { users } = await api.fetchUserDirectory();
+      const { users } = await api.fetchContactDirectory();
       setDirectory(users);
     } catch {
       setDirectory([]);
@@ -178,15 +180,15 @@ export function GroupMembersModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+      className="brenks-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="max-h-[85vh] w-full max-w-md overflow-hidden rounded-2xl border border-tg-border bg-tg-panel shadow-2xl">
-        <div className="border-b border-tg-border px-5 py-4">
+      <div className="brenks-modal-panel max-h-[85vh] w-full max-w-md overflow-hidden rounded-[1.6rem]">
+        <div className="border-b border-tg-border/70 px-5 py-4">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
             {chat.type === 'channel' ? 'Канал' : 'Группа'}
           </h2>
@@ -244,7 +246,7 @@ export function GroupMembersModal({
                     value={nameDraft}
                     onChange={(e) => setNameDraft(e.target.value)}
                     maxLength={128}
-                    className="min-w-0 flex-1 rounded-xl border border-tg-border bg-white px-3 py-2 text-sm dark:bg-slate-900/40 dark:text-slate-100"
+                    className="brenks-modal-input min-w-0 flex-1 rounded-xl border border-tg-border bg-white/95 px-3 py-2 text-sm outline-none ring-tg-accent/20 transition focus:ring-2 dark:bg-slate-900/40"
                   />
                   <button
                     type="button"
@@ -259,12 +261,15 @@ export function GroupMembersModal({
               <button
                 type="button"
                 onClick={() => setAddOpen((o) => !o)}
-                className="w-full rounded-xl border border-tg-border py-2 text-sm font-medium text-tg-accent"
+                className="w-full rounded-xl border border-tg-border bg-tg-hover/30 py-2 text-sm font-semibold text-tg-accent transition hover:bg-tg-hover/70"
               >
                 {addOpen ? 'Скрыть выбор' : 'Добавить участников'}
               </button>
               {addOpen ? (
-                <div className="max-h-48 overflow-y-auto rounded-xl border border-tg-border bg-tg-hover/30 p-2 dark:bg-slate-900/30">
+                <div
+                  ref={addListRef}
+                  className="brenks-modal-list scrollbar-thin scroll-smooth max-h-48 overflow-y-auto rounded-xl p-2"
+                >
                   {dirLoading ? (
                     <p className="py-4 text-center text-sm text-tg-muted">
                       Загрузка…
@@ -282,9 +287,20 @@ export function GroupMembersModal({
                           <li key={u.id}>
                             <button
                               type="button"
-                              onClick={() => togglePick(u.id)}
-                              className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm ${
-                                sel ? 'bg-tg-mine/80 dark:bg-slate-800/60' : 'hover:bg-tg-hover'
+                              ref={(el) => {
+                                addBtnRefById.current[u.id] = el;
+                              }}
+                              onClick={() => {
+                                togglePick(u.id);
+                                requestAnimationFrame(() => {
+                                  addBtnRefById.current[u.id]?.scrollIntoView({
+                                    behavior: 'smooth',
+                                    block: 'nearest',
+                                  });
+                                });
+                              }}
+                              className={`brenks-modal-row flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm ${
+                                sel ? 'bg-tg-mine/80 dark:bg-slate-800/60' : ''
                               }`}
                             >
                               <span
@@ -342,7 +358,7 @@ export function GroupMembersModal({
             <p className="mt-2 text-sm text-red-500 dark:text-red-400">{err}</p>
           ) : null}
         </div>
-        <ul className="scrollbar-thin max-h-[45vh] overflow-y-auto py-2">
+        <ul className="scrollbar-thin max-h-[45vh] overflow-y-auto px-2 py-2">
           {parts.map((p) => {
             const online = onlineUserIds.includes(p.id);
             const isSelf = p.id === selfId;
@@ -360,7 +376,7 @@ export function GroupMembersModal({
                       onClose();
                     }
                   }}
-                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-tg-hover ${
+                  className={`brenks-modal-row flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left ${
                     !isSelf && onMemberClick ? 'cursor-pointer' : 'cursor-default'
                   } disabled:opacity-100`}
                 >
@@ -402,7 +418,7 @@ export function GroupMembersModal({
             );
           })}
         </ul>
-        <div className="border-t border-tg-border px-4 py-3">
+        <div className="border-t border-tg-border/70 bg-tg-hover/25 px-4 py-3">
           <button
             type="button"
             onClick={onClose}

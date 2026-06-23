@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMessenger } from '@/contexts/MessengerContext';
 import * as api from '@/lib/api';
@@ -6,17 +6,19 @@ import type { DirectoryUser } from '@/lib/api';
 import { IconCheck, IconChevronRight, IconSearch } from '@/components/icons';
 import { UserAvatar } from '@/components/UserAvatar';
 import { participantLabel } from '@/lib/userDisplay';
+import { isWaitingForSearchInput, userSearchQuery } from '@/lib/userSearch';
 
 type Props = {
   open: boolean;
   onClose: () => void;
+  initialTab?: 'direct' | 'group' | 'channel';
 };
 
 function userLabel(u: DirectoryUser): string {
   return participantLabel(u);
 }
 
-export function NewChatModal({ open, onClose }: Props) {
+export function NewChatModal({ open, onClose, initialTab = 'direct' }: Props) {
   const { user } = useAuth();
   const { createDirect, createGroup, createChannel, onlineUserIds } =
     useMessenger();
@@ -25,15 +27,22 @@ export function NewChatModal({ open, onClose }: Props) {
   const [search, setSearch] = useState('');
   const [groupName, setGroupName] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [manualNick, setManualNick] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [dirLoading, setDirLoading] = useState(false);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const memberBtnRefById = useRef<Record<string, HTMLButtonElement | null>>({});
 
-  const loadDirectory = useCallback(async () => {
+  const loadDirectory = useCallback(async (mode: 'direct' | 'group' | 'channel') => {
+    if (mode === 'direct') {
+      setDirectory([]);
+      setDirLoading(false);
+      return;
+    }
     setDirLoading(true);
     try {
-      const { users } = await api.fetchUserDirectory();
+      const { users } =
+        await api.fetchContactDirectory();
       setDirectory(users);
     } catch {
       setDirectory([]);
@@ -44,15 +53,50 @@ export function NewChatModal({ open, onClose }: Props) {
 
   useEffect(() => {
     if (!open) return;
-    void loadDirectory();
+    setTab(initialTab);
     setError(null);
-    setSearch('');
-    setManualNick('');
     setGroupName('');
+  }, [open, initialTab]);
+
+  useEffect(() => {
+    if (!open) return;
+    void loadDirectory(tab);
+    setSearch('');
     setSelectedIds(new Set());
-  }, [open, loadDirectory]);
+    setError(null);
+  }, [open, tab, loadDirectory]);
+
+  useEffect(() => {
+    if (!open || tab !== 'direct') return;
+    const query = userSearchQuery(search, { allowPlainUsername: true });
+    if (!query) {
+      setDirectory([]);
+      setDirLoading(false);
+      return;
+    }
+    let alive = true;
+    setDirLoading(true);
+    const timer = window.setTimeout(() => {
+      api
+        .searchUsers(query)
+        .then(({ users }) => {
+          if (alive) setDirectory(users);
+        })
+        .catch(() => {
+          if (alive) setDirectory([]);
+        })
+        .finally(() => {
+          if (alive) setDirLoading(false);
+        });
+    }, 240);
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+    };
+  }, [open, tab, search]);
 
   const filtered = useMemo(() => {
+    if (tab === 'direct') return directory;
     const t = search.trim();
     if (!t) return directory;
     if (t.startsWith('@')) {
@@ -67,7 +111,7 @@ export function NewChatModal({ open, onClose }: Props) {
       const dn = u.displayName?.trim().toLowerCase() ?? '';
       return dn.length > 0 && dn.includes(q);
     });
-  }, [directory, search]);
+  }, [directory, search, tab]);
 
   const toggleMember = (id: string) => {
     setSelectedIds((prev) => {
@@ -83,25 +127,6 @@ export function NewChatModal({ open, onClose }: Props) {
     setLoading(true);
     try {
       await createDirect({ userId: targetUserId });
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const submitManualDirect = async () => {
-    const nick = manualNick.trim().replace(/^@+/, '');
-    if (nick.length < 2) {
-      setError('Введите ник (от 2 символов)');
-      return;
-    }
-    setError(null);
-    setLoading(true);
-    try {
-      await createDirect({ username: nick });
-      setManualNick('');
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка');
@@ -152,24 +177,38 @@ export function NewChatModal({ open, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
+      className="brenks-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="flex max-h-[min(90dvh,640px)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-tg-border bg-tg-panel shadow-2xl">
-        <div className="shrink-0 border-b border-tg-border px-5 py-4">
-          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
-            Новый чат
-          </h2>
-          <p className="mt-1 text-xs text-tg-muted">
-            Выберите человека из списка — все зарегистрированные пользователи видны здесь
-          </p>
-          <div className="relative mt-4 flex gap-1 rounded-2xl border border-tg-border/70 bg-tg-hover/90 p-1 dark:border-slate-600/80 dark:bg-slate-800/80">
+      <div className="brenks-modal-panel flex max-h-[min(90dvh,660px)] w-full max-w-md flex-col overflow-hidden rounded-[1.6rem]">
+        <div className="shrink-0 px-5 pb-4 pt-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-semibold tracking-normal text-slate-900 dark:text-slate-100">
+                Новый чат
+              </h2>
+              <p className="mt-1 text-sm text-tg-muted">
+                {tab === 'direct'
+                  ? 'Введите @username или ID пользователя'
+                  : 'Добавляйте людей из ваших личных чатов'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-tg-hover text-tg-muted transition hover:bg-tg-border hover:text-slate-900 dark:hover:text-slate-100"
+              title="Закрыть"
+            >
+              ×
+            </button>
+          </div>
+          <div className="brenks-modal-field relative flex gap-1 rounded-[1.35rem] p-1 shadow-inner">
             <span
-              className="pointer-events-none absolute bottom-1 top-1 left-1 rounded-xl bg-tg-panel shadow-md transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform dark:bg-slate-700 dark:shadow-black/30"
+              className="pointer-events-none absolute bottom-1 left-1 top-1 rounded-2xl bg-white shadow-[0_8px_24px_rgba(15,23,42,0.10)] transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform dark:bg-zinc-700 dark:shadow-black/25"
               style={{
                 width: 'calc((100% - 8px - 8px) / 3)',
                 transform:
@@ -182,7 +221,7 @@ export function NewChatModal({ open, onClose }: Props) {
             />
             <button
               type="button"
-              className={`relative z-10 min-h-[2.5rem] flex-1 rounded-xl py-2 text-sm font-medium transition-colors duration-500 ${
+              className={`relative z-10 min-h-[2.5rem] flex-1 rounded-2xl py-2 text-sm font-semibold transition-colors duration-500 ${
                 tab === 'direct'
                   ? 'text-slate-800 dark:text-slate-100'
                   : 'text-tg-muted hover:text-slate-600 dark:hover:text-slate-300'
@@ -193,7 +232,7 @@ export function NewChatModal({ open, onClose }: Props) {
             </button>
             <button
               type="button"
-              className={`relative z-10 min-h-[2.5rem] flex-1 rounded-xl py-2 text-sm font-medium transition-colors duration-500 ${
+              className={`relative z-10 min-h-[2.5rem] flex-1 rounded-2xl py-2 text-sm font-semibold transition-colors duration-500 ${
                 tab === 'group'
                   ? 'text-slate-800 dark:text-slate-100'
                   : 'text-tg-muted hover:text-slate-600 dark:hover:text-slate-300'
@@ -204,7 +243,7 @@ export function NewChatModal({ open, onClose }: Props) {
             </button>
             <button
               type="button"
-              className={`relative z-10 min-h-[2.5rem] flex-1 rounded-xl py-2 text-sm font-medium transition-colors duration-500 ${
+              className={`relative z-10 min-h-[2.5rem] flex-1 rounded-2xl py-2 text-sm font-semibold transition-colors duration-500 ${
                 tab === 'channel'
                   ? 'text-slate-800 dark:text-slate-100'
                   : 'text-tg-muted hover:text-slate-600 dark:hover:text-slate-300'
@@ -216,7 +255,7 @@ export function NewChatModal({ open, onClose }: Props) {
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-hidden px-5 py-3">
+        <div className="min-h-0 flex-1 overflow-hidden border-t border-tg-border/70 px-5 py-4">
           <div className="relative mb-3">
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tg-muted">
               <IconSearch className="h-4 w-4" />
@@ -224,8 +263,10 @@ export function NewChatModal({ open, onClose }: Props) {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Поиск..."
-              className="w-full rounded-xl border border-tg-border bg-white py-2.5 pl-9 pr-3 text-sm outline-none ring-tg-accent/25 focus:ring-2 dark:bg-slate-900/40 dark:text-slate-100"
+              placeholder={
+                tab === 'direct' ? '@username или ID' : 'Поиск по контактам...'
+              }
+              className="brenks-modal-input w-full rounded-2xl border border-tg-border bg-white/95 py-3 pl-10 pr-3 text-sm outline-none shadow-sm ring-tg-accent/20 transition focus:ring-2 dark:bg-zinc-900/60"
             />
           </div>
 
@@ -237,7 +278,7 @@ export function NewChatModal({ open, onClose }: Props) {
                 placeholder={
                   tab === 'channel' ? 'Название канала' : 'Название группы'
                 }
-                className="w-full rounded-xl border border-tg-border bg-white px-3 py-2.5 text-sm font-medium outline-none ring-tg-accent/25 focus:ring-2 dark:bg-slate-900/40 dark:text-slate-100"
+                className="brenks-modal-input w-full rounded-2xl border border-tg-border bg-white/95 px-3 py-3 text-sm font-medium outline-none shadow-sm ring-tg-accent/20 focus:ring-2 dark:bg-zinc-900/60"
               />
               {selectedIds.size > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-1.5">
@@ -260,24 +301,33 @@ export function NewChatModal({ open, onClose }: Props) {
               ) : (
                 <p className="mt-2 text-xs text-tg-muted">
                   {tab === 'channel'
-                    ? 'Подписчики только читают. Добавьте людей ниже или оставьте канал только для себя.'
-                    : 'Нажмите на людей ниже — они попадут в группу'}
+                    ? 'Подписчики только читают. В списке ниже только ваши контакты.'
+                    : 'Нажмите на контакты ниже — они попадут в группу'}
                 </p>
               )}
             </div>
           ) : null}
 
-          <div className="scrollbar-thin max-h-[min(50vh,320px)] overflow-y-auto rounded-xl border border-tg-border/80 bg-tg-hover/40 dark:bg-slate-900/20">
+          <div
+            ref={listRef}
+            className="brenks-modal-list scrollbar-thin scroll-smooth max-h-[min(50vh,320px)] overflow-y-auto rounded-2xl p-1 shadow-inner"
+          >
             {dirLoading ? (
               <p className="px-4 py-8 text-center text-sm text-tg-muted">
                 Загрузка списка…
               </p>
             ) : filtered.length === 0 ? (
               <p className="px-4 py-8 text-center text-sm text-tg-muted">
-                Никого не найдено
+                {tab === 'direct'
+                  ? isWaitingForSearchInput(search, {
+                      allowPlainUsername: true,
+                    })
+                    ? 'Введите @username, username или ID пользователя'
+                    : 'Пользователь не найден'
+                  : 'Пока нет контактов. Сначала найдите пользователя через @username и откройте личный чат.'}
               </p>
             ) : (
-              <ul className="divide-y divide-tg-border/50">
+              <ul className="space-y-1">
                 {filtered.map((u) => {
                   const online = onlineUserIds.includes(u.id);
                   const selected = selectedIds.has(u.id);
@@ -288,7 +338,7 @@ export function NewChatModal({ open, onClose }: Props) {
                           type="button"
                           disabled={loading}
                           onClick={() => void pickDirect(u.id)}
-                          className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-tg-hover disabled:opacity-50"
+                          className="brenks-modal-row flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition hover:shadow-sm disabled:opacity-50"
                         >
                           <UserAvatar
                             username={userLabel(u)}
@@ -296,7 +346,7 @@ export function NewChatModal({ open, onClose }: Props) {
                             size="md"
                           />
                           <div className="min-w-0 flex-1">
-                            <p className="truncate font-medium text-slate-800 dark:text-slate-100">
+                            <p className="truncate font-semibold">
                               {userLabel(u)}
                             </p>
                             <p className="truncate text-xs text-tg-muted">
@@ -318,9 +368,20 @@ export function NewChatModal({ open, onClose }: Props) {
                       <button
                         type="button"
                         disabled={loading}
-                        onClick={() => toggleMember(u.id)}
-                        className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-tg-hover disabled:opacity-50 ${
-                          selected ? 'bg-tg-mine/80 dark:bg-slate-800/50' : ''
+                        ref={(el) => {
+                          memberBtnRefById.current[u.id] = el;
+                        }}
+                        onClick={() => {
+                          toggleMember(u.id);
+                          requestAnimationFrame(() => {
+                            memberBtnRefById.current[u.id]?.scrollIntoView({
+                              behavior: 'smooth',
+                              block: 'nearest',
+                            });
+                          });
+                        }}
+                        className={`brenks-modal-row flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition hover:shadow-sm disabled:opacity-50 ${
+                          selected ? 'bg-sky-100/75 shadow-sm dark:bg-zinc-700/70' : ''
                         }`}
                       >
                         <span
@@ -340,7 +401,7 @@ export function NewChatModal({ open, onClose }: Props) {
                           size="md"
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium text-slate-800 dark:text-slate-100">
+                          <p className="truncate font-semibold">
                             {userLabel(u)}
                           </p>
                           <p className="truncate text-xs text-tg-muted">
@@ -360,32 +421,6 @@ export function NewChatModal({ open, onClose }: Props) {
             )}
           </div>
 
-          {tab === 'direct' ? (
-            <div className="mt-3 rounded-xl border border-dashed border-tg-border bg-tg-hover/30 px-3 py-2.5">
-              <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-tg-muted">
-                Или введите ник вручную
-              </p>
-              <div className="flex gap-2">
-                <input
-                  value={manualNick}
-                  onChange={(e) => setManualNick(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') void submitManualDirect();
-                  }}
-                  placeholder="ник (без @)"
-                  className="min-w-0 flex-1 rounded-lg border border-tg-border bg-white px-3 py-2 text-sm dark:bg-slate-900/40 dark:text-slate-100"
-                />
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => void submitManualDirect()}
-                  className="shrink-0 rounded-lg bg-tg-accent px-3 py-2 text-sm font-semibold text-white hover:brightness-105 disabled:opacity-50"
-                >
-                  OK
-                </button>
-              </div>
-            </div>
-          ) : null}
         </div>
 
         {error ? (
@@ -394,11 +429,11 @@ export function NewChatModal({ open, onClose }: Props) {
           </p>
         ) : null}
 
-        <div className="flex shrink-0 justify-end gap-2 border-t border-tg-border px-5 py-4">
+        <div className="flex shrink-0 justify-end gap-2 border-t border-tg-border/70 bg-tg-hover/25 px-5 py-4 backdrop-blur-xl">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl px-4 py-2 text-sm font-medium text-tg-muted hover:bg-tg-hover"
+            className="rounded-2xl px-4 py-2 text-sm font-semibold text-tg-muted hover:bg-tg-hover"
           >
             Закрыть
           </button>
@@ -407,7 +442,7 @@ export function NewChatModal({ open, onClose }: Props) {
               type="button"
               disabled={loading || selectedIds.size === 0}
               onClick={() => void submitGroup()}
-              className="rounded-xl bg-tg-accent px-5 py-2 text-sm font-semibold text-white shadow hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-2xl bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-100 dark:text-slate-950"
             >
               {loading ? '…' : `Создать · ${selectedIds.size} чел.`}
             </button>
@@ -417,7 +452,7 @@ export function NewChatModal({ open, onClose }: Props) {
               type="button"
               disabled={loading}
               onClick={() => void submitChannel()}
-              className="rounded-xl bg-tg-accent px-5 py-2 text-sm font-semibold text-white shadow hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-2xl bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-100 dark:text-slate-950"
             >
               {loading
                 ? '…'

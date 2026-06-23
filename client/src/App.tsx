@@ -35,6 +35,14 @@ export default function App() {
               }
             />
             <Route
+              path="/u/:username"
+              element={
+                <Protected>
+                  <MessengerPage />
+                </Protected>
+              }
+            />
+            <Route
               path="/admin"
               element={
                 <AdminOnly>

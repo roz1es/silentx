@@ -1,13 +1,14 @@
-// Service Worker для Silentix - Push-уведомления
+// Service Worker для БренксЧат - Push-уведомления
 
-const PUSH_TAG = 'silentix-push';
+const PUSH_TAG = 'brenkschat-push';
 
 self.addEventListener('push', (event) => {
   const data = event.data?.json() || {};
   
-  const title = data.title || 'Silentix';
+  const title = data.title || 'БренксЧат';
   const body = data.body || 'Новое сообщение';
   const tag = data.tag || PUSH_TAG;
+  const isCall = !!data.data?.call;
   
   event.waitUntil(
     self.registration.showNotification(title, {
@@ -16,7 +17,9 @@ self.addEventListener('push', (event) => {
       badge: '/badge-72.png',
       tag,
       data: data.data,
-      vibrate: [200, 100, 200],
+      requireInteraction: !!data.requireInteraction || isCall,
+      renotify: isCall,
+      vibrate: isCall ? [300, 120, 300, 120, 300] : [200, 100, 200],
     })
   );
 });
@@ -25,7 +28,8 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   
   const chatId = event.notification.data?.chatId;
-  const url = chatId ? `/?chat=${chatId}` : '/';
+  const isCall = !!event.notification.data?.call;
+  const url = chatId ? `/?chat=${chatId}` : isCall ? '/?call=1' : '/';
   
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {

@@ -52,6 +52,21 @@ npm run dev
 
 Переменные окружения (опционально): `PORT` — порт API (по умолчанию 3001), `HOST` — адрес привязки (по умолчанию `0.0.0.0`).
 
+### Почта для кодов входа и сброса пароля
+
+Коды можно отправлять через Gmail SMTP. Создайте отдельную почту Google, включите двухфакторную защиту и выпустите App Password для приложения. Затем задайте переменные из `server/.env.example`:
+
+```bash
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=your-brenkschat-mail@gmail.com
+SMTP_PASS=your-google-app-password
+MAIL_FROM="BrenksChat <your-brenkschat-mail@gmail.com>"
+```
+
+Если SMTP не настроен, сервер не падает: письмо выводится в консоль с префиксом `[email:dev]`, чтобы локально тестировать коды без реальной отправки.
+
 ### Демо-аккаунты (после старта сервера)
 
 В памяти уже есть пользователи:

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="БренксЧат">
+  <defs>
+    <radialGradient id="bgGlow" cx="42%" cy="28%" r="72%">
+      <stop offset="0" stop-color="#f5f7ff"/>
+      <stop offset="0.48" stop-color="#b9bdcb"/>
+      <stop offset="1" stop-color="#686d7c"/>
+    </radialGradient>
+    <linearGradient id="glass" x1="20%" y1="8%" x2="78%" y2="92%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.78"/>
+      <stop offset="0.46" stop-color="#b8bdcc" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#252a36" stop-opacity="0.72"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="18%" y1="6%" x2="80%" y2="88%">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.5" stop-color="#d9dcff"/>
+      <stop offset="1" stop-color="#6f7488"/>
+    </linearGradient>
+    <filter id="shadow" x="-18%" y="-18%" width="136%" height="142%">
+      <feDropShadow dx="0" dy="34" stdDeviation="26" flood-color="#151923" flood-opacity="0.44"/>
+      <feDropShadow dx="-10" dy="-12" stdDeviation="12" flood-color="#ffffff" flood-opacity="0.34"/>
+    </filter>
+    <filter id="innerGlow" x="-8%" y="-8%" width="116%" height="116%">
+      <feGaussianBlur stdDeviation="2.4" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#bgGlow)"/>
+  <path d="M318 214h332c112 0 202 88 202 198s-90 198-202 198H318c-42 0-76-34-76-76V290c0-42 34-76 76-76Z"
+    fill="url(#glass)" stroke="url(#edge)" stroke-width="26" filter="url(#shadow)"/>
+  <path d="M306 814c-36 0-64-28-64-64V548c0-42 34-76 76-76h416c92 0 166 74 166 166S826 804 734 804H454l-108 68c-18 11-40-2-40-24v-34Z"
+    fill="url(#glass)" stroke="url(#edge)" stroke-width="26" filter="url(#shadow)"/>
+  <path d="M286 540 792 394" stroke="#0f1320" stroke-width="42" stroke-linecap="round" opacity="0.72"/>
+  <g filter="url(#innerGlow)">
+    <circle cx="444" cy="670" r="24" fill="#eef1ff" stroke="#9da4b8" stroke-width="7"/>
+    <circle cx="512" cy="670" r="24" fill="#eef1ff" stroke="#9da4b8" stroke-width="7"/>
+    <circle cx="580" cy="670" r="24" fill="#eef1ff" stroke="#9da4b8" stroke-width="7"/>
+  </g>
+  <path d="M286 290c0-24 19-43 43-43h293c34 0 70 4 101 24" fill="none" stroke="#ffffff" stroke-width="9" stroke-linecap="round" opacity="0.55"/>
+  <path d="M318 548c0-24 19-43 43-43h340c46 0 85 13 113 42" fill="none" stroke="#ffffff" stroke-width="9" stroke-linecap="round" opacity="0.46"/>
+</svg>

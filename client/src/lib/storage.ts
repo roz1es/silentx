@@ -3,20 +3,15 @@ import type { User } from '@/types';
 const KEY = 'messenger_auth';
 const LEGACY_KEY = 'messenger_user';
 
-export type StoredAuth = { user: User; token: string };
+export type StoredUser = { user: User };
 
-export function loadAuth(): StoredAuth | null {
+export function loadAuth(): StoredUser | null {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
-      const data = JSON.parse(raw) as { user?: User; token?: unknown };
-      if (
-        data?.user?.id &&
-        data?.user?.username &&
-        typeof data.token === 'string' &&
-        data.token.length > 0
-      ) {
-        return { user: data.user, token: data.token };
+      const data = JSON.parse(raw) as { user?: User };
+      if (data?.user?.id && data?.user?.username) {
+        return { user: data.user };
       }
     }
     if (localStorage.getItem(LEGACY_KEY)) {
@@ -29,14 +24,14 @@ export function loadAuth(): StoredAuth | null {
   return null;
 }
 
-export function saveAuth(user: User, token: string): void {
-  localStorage.setItem(KEY, JSON.stringify({ user, token }));
+export function saveAuth(user: User): void {
+  localStorage.setItem(KEY, JSON.stringify({ user }));
 }
 
 export function updateStoredUser(user: User): void {
   const prev = loadAuth();
-  if (!prev?.token) return;
-  saveAuth(user, prev.token);
+  if (!prev) return;
+  saveAuth(user);
 }
 
 export function clearAuth(): void {
@@ -47,8 +42,4 @@ export function clearAuth(): void {
 /** Только пользователь (для начального состояния UI) */
 export function loadUser(): User | null {
   return loadAuth()?.user ?? null;
-}
-
-export function loadToken(): string | null {
-  return loadAuth()?.token ?? null;
 }

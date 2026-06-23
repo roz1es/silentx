@@ -1,0 +1,20 @@
+[Unit]
+Description=Daily БренксЧат backup
+After=mysql.service
+Requires=mysql.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/local/sbin/brenkschat-backup
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+PrivateTmp=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/root/backups
+ReadOnlyPaths=/var/www/brenkschat /etc/nginx /etc/turnserver.conf /etc/ssh
+UMask=0077

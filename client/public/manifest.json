@@ -1,13 +1,19 @@
 {
-  "name": "Silentix",
-  "short_name": "Silentix",
-  "description": "Мессенджер Silentix",
+  "name": "БренксЧат",
+  "short_name": "БренксЧат",
+  "description": "Мессенджер БренксЧат",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#1a1a1a",
-  "theme_color": "#0088cc",
+  "background_color": "#e4e7ef",
+  "theme_color": "#2f3440",
   "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
     {
       "src": "/icon-192.png",
       "sizes": "192x192",

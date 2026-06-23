@@ -10,9 +10,35 @@ export interface MessageMedia {
   durationMs?: number;
 }
 
+export interface EncryptedTextRecipient {
+  userId: string;
+  deviceId: string;
+  nonce: string;
+  ciphertext: string;
+}
+
+export interface EncryptedTextEnvelope {
+  version: 1;
+  algorithm: 'crypto_box_curve25519xsalsa20poly1305';
+  senderDeviceId: string;
+  /** Публичный ключ устройства отправителя на момент отправки.
+   * Нужен для расшифровки старых сообщений, даже если устройство уже не в каталоге.
+   */
+  senderPublicKey?: string;
+  recipients: EncryptedTextRecipient[];
+}
+
+export interface UserPrivacy {
+  showOnline?: boolean;
+  allowCalls?: boolean;
+  showEmail?: boolean;
+}
+
 export interface User {
   id: string;
   username: string;
+  email?: string;
+  emailVerified?: boolean;
   avatarUrl?: string;
   displayName?: string;
   bio?: string;
@@ -21,6 +47,8 @@ export interface User {
   birthDate?: string;
   /** Только у служебной учётки администратора */
   isAdmin?: boolean;
+  banned?: boolean;
+  privacy?: UserPrivacy;
 }
 
 export interface ChatParticipant {
@@ -28,6 +56,7 @@ export interface ChatParticipant {
   username: string;
   displayName?: string;
   avatarUrl?: string;
+  privacy?: UserPrivacy;
 }
 
 export interface Chat {
@@ -42,10 +71,10 @@ export interface Chat {
     text: string;
     time: number;
     senderId: string;
-  };
+  } | null;
   unread: Record<string, number>;
   lastReadAt?: Record<string, number>;
-  pinnedMessageId?: string;
+  pinnedMessageId?: string | null;
   /** Канал: id владельца (единственный, кто пишет) */
   channelOwnerId?: string;
   /** Локально для пользователя */
@@ -58,11 +87,16 @@ export interface Message {
   chatId: string;
   senderId: string;
   text: string;
+  encryptedText?: EncryptedTextEnvelope;
+  /** Вычисляется только на устройстве после локальной расшифровки. */
+  encryptionState?: 'encrypted' | 'pending' | 'recovering' | 'failed';
   imageUrl?: string;
   media?: MessageMedia;
   createdAt: number;
   deleted?: boolean;
   editedAt?: number;
+  replyToMessageId?: string;
+  reactions?: Record<string, string[]>;
 }
 
 export interface TypingState {

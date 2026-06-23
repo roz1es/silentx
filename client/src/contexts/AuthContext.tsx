@@ -11,8 +11,11 @@ import type { User } from '@/types';
 import * as api from '@/lib/api';
 import type { ProfilePatch } from '@/lib/api';
 import {
+  resetE2eeKeyWithPassword,
+  syncE2eeKeyWithPassword,
+} from '@/lib/e2ee';
+import {
   clearAuth,
-  loadToken,
   loadUser,
   saveAuth,
   updateStoredUser,
@@ -21,9 +24,31 @@ import {
 type AuthContextValue = {
   user: User | null;
   loading: boolean;
-  login: (username: string, password: string) => Promise<void>;
-  register: (username: string, password: string) => Promise<void>;
-  logout: () => void;
+  login: (
+    username: string,
+    password: string,
+    rememberMe: boolean
+  ) => Promise<api.AuthSuccess | api.EmailCodeChallenge>;
+  register: (
+    username: string,
+    email: string,
+    password: string
+  ) => Promise<api.AuthSuccess | api.EmailVerificationChallenge>;
+  confirmLogin: (
+    ticket: string,
+    code: string,
+    rememberMe: boolean,
+    password: string
+  ) => Promise<void>;
+  confirmRegister: (
+    ticket: string,
+    code: string,
+    password: string
+  ) => Promise<void>;
+  confirmEmailBind: (ticket: string, code: string) => Promise<void>;
+  restoreE2eeKey: (password: string) => Promise<void>;
+  resetE2eeKey: (password: string) => Promise<void>;
+  logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updateProfile: (patch: ProfilePatch) => Promise<void>;
 };
@@ -40,29 +65,114 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(u);
   }, []);
 
-  const login = useCallback(async (username: string, password: string) => {
+  const login = useCallback(async (
+    username: string,
+    password: string,
+    rememberMe: boolean
+  ) => {
     setLoading(true);
     try {
-      const { user: u, token } = await api.login(username, password);
-      saveAuth(u, token);
+      const result = await api.login(username, password, rememberMe);
+      if ('user' in result) {
+        await syncE2eeKeyWithPassword(result.user.id, password).catch(
+          (error) => console.warn('[e2ee] синхронизация ключа не удалась', error)
+        );
+        saveAuth(result.user);
+        setUser(result.user);
+      }
+      return result;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const register = useCallback(
+    async (username: string, email: string, password: string) => {
+      setLoading(true);
+      try {
+        const result = await api.register(username, email, password);
+        if ('user' in result) {
+          saveAuth(result.user);
+          setUser(result.user);
+        }
+        return result;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  const confirmLogin = useCallback(async (
+    ticket: string,
+    code: string,
+    rememberMe: boolean,
+    password: string
+  ) => {
+    setLoading(true);
+    try {
+      const { user: u } = await api.confirmLogin(ticket, code, rememberMe);
+      await syncE2eeKeyWithPassword(u.id, password).catch(
+        (error) => console.warn('[e2ee] синхронизация ключа не удалась', error)
+      );
+      saveAuth(u);
       setUser(u);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const register = useCallback(async (username: string, password: string) => {
+  const confirmRegister = useCallback(async (
+    ticket: string,
+    code: string,
+    password: string
+  ) => {
     setLoading(true);
     try {
-      const { user: u, token } = await api.register(username, password);
-      saveAuth(u, token);
+      const { user: u } = await api.confirmRegister(ticket, code);
+      await syncE2eeKeyWithPassword(u.id, password).catch(
+        (error) => console.warn('[e2ee] создание копии ключа не удалось', error)
+      );
+      saveAuth(u);
       setUser(u);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const logout = useCallback(() => {
+  const confirmEmailBind = useCallback(async (ticket: string, code: string) => {
+    setLoading(true);
+    try {
+      const { user: u } = await api.confirmEmailBind(ticket, code);
+      updateStoredUser(u);
+      setUser(u);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const restoreE2eeKey = useCallback(
+    async (password: string) => {
+      if (!user) throw new Error('Требуется авторизация');
+      await syncE2eeKeyWithPassword(user.id, password);
+    },
+    [user]
+  );
+
+  const resetE2eeKey = useCallback(
+    async (password: string) => {
+      if (!user) throw new Error('Требуется авторизация');
+      await resetE2eeKeyWithPassword(user.id, password);
+    },
+    [user]
+  );
+
+  const logout = useCallback(async () => {
+    try {
+      await api.logout();
+    } catch {
+      // Локальный выход всё равно должен сработать при недоступном сервере.
+    }
     clearAuth();
     setUser(null);
   }, []);
@@ -74,8 +184,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!loadToken()) return;
-    refreshUser().catch(() => {});
+    refreshUser().catch(() => {
+      clearAuth();
+      setUser(null);
+    });
   }, [refreshUser]);
 
   const value = useMemo(
@@ -84,11 +196,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       login,
       register,
+      confirmLogin,
+      confirmRegister,
+      confirmEmailBind,
+      restoreE2eeKey,
+      resetE2eeKey,
       logout,
       refreshUser,
       updateProfile,
     }),
-    [user, loading, login, register, logout, refreshUser, updateProfile]
+    [
+      user,
+      loading,
+      login,
+      register,
+      confirmLogin,
+      confirmRegister,
+      confirmEmailBind,
+      restoreE2eeKey,
+      resetE2eeKey,
+      logout,
+      refreshUser,
+      updateProfile,
+    ]
   );
 
   return (

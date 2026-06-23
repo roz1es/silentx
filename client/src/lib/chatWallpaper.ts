@@ -1,4 +1,5 @@
-const KEY = 'silentx_chat_wallpaper';
+const KEY = 'brenkschat_chat_wallpaper';
+const LEGACY_KEY = 'silentx_chat_wallpaper';
 
 export type ChatWallpaperId =
   | 'classic'
@@ -16,43 +17,50 @@ export const CHAT_WALLPAPER_PRESETS: {
   {
     id: 'classic',
     label: 'Классика',
-    previewClass: 'bg-sky-100 dark:bg-slate-800',
+    previewClass: 'chat-wallpaper-classic',
   },
   {
     id: 'plain',
     label: 'Без узора',
-    previewClass: 'bg-[#dfe8ee] dark:bg-[#1a222c]',
+    previewClass: 'chat-wallpaper-plain',
   },
   {
     id: 'bubbles',
     label: 'Пузыри',
-    previewClass: 'bg-cyan-50 dark:bg-slate-900',
+    previewClass: 'chat-wallpaper-bubbles',
   },
   {
     id: 'ocean',
     label: 'Океан',
-    previewClass: 'bg-gradient-to-b from-sky-200 to-cyan-100 dark:from-slate-900 dark:to-cyan-950',
+    previewClass: 'chat-wallpaper-ocean',
   },
   {
     id: 'dusk',
     label: 'Сумерки',
-    previewClass: 'bg-gradient-to-b from-violet-200/80 to-indigo-100 dark:from-indigo-950 dark:to-slate-950',
+    previewClass: 'chat-wallpaper-dusk',
   },
   {
     id: 'mint',
     label: 'Мята',
-    previewClass: 'bg-gradient-to-b from-emerald-100 to-teal-50 dark:from-emerald-950 dark:to-slate-900',
+    previewClass: 'chat-wallpaper-mint',
   },
 ];
 
+function isChatWallpaperId(v: string | null): v is ChatWallpaperId {
+  return Boolean(v && CHAT_WALLPAPER_PRESETS.some((p) => p.id === v));
+}
+
 export function loadChatWallpaperId(): ChatWallpaperId {
   try {
-    const v = localStorage.getItem(KEY);
-    if (
-      v &&
-      CHAT_WALLPAPER_PRESETS.some((p) => p.id === v)
-    ) {
-      return v as ChatWallpaperId;
+    const current = localStorage.getItem(KEY);
+    if (isChatWallpaperId(current)) {
+      return current;
+    }
+
+    const legacy = localStorage.getItem(LEGACY_KEY);
+    if (isChatWallpaperId(legacy)) {
+      localStorage.setItem(KEY, legacy);
+      return legacy;
     }
   } catch {
     /* noop */
@@ -63,6 +71,7 @@ export function loadChatWallpaperId(): ChatWallpaperId {
 export function saveChatWallpaperId(id: ChatWallpaperId): void {
   try {
     localStorage.setItem(KEY, id);
+    localStorage.removeItem(LEGACY_KEY);
   } catch {
     /* noop */
   }

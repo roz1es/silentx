@@ -1,16 +1,27 @@
 import webpush from 'web-push';
 import * as store from './store.js';
 
+let webPushConfigured = false;
+
 // Настройка VAPID (должна быть вызвана перед использованием)
 export function setupWebPush(publicKey: string, privateKey: string, subject: string): void {
   webpush.setVapidDetails(subject, publicKey, privateKey);
+  webPushConfigured = true;
 }
 
 // Отправка push-уведомления пользователю
 export async function sendPushNotification(
   userId: string,
-  payload: { title: string; body: string; icon?: string; tag?: string; data?: { chatId?: string } }
+  payload: {
+    title: string;
+    body: string;
+    icon?: string;
+    tag?: string;
+    requireInteraction?: boolean;
+    data?: { chatId?: string; call?: boolean; fromUserId?: string; callType?: 'audio' | 'video' };
+  }
 ): Promise<void> {
+  if (!webPushConfigured) return;
   const subscriptions = store.getPushSubscriptions(userId);
   if (subscriptions.length === 0) return;
 

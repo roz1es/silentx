@@ -1,5 +1,10 @@
 import { v4 as uuid } from 'uuid';
 import type { Chat, Message, User } from './types.js';
+import {
+  DISABLED_PASSWORD,
+  hashPassword,
+  isPasswordHash,
+} from './password.js';
 
 export type PushSubscriptionData = {
   endpoint: string;
@@ -14,6 +19,11 @@ export type ChatParticipantRow = {
   username: string;
   displayName?: string;
   avatarUrl?: string;
+  privacy?: {
+    showOnline?: boolean;
+    allowCalls?: boolean;
+    showEmail?: boolean;
+  };
 };
 
 export type SerializedChat = Omit<Chat, 'pinnedMessageId'> & {
@@ -26,6 +36,7 @@ export type SerializedChat = Omit<Chat, 'pinnedMessageId'> & {
 };
 
 export function previewForMessage(msg: Message): string {
+  if (msg.encryptedText) return 'Сообщение';
   if (msg.media) {
     switch (msg.media.kind) {
       case 'image':
@@ -107,6 +118,7 @@ function rowForParticipant(id: string): ChatParticipantRow {
     username: p?.username ?? 'User',
     displayName: p?.displayName,
     avatarUrl: p?.avatarUrl,
+    privacy: p?.privacy,
   };
 }
 
@@ -134,18 +146,104 @@ export function serializeChatForViewer(
     muted: isChatMutedForUser(viewerId, chat.id),
     pinnedToTop: isChatPinnedTopForUser(viewerId, chat.id),
     pinnedMessageId: chat.pinnedMessageId ?? null,
+    // Важно: undefined не сериализуется в JSON, из-за чего клиент не может
+    // "сбросить" lastMessage после очистки чата. Поэтому отдаём null явно.
+    lastMessage: chat.lastMessage
+      ? {
+          ...chat.lastMessage,
+          text:
+            chat.lastMessage.text === 'Защищённое сообщение' ||
+            chat.lastMessage.text === 'Защищенное сообщение' ||
+            chat.lastMessage.text === 'Пробуем расшифровать сообщение…' ||
+            chat.lastMessage.text === 'Ожидается восстановление ключа шифрования' ||
+            chat.lastMessage.text === 'Не удалось расшифровать защищённое сообщение' ||
+            chat.lastMessage.text === 'Не удалось расшифровать защищенное сообщение' ||
+            chat.lastMessage.text === 'Новое сообщение'
+              ? 'Сообщение'
+              : chat.lastMessage.text,
+        }
+      : null,
   };
 }
 
 /** Все пользователи кроме себя — для выбора в новом чате / группе. */
 export function listDirectoryUsers(excludeUserId: string): ChatParticipantRow[] {
   return [...users.values()]
-    .filter((u) => u.id !== excludeUserId)
+    .filter((u) => u.id !== excludeUserId && !u.banned)
     .map((u) => ({
       id: u.id,
       username: u.username,
       displayName: u.displayName,
       avatarUrl: u.avatarUrl,
+      privacy: u.privacy,
+    }))
+    .sort((a, b) => {
+      const la = (a.displayName?.trim() || a.username).toLowerCase();
+      const lb = (b.displayName?.trim() || b.username).toLowerCase();
+      return la.localeCompare(lb, 'ru');
+    });
+}
+
+export function searchDirectoryUsers(
+  viewerId: string,
+  query: string,
+  limit = 8
+): ChatParticipantRow[] {
+  const raw = query.trim();
+  const q = raw.replace(/^@+/, '').toLowerCase();
+  if (q.length < 2) return [];
+  const searchByUsername = raw.startsWith('@') || !raw.startsWith('id:');
+  const idQuery = raw.toLowerCase().startsWith('id:')
+    ? raw.slice(3).trim().toLowerCase()
+    : q;
+  return listDirectoryUsers(viewerId)
+    .filter((u) => {
+      const usernameMatches =
+        searchByUsername && u.username.toLowerCase().includes(q);
+      const idMatches =
+        idQuery.length >= 6 && u.id.toLowerCase().includes(idQuery);
+      return usernameMatches || idMatches;
+    })
+    .slice(0, limit);
+}
+
+export function usersShareDirectChat(a: string, b: string): boolean {
+  if (a === b) return true;
+  for (const c of chats.values()) {
+    if (
+      c.type === 'direct' &&
+      c.participantIds.includes(a) &&
+      c.participantIds.includes(b)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function canAddContactToSharedChat(requesterId: string, targetId: string): boolean {
+  const requester = users.get(requesterId);
+  if (requester?.isAdmin) return users.has(targetId);
+  return usersShareDirectChat(requesterId, targetId);
+}
+
+export function listContactUsers(userId: string): ChatParticipantRow[] {
+  const ids = new Set<string>();
+  for (const c of chats.values()) {
+    if (c.type !== 'direct' || !c.participantIds.includes(userId)) continue;
+    c.participantIds.forEach((id) => {
+      if (id !== userId) ids.add(id);
+    });
+  }
+  return [...ids]
+    .map((id) => users.get(id))
+    .filter((u): u is User => Boolean(u && !u.banned))
+    .map((u) => ({
+      id: u.id,
+      username: u.username,
+      displayName: u.displayName,
+      avatarUrl: u.avatarUrl,
+      privacy: u.privacy,
     }))
     .sort((a, b) => {
       const la = (a.displayName?.trim() || a.username).toLowerCase();
@@ -163,55 +261,87 @@ function ensureMessages(chatId: string): Message[] {
   return list;
 }
 
-/** Встроенные админы: после загрузки state.json их подмешиваем, если файла не обновляли */
-const BUILTIN_ADMIN_ACCOUNTS: User[] = [
+/** Зарезервированные администраторы без встроенных паролей. */
+const BUILTIN_ADMIN_ACCOUNTS: Array<Pick<User, 'id' | 'username' | 'isAdmin'>> = [
   {
     id: 'user-admin-roz1es',
     username: 'roz1es',
-    password: '121212',
     isAdmin: true,
   },
   {
     id: 'user-admin-elzi',
     username: 'ELZI',
-    password: '121212',
     isAdmin: true,
   },
 ];
 
-/** Синхронизация админов с диска: пароль, флаг admin, учётка ELZI если её не было в старом JSON */
+/** Синхронизация флагов администраторов без изменения существующих паролей. */
 export function ensureBuiltinAccounts(): void {
   for (const spec of BUILTIN_ADMIN_ACCOUNTS) {
     const byId = users.get(spec.id);
     if (byId) {
-      byId.password = spec.password;
       byId.isAdmin = true;
       byId.username = spec.username;
       continue;
     }
-    const byName = [...users.values()].find(
-      (u) => u.username.toLowerCase() === spec.username.toLowerCase()
+    users.set(spec.id, { ...spec, password: DISABLED_PASSWORD });
+  }
+
+  const bot =
+    users.get('user-bot') ??
+    [...users.values()].find((u) =>
+      ['silentx', 'brenkschat'].includes(u.username.toLowerCase())
     );
-    if (byName) {
-      byName.password = spec.password;
-      byName.isAdmin = true;
-      byName.username = spec.username;
-      continue;
+  if (bot) {
+    bot.username = 'brenkschat';
+    bot.displayName = 'БренксЧат';
+    bot.password = DISABLED_PASSWORD;
+    for (const chat of chats.values()) {
+      if (chat.type !== 'direct' || !chat.participantIds.includes(bot.id)) continue;
+      if (['silentx', 'brenkschat'].includes(chat.name.toLowerCase())) {
+        chat.name = 'БренксЧат';
+      }
+      for (const message of messagesByChat.get(chat.id) ?? []) {
+        if (
+          message.senderId === bot.id &&
+          /демо-мессенджер (?:SilentX|Silentix|BrenksChat)/i.test(message.text)
+        ) {
+          message.text = 'Добро пожаловать в БренксЧат!';
+        }
+      }
     }
-    users.set(spec.id, { ...spec });
   }
 }
 
 function seed() {
   const bot: User = {
     id: 'user-bot',
-    username: 'silentx',
-    password: '',
+    username: 'brenkschat',
+    displayName: 'БренксЧат',
+    password: DISABLED_PASSWORD,
   };
   users.set(bot.id, bot);
   for (const a of BUILTIN_ADMIN_ACCOUNTS) {
-    users.set(a.id, { ...a });
+    users.set(a.id, { ...a, password: DISABLED_PASSWORD });
   }
+}
+
+/**
+ * Одноразово переводит старые открытые пароли в Argon2id.
+ * Возвращает количество изменённых учётных записей.
+ */
+export async function migrateLegacyPasswords(): Promise<number> {
+  let migrated = 0;
+  for (const user of users.values()) {
+    if (user.password === DISABLED_PASSWORD || isPasswordHash(user.password)) {
+      continue;
+    }
+    user.password = user.password
+      ? await hashPassword(user.password)
+      : DISABLED_PASSWORD;
+    migrated += 1;
+  }
+  return migrated;
 }
 
 export type PersistedStateV1 = {
@@ -270,14 +400,54 @@ export function findUserByUsername(username: string): User | undefined {
   );
 }
 
-export function createUser(username: string, password: string): User {
+export function findUserByEmail(email: string): User | undefined {
+  const normalized = email.trim().toLowerCase();
+  return [...users.values()].find((u) => u.email?.toLowerCase() === normalized);
+}
+
+export function createUser(
+  username: string,
+  passwordHash: string,
+  email?: string,
+  emailVerified = false
+): User {
+  if (!isPasswordHash(passwordHash)) {
+    throw new Error('createUser requires an Argon2id password hash');
+  }
   const user: User = {
     id: uuid(),
     username,
-    password,
+    password: passwordHash,
+    email,
+    emailVerified: email ? emailVerified : undefined,
   };
   users.set(user.id, user);
   return user;
+}
+
+export function updateUserPassword(
+  userId: string,
+  passwordHash: string
+): User | undefined {
+  if (!isPasswordHash(passwordHash)) {
+    throw new Error('updateUserPassword requires an Argon2id password hash');
+  }
+  const u = users.get(userId);
+  if (!u) return undefined;
+  u.password = passwordHash;
+  return u;
+}
+
+export function updateUserEmail(
+  userId: string,
+  email: string,
+  verified: boolean
+): User | undefined {
+  const u = users.get(userId);
+  if (!u) return undefined;
+  u.email = email;
+  u.emailVerified = verified;
+  return u;
 }
 
 export function updateUserAvatar(
@@ -298,6 +468,11 @@ export function updateUserProfile(
     displayName?: string | null;
     phone?: string | null;
     birthDate?: string | null;
+    privacy?: {
+      showOnline?: boolean;
+      allowCalls?: boolean;
+      showEmail?: boolean;
+    };
   }
 ): User | undefined {
   const u = users.get(userId);
@@ -334,6 +509,20 @@ export function updateUserProfile(
       u.birthDate = bd.trim();
     }
   }
+  if ('privacy' in patch && patch.privacy) {
+    u.privacy = {
+      showOnline: patch.privacy.showOnline !== false,
+      allowCalls: patch.privacy.allowCalls !== false,
+      showEmail: patch.privacy.showEmail === true,
+    };
+  }
+  return u;
+}
+
+export function setUserBlocked(userId: string, banned: boolean): User | undefined {
+  const u = users.get(userId);
+  if (!u || u.isAdmin) return undefined;
+  u.banned = banned ? true : undefined;
   return u;
 }
 
@@ -358,7 +547,7 @@ export function getChat(chatId: string): Chat | undefined {
 }
 
 export function getMessages(chatId: string): Message[] {
-  return [...ensureMessages(chatId)];
+  return ensureMessages(chatId).filter((m) => !m.deleted);
 }
 
 export function addMessage(msg: Message): void {
@@ -376,6 +565,44 @@ export function addMessage(msg: Message): void {
       chat.unread[pid] = (chat.unread[pid] ?? 0) + 1;
     }
   });
+}
+
+export function toggleMessageReaction(
+  chatId: string,
+  messageId: string,
+  userId: string,
+  emoji: string
+): Message | undefined {
+  const allowed = new Set(['👍', '❤️', '😂', '🔥', '😮']);
+  if (!allowed.has(emoji)) return undefined;
+  const list = ensureMessages(chatId);
+  const msg = list.find((m) => m.id === messageId);
+  if (!msg || msg.deleted) return undefined;
+  const next = { ...(msg.reactions ?? {}) };
+  for (const key of Object.keys(next)) {
+    next[key] = next[key].filter((id) => id !== userId);
+    if (next[key].length === 0) delete next[key];
+  }
+  const cur = next[emoji] ?? [];
+  if (!msg.reactions?.[emoji]?.includes(userId)) {
+    next[emoji] = [...cur, userId];
+  }
+  msg.reactions = Object.keys(next).length > 0 ? next : undefined;
+  return msg;
+}
+
+function updateLastMessageForChat(chatId: string): void {
+  const chat = chats.get(chatId);
+  if (!chat) return;
+  const list = ensureMessages(chatId);
+  const last = [...list].reverse().find((m) => !m.deleted);
+  chat.lastMessage = last
+    ? {
+        text: previewForMessage(last),
+        time: last.createdAt,
+        senderId: last.senderId,
+      }
+    : undefined;
 }
 
 export function markChatRead(chatId: string, userId: string): Chat | undefined {
@@ -399,6 +626,13 @@ export function softDeleteMessage(
   const msg = list.find((m) => m.id === messageId);
   if (!msg || msg.senderId !== requesterId) return undefined;
   msg.deleted = true;
+  const chat = chats.get(chatId);
+  if (chat?.lastMessage?.time === msg.createdAt) {
+    updateLastMessageForChat(chatId);
+  }
+  if (chat?.pinnedMessageId === messageId) {
+    chat.pinnedMessageId = undefined;
+  }
   return msg;
 }
 
@@ -417,6 +651,34 @@ export function editMessageText(
   const text = newText.trim();
   if (!text || text.length > MAX_MSG_LEN) return undefined;
   msg.text = text;
+  msg.editedAt = Date.now();
+  const chat = chats.get(chatId);
+  if (chat?.lastMessage) {
+    const nonDeleted = list.filter((m) => !m.deleted);
+    const last = nonDeleted[nonDeleted.length - 1];
+    if (last?.id === messageId) {
+      chat.lastMessage = {
+        text: previewForMessage(msg),
+        time: msg.createdAt,
+        senderId: msg.senderId,
+      };
+    }
+  }
+  return { message: msg, chat };
+}
+
+export function editMessageEncryptedText(
+  chatId: string,
+  messageId: string,
+  requesterId: string,
+  encryptedText: Message['encryptedText']
+): { message: Message; chat: Chat | undefined } | undefined {
+  const list = ensureMessages(chatId);
+  const msg = list.find((m) => m.id === messageId);
+  if (!msg || msg.senderId !== requesterId || msg.deleted) return undefined;
+  if (msg.media || msg.imageUrl || !encryptedText) return undefined;
+  msg.text = '';
+  msg.encryptedText = encryptedText;
   msg.editedAt = Date.now();
   const chat = chats.get(chatId);
   if (chat?.lastMessage) {
@@ -468,6 +730,7 @@ export function addChatMembers(
   const set = new Set(chat.participantIds);
   for (const id of memberIds) {
     if (!id || !users.has(id)) continue;
+    if (!canAddContactToSharedChat(requesterId, id)) continue;
     set.add(id);
   }
   if (set.size === chat.participantIds.length) return chat;
@@ -615,12 +878,37 @@ export function createDirectChatIfNeeded(
   return chat;
 }
 
+export function ensureSavedChat(userId: string): Chat {
+  const existing = [...chats.values()].find(
+    (c) =>
+      c.type === 'direct' &&
+      c.participantIds.length === 1 &&
+      c.participantIds[0] === userId
+  );
+  if (existing) return existing;
+  const chat: Chat = {
+    id: uuid(),
+    type: 'direct',
+    name: 'Избранное',
+    participantIds: [userId],
+    unread: {},
+    lastReadAt: {},
+  };
+  chats.set(chat.id, chat);
+  return chat;
+}
+
 export function createGroupChat(
   creatorId: string,
   name: string,
   memberIds: string[]
 ): Chat {
-  const participantIds = [...new Set([creatorId, ...memberIds])];
+  const participantIds = [
+    ...new Set([
+      creatorId,
+      ...memberIds.filter((id) => canAddContactToSharedChat(creatorId, id)),
+    ]),
+  ];
   const chat: Chat = {
     id: uuid(),
     type: 'group',
@@ -646,7 +934,12 @@ export function createChannelChat(
   name: string,
   subscriberIds: string[]
 ): Chat {
-  const participantIds = [...new Set([ownerId, ...subscriberIds])];
+  const participantIds = [
+    ...new Set([
+      ownerId,
+      ...subscriberIds.filter((id) => canAddContactToSharedChat(ownerId, id)),
+    ]),
+  ];
   const chat: Chat = {
     id: uuid(),
     type: 'channel',
@@ -668,7 +961,7 @@ export function createChannelChat(
 }
 
 export function ensureWelcomeChat(userId: string): void {
-  const bot = [...users.values()].find((u) => u.username === 'silentx');
+  const bot = users.get('user-bot');
   if (!bot) return;
   const exists = [...chats.values()].some(
     (c) =>
@@ -680,7 +973,7 @@ export function ensureWelcomeChat(userId: string): void {
   const chat: Chat = {
     id: uuid(),
     type: 'direct',
-    name: 'silentx',
+    name: 'БренксЧат',
     participantIds: [userId, bot.id],
     unread: { [userId]: 1 },
     lastReadAt: {},
@@ -690,7 +983,7 @@ export function ensureWelcomeChat(userId: string): void {
     id: uuid(),
     chatId: chat.id,
     senderId: bot.id,
-    text: 'Добро пожаловать! Это демо-мессенджер SilentX.',
+    text: 'Добро пожаловать в БренксЧат!',
     createdAt: Date.now(),
   });
 }
@@ -700,26 +993,39 @@ export type AdminUserRow = {
   username: string;
   displayName?: string;
   isAdmin: boolean;
+  email?: string;
+  emailVerified: boolean;
+  banned: boolean;
+  messageCount: number;
+  chatCount: number;
 };
 
 export function getAdminOverview(): {
   userCount: number;
+  blockedUserCount: number;
   chatCount: number;
   directChatCount: number;
   groupChatCount: number;
+  channelChatCount: number;
   messageCount: number;
   users: AdminUserRow[];
 } {
   let messageCount = 0;
+  const byUserMessages = new Map<string, number>();
   for (const list of messagesByChat.values()) {
     messageCount += list.length;
+    for (const msg of list) {
+      byUserMessages.set(msg.senderId, (byUserMessages.get(msg.senderId) ?? 0) + 1);
+    }
   }
   const chatList = [...chats.values()];
   return {
     userCount: users.size,
+    blockedUserCount: [...users.values()].filter((u) => !!u.banned).length,
     chatCount: chatList.length,
     directChatCount: chatList.filter((c) => c.type === 'direct').length,
     groupChatCount: chatList.filter((c) => c.type === 'group').length,
+    channelChatCount: chatList.filter((c) => c.type === 'channel').length,
     messageCount,
     users: [...users.values()]
       .map((u) => ({
@@ -727,6 +1033,11 @@ export function getAdminOverview(): {
         username: u.username,
         displayName: u.displayName,
         isAdmin: !!u.isAdmin,
+        email: u.email,
+        emailVerified: !!u.emailVerified,
+        banned: !!u.banned,
+        messageCount: byUserMessages.get(u.id) ?? 0,
+        chatCount: chatList.filter((c) => c.participantIds.includes(u.id)).length,
       }))
       .sort((a, b) => a.username.localeCompare(b.username, 'ru')),
   };

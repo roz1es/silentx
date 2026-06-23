@@ -7,6 +7,7 @@ import { useMessenger } from '@/contexts/MessengerContext';
 import { UserAvatar } from '@/components/UserAvatar';
 import {
   IconMoreVertical,
+  IconLock,
   IconPalette,
   IconPhone,
   IconSearch,
@@ -18,7 +19,7 @@ import { ruSubscribers } from '@/lib/pluralRu';
 import { chatParticipantLabel } from '@/lib/userDisplay';
 
 function titleFor(chat: Chat | null, selfId: string): string {
-  if (!chat) return 'SilentX';
+  if (!chat) return 'БренксЧат';
   if (chat.displayName) return chat.displayName;
   if (chat.type === 'group' || chat.type === 'channel') return chat.name;
   const other = chat.participants?.find((p) => p.id !== selfId);
@@ -82,6 +83,7 @@ export function ChatHeader({ onGroupInfo, onPeerProfile }: Props) {
     setPinnedTop,
     clearChat,
     deleteChat,
+    textEncryptionStatus,
   } = useMessenger();
   const { startCall } = useCall();
   const { wallpaperId, setWallpaperId } = useChatWallpaper();
@@ -144,14 +146,17 @@ export function ChatHeader({ onGroupInfo, onPeerProfile }: Props) {
   }, [activeChat, user]);
 
   const typingEntries = Object.entries(typingNames);
-
-  const status = useMemo(() => {
+  const typingLabel = useMemo(() => {
     if (typingEntries.length === 1) {
-      return `${typingEntries[0][1]} печатает…`;
+      return `${typingEntries[0][1]} печатает`;
     }
     if (typingEntries.length > 1) {
-      return `${typingEntries.map(([, n]) => n).join(', ')} печатают…`;
+      return `${typingEntries.map(([, name]) => name).join(', ')} печатают`;
     }
+    return '';
+  }, [typingNames]);
+
+  const status = useMemo(() => {
     if (!activeChat) return '';
     if (activeChat.type === 'channel') {
       const n = activeChat.participantIds?.length ?? 0;
@@ -163,7 +168,7 @@ export function ChatHeader({ onGroupInfo, onPeerProfile }: Props) {
     }
     if (otherOnline) return 'в сети';
     return 'не в сети';
-  }, [typingEntries, activeChat, otherOnline]);
+  }, [activeChat, otherOnline]);
 
   if (!user) return null;
 
@@ -231,7 +236,7 @@ export function ChatHeader({ onGroupInfo, onPeerProfile }: Props) {
       ? createPortal(
           <div
             ref={dropdownRef}
-            className="fixed z-[10000] min-w-[220px] rounded-xl border border-tg-border bg-tg-panel py-1 shadow-2xl dark:shadow-black/40"
+            className="fixed z-[10000] min-w-[220px] rounded-xl border border-white/70 bg-white/90 py-1 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-zinc-800/90 dark:shadow-black/30"
             style={{ top: menuPos.top, right: menuPos.right }}
             role="menu"
           >
@@ -316,14 +321,39 @@ export function ChatHeader({ onGroupInfo, onPeerProfile }: Props) {
       : null;
 
   return (
-    <div className="relative z-20 shrink-0 border-b border-tg-border bg-tg-panel/95 shadow-sm backdrop-blur-md">
+    <div className="relative z-20 shrink-0 border-b border-white/70 bg-white/75 shadow-[0_8px_26px_rgba(15,23,42,0.06)] backdrop-blur-2xl dark:border-zinc-600/40 dark:bg-zinc-800/95 dark:shadow-none">
       <header className="flex h-12 items-center gap-2 px-2 md:h-14 md:gap-3 md:px-4">
         {showGroupStyle ? groupAvatar : directAvatar}
         <div className="flex min-w-0 flex-1 flex-col justify-center">
-          {titleEl}
+          <div className="flex min-w-0 items-center gap-1.5">
+            {titleEl}
+            {textEncryptionStatus === 'protected' ? (
+              <span
+                className="shrink-0 text-emerald-600 dark:text-emerald-400"
+                title="Новые текстовые сообщения защищены сквозным шифрованием"
+              >
+                <IconLock className="h-3.5 w-3.5" />
+              </span>
+            ) : null}
+          </div>
           {activeChat ? (
-            <p className="truncate text-[10px] text-tg-muted sm:text-xs">
-              {status}
+            <p
+              className={`truncate text-[10px] sm:text-xs ${
+                typingLabel ? 'text-sky-600 dark:text-sky-300' : 'text-tg-muted'
+              }`}
+            >
+              {typingLabel ? (
+                <span className="typing-status" aria-label={typingLabel}>
+                  <span className="truncate">{typingLabel}</span>
+                  <span className="typing-dots" aria-hidden>
+                    <span />
+                    <span />
+                    <span />
+                  </span>
+                </span>
+              ) : (
+                status
+              )}
             </p>
           ) : null}
         </div>
@@ -362,17 +392,23 @@ export function ChatHeader({ onGroupInfo, onPeerProfile }: Props) {
         ) : null}
         {menuPortal}
         <div
-          className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-            typingEntries.length > 0
-              ? 'bg-amber-400'
-              : otherOnline
-                ? 'bg-emerald-500'
-                : 'bg-slate-400'
+          className={`relative h-2.5 w-2.5 shrink-0 ${
+            otherOnline ? 'pulse-online' : ''
           }`}
           title={
             typingEntries.length ? 'Печатает' : otherOnline ? 'Онлайн' : 'Оффлайн'
           }
-        />
+        >
+          <div
+            className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+              typingEntries.length > 0
+                ? 'typing-presence-dot bg-sky-400'
+                : otherOnline
+                  ? 'bg-emerald-500'
+                  : 'bg-slate-400'
+            }`}
+          />
+        </div>
       </header>
       {activeChat && searchOpen ? (
         <div className="border-t border-tg-border/80 px-3 py-2 md:px-4">
@@ -403,7 +439,7 @@ export function ChatHeader({ onGroupInfo, onPeerProfile }: Props) {
       {wallpaperOpen
         ? createPortal(
             <div
-              className="fixed inset-0 z-[10001] flex items-end justify-center bg-black/45 p-4 pb-8 backdrop-blur-[2px] sm:items-center sm:pb-4"
+              className="fixed inset-0 z-[10001] flex items-end justify-center bg-black/40 p-4 pb-8 backdrop-blur-[2px] sm:items-center sm:pb-4"
               role="dialog"
               aria-modal="true"
               aria-label="Фон чатов"
@@ -411,7 +447,7 @@ export function ChatHeader({ onGroupInfo, onPeerProfile }: Props) {
                 if (e.target === e.currentTarget) setWallpaperOpen(false);
               }}
             >
-              <div className="w-full max-w-sm rounded-2xl border border-tg-border bg-tg-panel p-4 shadow-2xl">
+              <div className="w-full max-w-sm rounded-2xl border border-white/70 bg-white/95 p-4 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-zinc-800/95 dark:shadow-black/30">
                 <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
                   Фон чатов
                 </h3>
@@ -429,12 +465,12 @@ export function ChatHeader({ onGroupInfo, onPeerProfile }: Props) {
                       }}
                       className={`flex flex-col items-center gap-1.5 rounded-xl border-2 p-2 transition hover:bg-tg-hover ${
                         wallpaperId === p.id
-                          ? 'border-[rgb(var(--tg-accent))]'
+                          ? 'border-slate-400 bg-slate-100/80 dark:border-slate-500 dark:bg-white/5'
                           : 'border-transparent'
                       }`}
                     >
                       <span
-                        className={`h-11 w-full rounded-lg border border-tg-border/50 ${p.previewClass}`}
+                        className={`h-12 w-full overflow-hidden rounded-lg border border-tg-border/50 shadow-inner ${p.previewClass}`}
                       />
                       <span className="text-center text-[10px] font-medium leading-tight text-tg-muted">
                         {p.label}

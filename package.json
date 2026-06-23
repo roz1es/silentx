@@ -1,5 +1,8 @@
 {
   "name": "messengercursor",
+  "version": "1.0.0",
+  "description": "Настольный мессенджер БренксЧат",
+  "author": "Команда БренксЧат",
   "private": true,
   "workspaces": [
     "client",
@@ -10,10 +13,62 @@
     "build": "npm run build -w client && npm run build -w server",
     "start": "npm run start -w server",
     "client": "npm run dev -w client",
-    "server": "npm run dev -w server"
+    "server": "npm run dev -w server",
+    "desktop:dev": "concurrently -n server,client,electron -c blue,green,magenta \"npm run dev -w server\" \"npm run dev -w client\" \"wait-on tcp:5173 && ELECTRON_DEV=1 electron .\"",
+    "desktop:start": "npm run build && NODE_ENV=production electron .",
+    "desktop:pack:mac": "npm run build && electron-builder --mac dmg",
+    "desktop:pack:win": "npm run build && electron-builder --win nsis --x64"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",
-    "sharp": "^0.34.5"
+    "electron": "^36.2.1",
+    "electron-builder": "^24.13.3",
+    "electron-updater": "^6.3.9",
+    "sharp": "^0.34.5",
+    "wait-on": "^8.0.3"
+  },
+  "main": "electron/main.cjs",
+  "build": {
+    "appId": "com.brenkschat.desktop",
+    "productName": "БренксЧат",
+    "files": [
+      "electron/**/*",
+      "client/dist/**/*",
+      "server/dist/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://example.com/brenkschat-updates"
+      }
+    ],
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "artifactName": "BrenksChat-${version}-mac.${ext}",
+      "icon": "build/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "BrenksChat-${version}-win.${ext}",
+      "icon": "build/icon.ico"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "artifactName": "BrenksChat-${version}-linux.${ext}",
+      "icon": "build/icon.png"
+    }
   }
 }

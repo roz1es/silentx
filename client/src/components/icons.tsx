@@ -43,6 +43,27 @@ export function IconMic(props: IconProps) {
   );
 }
 
+export function IconLock(props: IconProps) {
+  return strokeIcon(
+    <>
+      <rect x="5" y="10" width="14" height="10" rx="2" />
+      <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+    </>,
+    props
+  );
+}
+
+export function IconMicOff(props: IconProps) {
+  return strokeIcon(
+    <>
+      <path d="M9 6v5a3 3 0 0 0 5 2.2" />
+      <path d="M15 9.3V6a3 3 0 0 0-5.1-2.1" />
+      <path d="M19 11a7 7 0 0 1-1.4 4.2M5 11a7 7 0 0 0 10.4 6.1M12 18v3M8 21h8M4 4l16 16" />
+    </>,
+    props
+  );
+}
+
 /** Video note / circle record */
 export function IconVideoCircle(props: IconProps) {
   return strokeIcon(
@@ -110,11 +131,55 @@ export function IconVideoCam(props: IconProps) {
   );
 }
 
+export function IconVideoOff(props: IconProps) {
+  return strokeIcon(
+    <>
+      <path d="M4 8a2 2 0 0 1 2-2h5.5" />
+      <path d="M14 10.5 20 7v10l-3.5-2" />
+      <path d="M4 11v5a2 2 0 0 0 2 2h8a2 2 0 0 0 1.3-.5" />
+      <path d="M4 4l16 16" />
+    </>,
+    props
+  );
+}
+
+export function IconVolume(props: IconProps) {
+  return strokeIcon(
+    <>
+      <path d="M4 9v6h4l5 4V5L8 9H4Z" />
+      <path d="M16 8.5a5 5 0 0 1 0 7M19 6a9 9 0 0 1 0 12" />
+    </>,
+    props
+  );
+}
+
+export function IconVolumeOff(props: IconProps) {
+  return strokeIcon(
+    <>
+      <path d="M4 9v6h4l5 4v-6" />
+      <path d="M13 8V5L9.8 7.6" />
+      <path d="M18 9l4 4M22 9l-4 4M4 4l16 16" />
+    </>,
+    props
+  );
+}
+
 export function IconSearch(props: IconProps) {
   return strokeIcon(
     <>
       <circle cx="11" cy="11" r="6.5" />
       <path d="M20 20 16 16" />
+    </>,
+    props
+  );
+}
+
+export function IconDatabase(props: IconProps) {
+  return strokeIcon(
+    <>
+      <ellipse cx="12" cy="5" rx="7" ry="3" />
+      <path d="M5 5v6c0 1.7 3.1 3 7 3s7-1.3 7-3V5" />
+      <path d="M5 11v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" />
     </>,
     props
   );

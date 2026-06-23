@@ -72,7 +72,7 @@ export function BirthDateFields({ value, onChange, disabled }: Props) {
   };
 
   const selectClass =
-    'w-full appearance-none rounded-2xl border border-tg-border/80 bg-slate-100/90 py-3 pl-3 pr-8 text-center text-[15px] font-medium text-slate-900 shadow-sm outline-none transition focus:border-tg-accent focus:ring-2 focus:ring-[rgb(var(--tg-accent))]/25 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-100';
+    'brenks-profile-input w-full appearance-none rounded-2xl py-3 pl-3 pr-8 text-center text-[15px] font-medium outline-none disabled:opacity-50';
 
   return (
     <div className="birth-date-fields space-y-2">

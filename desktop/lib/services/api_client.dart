@@ -127,9 +127,14 @@ class ApiClient {
       );
     }
 
+    final token = json['token']?.toString() ?? '';
+    if (token.isEmpty) {
+      throw ApiException('Сервер не вернул токен авторизации.');
+    }
+
     return AuthResult.success(
       user: User.fromJson((json['user'] as Map).cast<String, dynamic>()),
-      token: json['token']?.toString() ?? '',
+      token: token,
     );
   }
 
@@ -146,9 +151,14 @@ class ApiClient {
       },
     );
 
+    final token = json['token']?.toString() ?? '';
+    if (token.isEmpty) {
+      throw ApiException('Сервер не вернул токен авторизации.');
+    }
+
     return AuthResult.success(
       user: User.fromJson((json['user'] as Map).cast<String, dynamic>()),
-      token: json['token']?.toString() ?? '',
+      token: token,
     );
   }
 

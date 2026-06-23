@@ -206,7 +206,7 @@ async function respondWithAuthenticatedUser(
     path: '/',
     ...(rememberMe ? { maxAge: REMEMBER_COOKIE_MAX_AGE_MS } : {}),
   });
-  res.json({ user: publicUser(user) });
+  res.json({ user: publicUser(user), token });
 }
 
 function disconnectSession(sessionId: string): void {

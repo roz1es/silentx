@@ -35,7 +35,7 @@ async function request<T>(
   }
 }
 
-export type AuthSuccess = { user: User };
+export type AuthSuccess = { user: User; token?: string };
 export type EmailCodeChallenge = {
   emailCodeRequired: true;
   ticket: string;

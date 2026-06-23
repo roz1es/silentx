@@ -26,6 +26,8 @@
 	<string>$(PRODUCT_COPYRIGHT)</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>БренксЧат использует микрофон для записи голосовых сообщений и звонков.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>БренксЧат использует камеру для записи видеокружков и видеозвонков.</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>

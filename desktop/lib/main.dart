@@ -43,10 +43,9 @@ class _BrenksChatDesktopAppState extends State<BrenksChatDesktopApp> {
   }
 
   Future<void> _bootstrap() async {
-    final savedServer = await _authStore.loadServerUrl();
     final savedTheme = await _authStore.loadTheme();
     final token = await _authStore.loadToken();
-    final serverUrl = normalizeServerUrl(savedServer ?? defaultApiUrl);
+    final serverUrl = normalizeServerUrl(defaultApiUrl);
     final themeMode = savedTheme == 'light' ? ThemeMode.light : ThemeMode.dark;
     if (token == null || token.isEmpty) {
       if (!mounted) return;

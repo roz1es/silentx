@@ -516,7 +516,6 @@ class _LoginScreenState extends State<LoginScreen> {
           'Не выходить на этом устройстве 30 дней',
           style: TextStyle(color: muted, fontSize: 12),
         ),
-        activeColor: accent,
       ),
     );
   }
@@ -609,9 +608,13 @@ class _LoginScreenState extends State<LoginScreen> {
           child: const Text('Забыли пароль?'),
         ),
         if (_mode == _AuthMode.login)
-          const Text(
-            'Код придёт на почту',
-            style: TextStyle(color: muted, fontSize: 12),
+          const Flexible(
+            child: Text(
+              'Код придёт на почту',
+              textAlign: TextAlign.right,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: muted, fontSize: 12),
+            ),
           ),
       ],
     );

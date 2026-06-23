@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' as io;
+import 'dart:ui' show ImageFilter;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +18,108 @@ import '../widgets/empty_state.dart';
 
 const _quickReactions = ['👍', '❤️', '😂', '🔥', '😮'];
 const _maxMediaDataUrlLength = 14 * 1000 * 1000;
+
+BoxDecoration _glassDecoration({
+  Color? color,
+  double radius = 24,
+  Color? borderColor,
+  List<BoxShadow>? shadows,
+}) {
+  return BoxDecoration(
+    color: color ?? const Color(0xC627272A),
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(
+      color: borderColor ?? Colors.white.withValues(alpha: 0.1),
+    ),
+    boxShadow: shadows ??
+        [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 28,
+            offset: const Offset(0, 16),
+          ),
+          BoxShadow(
+            color: Colors.white.withValues(alpha: 0.045),
+            blurRadius: 0,
+            offset: const Offset(0, 1),
+          ),
+        ],
+  );
+}
+
+class _GlassSurface extends StatelessWidget {
+  const _GlassSurface({
+    required this.child,
+    this.padding,
+    this.margin,
+    this.radius = 24,
+    this.color,
+    this.width,
+  });
+
+  final Widget child;
+  final EdgeInsetsGeometry? padding;
+  final EdgeInsetsGeometry? margin;
+  final double radius;
+  final Color? color;
+  final double? width;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: margin,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+          child: Container(
+            width: width,
+            padding: padding,
+            decoration: _glassDecoration(color: color, radius: radius),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SoftIconButton extends StatelessWidget {
+  const _SoftIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    this.active = false,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: Icon(icon),
+      style: IconButton.styleFrom(
+        fixedSize: const Size(42, 42),
+        backgroundColor: active
+            ? accent.withValues(alpha: 0.16)
+            : Colors.white.withValues(alpha: 0.045),
+        disabledBackgroundColor: Colors.white.withValues(alpha: 0.025),
+        foregroundColor: active ? accent : muted,
+        disabledForegroundColor: muted.withValues(alpha: 0.38),
+        side: BorderSide(
+          color: active
+              ? accent.withValues(alpha: 0.26)
+              : Colors.white.withValues(alpha: 0.075),
+        ),
+      ),
+    );
+  }
+}
 
 class MessengerScreen extends StatefulWidget {
   const MessengerScreen({
@@ -604,82 +707,97 @@ class _MessengerScreenState extends State<MessengerScreen> {
             .toList(growable: false);
 
     return Scaffold(
-      body: Row(
-        children: [
-          SizedBox(
-            width: 384,
-            child: _Sidebar(
-              user: widget.user,
-              serverUrl: widget.serverUrl,
-              chats: visibleChats,
-              activeChatId: _activeChatId,
-              loading: _loadingChats,
-              connected: _socketConnected,
-              onlineUserIds: _onlineUserIds,
-              searchController: _chatSearchController,
-              onSearchChanged: () => setState(() {}),
-              onRefresh: _loadChats,
-              onLogout: widget.onLogout,
-              onNewChat: _showNewChatDialog,
-              onOpenAccount: _showAccountDialog,
-              onSelectChat: _selectChat,
-            ),
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF262B34),
+              Color(0xFF20242B),
+              Color(0xFF1D2128),
+            ],
           ),
-          const VerticalDivider(width: 1, color: Color(0xFF323946)),
-          Expanded(
-            child: _ChatPane(
-              chat: _activeChat,
-              serverUrl: widget.serverUrl,
-              user: widget.user,
-              messages: _messages,
-              pinnedMessage: _pinnedMessage,
-              typingNames: _typingNames.values.toList(growable: false),
-              loading: _loadingMessages,
-              sendingMedia: _sendingMedia,
-              recordingVoice: _recordingVoice,
-              recordingMs: _recordingMs,
-              error: _error,
-              replyTo: _replyTo,
-              editing: _editing,
-              messageController: _messageController,
-              scrollController: _messageScrollController,
-              onSend: _sendMessage,
-              onAttach: _pickAndSendAttachment,
-              onStartVoice: _startVoiceRecording,
-              onFinishVoice: _finishVoiceRecording,
-              onCancelVoice: _cancelVoiceRecording,
-              onCancelComposerMode: _cancelComposerMode,
-              onTyping: _notifyTyping,
-              onOpenProfile: _openChatProfile,
-              onToggleMute: _toggleMute,
-              onTogglePinTop: _togglePinTop,
-              onClearChat: _clearChat,
-              onDeleteChat: _deleteChat,
-              onUnpinMessage: () => _setPinnedMessage(null),
-              onReply: (message) => setState(() {
-                _editing = null;
-                _replyTo = message;
-              }),
-              onEdit: _startEdit,
-              onDeleteMessage: (message) {
-                final chatId = _activeChatId;
-                if (chatId == null) return;
-                _socket?.deleteMessage(chatId: chatId, messageId: message.id);
-              },
-              onPinMessage: _setPinnedMessage,
-              onReaction: (message, emoji) {
-                final chatId = _activeChatId;
-                if (chatId == null) return;
-                _socket?.toggleReaction(
-                  chatId: chatId,
-                  messageId: message.id,
-                  emoji: emoji,
-                );
-              },
-              onPlayVoice: _playVoice,
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 392,
+              child: _Sidebar(
+                user: widget.user,
+                serverUrl: widget.serverUrl,
+                chats: visibleChats,
+                activeChatId: _activeChatId,
+                loading: _loadingChats,
+                connected: _socketConnected,
+                onlineUserIds: _onlineUserIds,
+                searchController: _chatSearchController,
+                onSearchChanged: () => setState(() {}),
+                onRefresh: _loadChats,
+                onNewChat: _showNewChatDialog,
+                onOpenAccount: _showAccountDialog,
+                onSelectChat: _selectChat,
+              ),
             ),
-          ),
-        ],
+            Container(width: 1, color: Colors.white.withValues(alpha: 0.07)),
+            Expanded(
+              child: _ChatPane(
+                chat: _activeChat,
+                serverUrl: widget.serverUrl,
+                user: widget.user,
+                messages: _messages,
+                pinnedMessage: _pinnedMessage,
+                typingNames: _typingNames.values.toList(growable: false),
+                loading: _loadingMessages,
+                sendingMedia: _sendingMedia,
+                recordingVoice: _recordingVoice,
+                recordingMs: _recordingMs,
+                error: _error,
+                replyTo: _replyTo,
+                editing: _editing,
+                messageController: _messageController,
+                scrollController: _messageScrollController,
+                onSend: _sendMessage,
+                onAttach: _pickAndSendAttachment,
+                onStartVoice: _startVoiceRecording,
+                onFinishVoice: _finishVoiceRecording,
+                onCancelVoice: _cancelVoiceRecording,
+                onCancelComposerMode: _cancelComposerMode,
+                onTyping: _notifyTyping,
+                onOpenProfile: _openChatProfile,
+                onToggleMute: _toggleMute,
+                onTogglePinTop: _togglePinTop,
+                onClearChat: _clearChat,
+                onDeleteChat: _deleteChat,
+                onUnpinMessage: () => _setPinnedMessage(null),
+                onReply: (message) => setState(() {
+                  _editing = null;
+                  _replyTo = message;
+                }),
+                onEdit: _startEdit,
+                onDeleteMessage: (message) {
+                  final chatId = _activeChatId;
+                  if (chatId == null) return;
+                  _socket?.deleteMessage(
+                    chatId: chatId,
+                    messageId: message.id,
+                  );
+                },
+                onPinMessage: _setPinnedMessage,
+                onReaction: (message, emoji) {
+                  final chatId = _activeChatId;
+                  if (chatId == null) return;
+                  _socket?.toggleReaction(
+                    chatId: chatId,
+                    messageId: message.id,
+                    emoji: emoji,
+                  );
+                },
+                onPlayVoice: _playVoice,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -697,7 +815,6 @@ class _Sidebar extends StatelessWidget {
     required this.searchController,
     required this.onSearchChanged,
     required this.onRefresh,
-    required this.onLogout,
     required this.onNewChat,
     required this.onOpenAccount,
     required this.onSelectChat,
@@ -713,7 +830,6 @@ class _Sidebar extends StatelessWidget {
   final TextEditingController searchController;
   final VoidCallback onSearchChanged;
   final VoidCallback onRefresh;
-  final VoidCallback onLogout;
   final VoidCallback onNewChat;
   final VoidCallback onOpenAccount;
   final ValueChanged<String> onSelectChat;
@@ -721,11 +837,27 @@ class _Sidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFF22262E),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF272B33).withValues(alpha: 0.96),
+            const Color(0xFF20242B).withValues(alpha: 0.92),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.22),
+            blurRadius: 28,
+            offset: const Offset(12, 0),
+          ),
+        ],
+      ),
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(18, 18, 14, 16),
+            padding: const EdgeInsets.fromLTRB(18, 18, 14, 14),
             child: Row(
               children: [
                 InkWell(
@@ -777,37 +909,48 @@ class _Sidebar extends StatelessWidget {
                     ],
                   ),
                 ),
-                IconButton(
-                  tooltip: 'Новый чат',
-                  onPressed: onNewChat,
-                  icon: const Icon(Icons.add_comment_rounded),
-                ),
-                IconButton(
-                  tooltip: 'Профиль и настройки',
-                  onPressed: onOpenAccount,
-                  icon: const Icon(Icons.tune_rounded),
-                ),
-                IconButton(
-                  tooltip: 'Обновить',
-                  onPressed: onRefresh,
-                  icon: const Icon(Icons.refresh_rounded),
-                ),
-                IconButton(
-                  tooltip: 'Выйти',
-                  onPressed: onLogout,
-                  icon: const Icon(Icons.logout_rounded),
+                Row(
+                  children: [
+                    _SoftIconButton(
+                      tooltip: 'Новый чат',
+                      onPressed: onNewChat,
+                      icon: Icons.add_rounded,
+                    ),
+                    const SizedBox(width: 8),
+                    _SoftIconButton(
+                      tooltip: 'Профиль и настройки',
+                      onPressed: onOpenAccount,
+                      icon: Icons.tune_rounded,
+                    ),
+                    const SizedBox(width: 8),
+                    _SoftIconButton(
+                      tooltip: 'Обновить',
+                      onPressed: onRefresh,
+                      icon: Icons.refresh_rounded,
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
-            child: TextField(
-              controller: searchController,
-              onChanged: (_) => onSearchChanged(),
-              decoration: const InputDecoration(
-                hintText: 'Поиск чатов...',
-                prefixIcon: Icon(Icons.search_rounded),
+            child: _GlassSurface(
+              radius: 28,
+              padding: EdgeInsets.zero,
+              color: const Color(0x5C18181B),
+              child: TextField(
+                controller: searchController,
+                onChanged: (_) => onSearchChanged(),
+                decoration: const InputDecoration(
+                  hintText: 'Поиск чатов...',
+                  prefixIcon: Icon(Icons.search_rounded),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                ),
               ),
             ),
           ),
@@ -819,21 +962,25 @@ class _Sidebar extends StatelessWidget {
                         title: 'Чатов пока нет',
                         subtitle: 'Создайте новый чат кнопкой сверху.',
                       )
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 18),
-                        itemBuilder: (context, index) {
-                          final chat = chats[index];
-                          return _ChatTile(
-                            chat: chat,
-                            serverUrl: serverUrl,
-                            selected: chat.id == activeChatId,
-                            onlineUserIds: onlineUserIds,
-                            currentUserId: user.id,
-                            onTap: () => onSelectChat(chat.id),
-                          );
-                        },
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemCount: chats.length,
+                    : Scrollbar(
+                        thumbVisibility: false,
+                        child: ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 18),
+                          itemBuilder: (context, index) {
+                            final chat = chats[index];
+                            return _ChatTile(
+                              chat: chat,
+                              serverUrl: serverUrl,
+                              selected: chat.id == activeChatId,
+                              onlineUserIds: onlineUserIds,
+                              currentUserId: user.id,
+                              onTap: () => onSelectChat(chat.id),
+                            );
+                          },
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 8),
+                          itemCount: chats.length,
+                        ),
                       ),
           ),
         ],
@@ -866,119 +1013,171 @@ class _ChatTile extends StatelessWidget {
         chat.participantIds.any(
           (id) => id != currentUserId && onlineUserIds.contains(id),
         );
-    return Material(
-      color: selected ? panelStrong : Colors.transparent,
-      borderRadius: BorderRadius.circular(22),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: selected
-                  ? accent.withValues(alpha: 0.28)
-                  : Colors.transparent,
-            ),
-          ),
-          child: Row(
-            children: [
-              Stack(
-                children: [
-                  BrenksAvatar(
-                    title: chat.title,
-                    imageUrl: chat.avatarUrl,
-                    baseUrl: serverUrl,
-                    size: 52,
-                  ),
-                  if (peerOnline)
-                    Positioned(
-                      right: 1,
-                      bottom: 1,
-                      child: Container(
-                        width: 13,
-                        height: 13,
-                        decoration: BoxDecoration(
-                          color: accent,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: const Color(0xFF22262E),
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                    ),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: selected
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFF3F4A59).withValues(alpha: 0.98),
+                  const Color(0xFF333943).withValues(alpha: 0.94),
+                ],
+              )
+            : LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withValues(alpha: 0.035),
+                  Colors.white.withValues(alpha: 0.012),
                 ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        border: Border.all(
+          color: selected
+              ? accent.withValues(alpha: 0.26)
+              : Colors.white.withValues(alpha: 0.055),
+        ),
+        boxShadow: selected
+            ? [
+                BoxShadow(
+                  color: accent.withValues(alpha: 0.08),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.14),
+                  blurRadius: 24,
+                  offset: const Offset(0, 12),
+                ),
+              ]
+            : const [],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(24),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(24),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Stack(
                   children: [
-                    Row(
-                      children: [
-                        if (chat.pinnedToTop) ...[
-                          const Icon(Icons.push_pin_rounded,
-                              size: 15, color: muted),
-                          const SizedBox(width: 4),
-                        ],
-                        Expanded(
-                          child: Text(
-                            chat.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
+                    BrenksAvatar(
+                      title: chat.title,
+                      imageUrl: chat.avatarUrl,
+                      baseUrl: serverUrl,
+                      size: 52,
+                    ),
+                    if (peerOnline)
+                      Positioned(
+                        right: 1,
+                        bottom: 1,
+                        child: Container(
+                          width: 13,
+                          height: 13,
+                          decoration: BoxDecoration(
+                            color: accent,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(0xFF22262E),
+                              width: 2,
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _lastMessageLabel(chat.lastMessage?.text),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: muted),
-                    ),
+                      ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (chat.lastMessage != null)
-                    Text(
-                      _formatTime(chat.lastMessage!.time),
-                      style: const TextStyle(color: muted, fontSize: 12),
-                    ),
-                  if (unread > 0) ...[
-                    const SizedBox(height: 7),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          if (chat.pinnedToTop) ...[
+                            const Icon(
+                              Icons.push_pin_rounded,
+                              size: 15,
+                              color: muted,
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                          Expanded(
+                            child: Text(
+                              chat.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      decoration: BoxDecoration(
-                        color: accent,
-                        borderRadius: BorderRadius.circular(999),
+                      const SizedBox(height: 4),
+                      Text(
+                        _lastMessageLabel(chat.lastMessage?.text),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color:
+                              selected ? text.withValues(alpha: 0.74) : muted,
+                        ),
                       ),
-                      child: Text(
-                        unread > 99 ? '99+' : '$unread',
-                        style: const TextStyle(
-                          color: Color(0xFF08131A),
-                          fontWeight: FontWeight.w900,
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (chat.lastMessage != null)
+                      Text(
+                        _formatTime(chat.lastMessage!.time),
+                        style: TextStyle(
+                          color:
+                              selected ? text.withValues(alpha: 0.66) : muted,
                           fontSize: 12,
                         ),
                       ),
-                    ),
+                    if (unread > 0) ...[
+                      const SizedBox(height: 7),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: accent,
+                          borderRadius: BorderRadius.circular(999),
+                          boxShadow: [
+                            BoxShadow(
+                              color: accent.withValues(alpha: 0.18),
+                              blurRadius: 14,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          unread > 99 ? '99+' : '$unread',
+                          style: const TextStyle(
+                            color: Color(0xFF08131A),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1069,8 +1268,18 @@ class _ChatPane extends StatelessWidget {
       );
     }
 
-    return ColoredBox(
-      color: bg,
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF2C333D),
+            Color(0xFF242B34),
+            Color(0xFF20252D),
+          ],
+        ),
+      ),
       child: Stack(
         children: [
           const Positioned.fill(child: CustomPaint(painter: _PatternPainter())),
@@ -1182,98 +1391,123 @@ class _ChatHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 82,
-      padding: const EdgeInsets.symmetric(horizontal: 22),
-      decoration: const BoxDecoration(
-        color: Color(0xFF202329),
-        border: Border(
-          bottom: BorderSide(color: Color(0xFF323946)),
-        ),
-      ),
-      child: Row(
-        children: [
-          InkWell(
-            onTap: onOpenProfile,
-            customBorder: const CircleBorder(),
-            child: BrenksAvatar(
-              title: chat.title,
-              imageUrl: chat.avatarUrl,
-              baseUrl: serverUrl,
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          height: 82,
+          padding: const EdgeInsets.symmetric(horizontal: 22),
+          decoration: BoxDecoration(
+            color: const Color(0xE0202329),
+            border: Border(
+              bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
             ),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: InkWell(
-              onTap: onOpenProfile,
-              borderRadius: BorderRadius.circular(12),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    chat.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
+          child: Row(
+            children: [
+              InkWell(
+                onTap: onOpenProfile,
+                customBorder: const CircleBorder(),
+                child: BrenksAvatar(
+                  title: chat.title,
+                  imageUrl: chat.avatarUrl,
+                  baseUrl: serverUrl,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: InkWell(
+                  onTap: onOpenProfile,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        chat.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        _chatSubtitle(chat),
+                        style: const TextStyle(color: muted),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              _SoftIconButton(
+                tooltip: 'Аудиозвонок будет следующим этапом',
+                onPressed: null,
+                icon: Icons.call_rounded,
+              ),
+              const SizedBox(width: 8),
+              _SoftIconButton(
+                tooltip: 'Видеозвонок будет следующим этапом',
+                onPressed: null,
+                icon: Icons.videocam_rounded,
+              ),
+              const SizedBox(width: 8),
+              PopupMenuButton<String>(
+                tooltip: 'Меню чата',
+                offset: const Offset(0, 48),
+                onSelected: (value) {
+                  switch (value) {
+                    case 'profile':
+                      onOpenProfile();
+                    case 'mute':
+                      onToggleMute();
+                    case 'pin':
+                      onTogglePinTop();
+                    case 'clear':
+                      onClearChat();
+                    case 'delete':
+                      onDeleteChat();
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(value: 'profile', child: Text('Профиль')),
+                  PopupMenuItem(
+                    value: 'mute',
+                    child:
+                        Text(chat.muted ? 'Включить звук' : 'Выключить звук'),
+                  ),
+                  PopupMenuItem(
+                    value: 'pin',
+                    child: Text(
+                      chat.pinnedToTop ? 'Открепить чат' : 'Закрепить чат',
                     ),
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    _chatSubtitle(chat),
-                    style: const TextStyle(color: muted),
+                  const PopupMenuItem(
+                    value: 'clear',
+                    child: Text('Очистить чат'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Text('Удалить', style: TextStyle(color: danger)),
                   ),
                 ],
-              ),
-            ),
-          ),
-          IconButton(
-            tooltip: 'Аудиозвонок будет следующим этапом',
-            onPressed: null,
-            icon: const Icon(Icons.call_rounded),
-          ),
-          IconButton(
-            tooltip: 'Видеозвонок будет следующим этапом',
-            onPressed: null,
-            icon: const Icon(Icons.videocam_rounded),
-          ),
-          PopupMenuButton<String>(
-            tooltip: 'Меню чата',
-            onSelected: (value) {
-              switch (value) {
-                case 'profile':
-                  onOpenProfile();
-                case 'mute':
-                  onToggleMute();
-                case 'pin':
-                  onTogglePinTop();
-                case 'clear':
-                  onClearChat();
-                case 'delete':
-                  onDeleteChat();
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: 'profile', child: Text('Профиль')),
-              PopupMenuItem(
-                value: 'mute',
-                child: Text(chat.muted ? 'Включить звук' : 'Выключить звук'),
-              ),
-              PopupMenuItem(
-                value: 'pin',
-                child:
-                    Text(chat.pinnedToTop ? 'Открепить чат' : 'Закрепить чат'),
-              ),
-              const PopupMenuItem(value: 'clear', child: Text('Очистить чат')),
-              const PopupMenuItem(
-                value: 'delete',
-                child: Text('Удалить', style: TextStyle(color: danger)),
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.045),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.075),
+                    ),
+                  ),
+                  child: const Icon(Icons.more_vert_rounded, color: muted),
+                ),
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1290,24 +1524,43 @@ class _PinnedBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return _GlassSurface(
       margin: const EdgeInsets.fromLTRB(18, 12, 18, 0),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: panelSoft.withValues(alpha: 0.88),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: accent.withValues(alpha: 0.24)),
-      ),
+      radius: 18,
+      color: const Color(0xA039404C),
       child: Row(
         children: [
-          const Icon(Icons.push_pin_rounded, color: accent, size: 18),
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.13),
+              shape: BoxShape.circle,
+              border: Border.all(color: accent.withValues(alpha: 0.18)),
+            ),
+            child: const Icon(Icons.push_pin_rounded, color: accent, size: 17),
+          ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              _messagePreview(message),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w700),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Закреплено',
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  _messagePreview(message),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ],
             ),
           ),
           IconButton(
@@ -1356,148 +1609,195 @@ class _Composer extends StatelessWidget {
   Widget build(BuildContext context) {
     final modeMessage = editing ?? replyTo;
     final modeTitle = editing != null ? 'Редактирование' : 'Ответ';
-    return Container(
-      padding: const EdgeInsets.fromLTRB(22, 10, 22, 18),
-      decoration: const BoxDecoration(
-        color: Color(0xCC202329),
-        border: Border(top: BorderSide(color: Color(0xFF323946))),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (recordingVoice)
-            Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: danger.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: danger.withValues(alpha: 0.28)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.mic_rounded, color: danger),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Запись голосового... ${_formatDuration(recordingMs)}',
-                      style: const TextStyle(
-                        color: text,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  TextButton.icon(
-                    onPressed: onCancelVoice,
-                    icon: const Icon(Icons.close_rounded),
-                    label: const Text('Отмена'),
-                  ),
-                ],
-              ),
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(22, 10, 22, 18),
+          decoration: BoxDecoration(
+            color: const Color(0xC8202329),
+            border: Border(
+              top: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
             ),
-          if (modeMessage != null)
-            Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-              decoration: BoxDecoration(
-                color: panelSoft,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: border),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 3,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: accent,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          modeTitle,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (recordingVoice)
+                _GlassSurface(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  radius: 18,
+                  color: const Color(0x5C7F1D1D),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: danger.withValues(alpha: 0.14),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.mic_rounded, color: danger),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Запись голосового... ${_formatDuration(recordingMs)}',
                           style: const TextStyle(
-                            color: accent,
+                            color: text,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        Text(
-                          _messagePreview(modeMessage),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: muted),
+                      ),
+                      TextButton.icon(
+                        onPressed: onCancelVoice,
+                        icon: const Icon(Icons.close_rounded),
+                        label: const Text('Отмена'),
+                      ),
+                    ],
+                  ),
+                ),
+              if (modeMessage != null)
+                _GlassSurface(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                  radius: 18,
+                  color: const Color(0x8039404C),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 3,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: accent,
+                          borderRadius: BorderRadius.circular(999),
                         ),
-                      ],
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              modeTitle,
+                              style: const TextStyle(
+                                color: accent,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            Text(
+                              _messagePreview(modeMessage),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: muted),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Отмена',
+                        onPressed: onCancelMode,
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+              _GlassSurface(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                radius: 34,
+                color: const Color(0xB827272A),
+                child: Row(
+                  children: [
+                    _SoftIconButton(
+                      tooltip: 'Прикрепить файл',
+                      onPressed:
+                          sendingMedia || recordingVoice ? null : onAttach,
+                      icon: Icons.attach_file_rounded,
                     ),
-                  ),
-                  IconButton(
-                    tooltip: 'Отмена',
-                    onPressed: onCancelMode,
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
-            ),
-          Row(
-            children: [
-              IconButton(
-                tooltip: 'Прикрепить файл',
-                onPressed: sendingMedia || recordingVoice ? null : onAttach,
-                icon: sendingMedia
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.attach_file_rounded),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  minLines: 1,
-                  maxLines: 5,
-                  enabled: !recordingVoice,
-                  onChanged: (value) => onTyping(value.trim().isNotEmpty),
-                  onSubmitted: (_) => onSend(),
-                  decoration: const InputDecoration(
-                    hintText: 'Сообщение',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              IconButton.filledTonal(
-                tooltip: recordingVoice
-                    ? 'Отправить голосовое'
-                    : 'Записать голосовое',
-                onPressed: recordingVoice ? onFinishVoice : onStartVoice,
-                icon: Icon(
-                  recordingVoice ? Icons.check_rounded : Icons.mic_rounded,
-                ),
-              ),
-              const SizedBox(width: 10),
-              FilledButton(
-                onPressed: recordingVoice ? null : onSend,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(54, 54),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  backgroundColor: accent,
-                  foregroundColor: const Color(0xFF08131A),
-                ),
-                child: Icon(
-                  editing != null ? Icons.check_rounded : Icons.send_rounded,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: controller,
+                        minLines: 1,
+                        maxLines: 5,
+                        enabled: !recordingVoice,
+                        onChanged: (value) => onTyping(value.trim().isNotEmpty),
+                        onSubmitted: (_) => onSend(),
+                        decoration: InputDecoration(
+                          hintText: 'Сообщение',
+                          filled: true,
+                          fillColor: const Color(0x8018181B),
+                          suffixIcon: sendingMedia
+                              ? const Padding(
+                                  padding: EdgeInsets.all(14),
+                                  child: SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                )
+                              : null,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(26),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(26),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(26),
+                            borderSide: BorderSide(
+                              color: accent.withValues(alpha: 0.18),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    _SoftIconButton(
+                      tooltip: recordingVoice
+                          ? 'Отправить голосовое'
+                          : 'Записать голосовое',
+                      onPressed: recordingVoice ? onFinishVoice : onStartVoice,
+                      icon: recordingVoice
+                          ? Icons.check_rounded
+                          : Icons.mic_rounded,
+                      active: recordingVoice,
+                    ),
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      width: 52,
+                      height: 52,
+                      child: FilledButton(
+                        onPressed: recordingVoice ? null : onSend,
+                        style: FilledButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          shape: const CircleBorder(),
+                          backgroundColor: accent,
+                          foregroundColor: const Color(0xFF08131A),
+                          disabledBackgroundColor:
+                              Colors.white.withValues(alpha: 0.08),
+                        ),
+                        child: Icon(
+                          editing != null
+                              ? Icons.check_rounded
+                              : Icons.send_rounded,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1544,18 +1844,42 @@ class _MessageBubble extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.fromLTRB(16, 12, 14, 10),
                 decoration: BoxDecoration(
-                  color: own ? const Color(0xFF3B5568) : panelSoft,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: own
+                        ? [
+                            const Color(0xFF4D6578).withValues(alpha: 0.98),
+                            const Color(0xFF3B4D5D).withValues(alpha: 0.98),
+                          ]
+                        : [
+                            const Color(0xFF525B6A).withValues(alpha: 0.98),
+                            const Color(0xFF424A58).withValues(alpha: 0.98),
+                          ],
+                  ),
                   borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(20),
-                    topRight: const Radius.circular(20),
-                    bottomLeft: Radius.circular(own ? 20 : 6),
-                    bottomRight: Radius.circular(own ? 6 : 20),
+                    topLeft: const Radius.circular(22),
+                    topRight: const Radius.circular(22),
+                    bottomLeft: Radius.circular(own ? 22 : 7),
+                    bottomRight: Radius.circular(own ? 7 : 22),
                   ),
                   border: Border.all(
                     color: own
-                        ? accent.withValues(alpha: 0.2)
-                        : Colors.white.withValues(alpha: 0.06),
+                        ? accent.withValues(alpha: 0.16)
+                        : Colors.white.withValues(alpha: 0.1),
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      blurRadius: 22,
+                      offset: const Offset(0, 12),
+                    ),
+                    BoxShadow(
+                      color: Colors.white.withValues(alpha: 0.055),
+                      blurRadius: 0,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -1598,9 +1922,11 @@ class _MessageBubble extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: panelStrong,
+                        color: const Color(0xCC303844),
                         borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: border),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.08),
+                        ),
                       ),
                       child: Text('${entry.key} ${entry.value.length}'),
                     );
@@ -1754,14 +2080,11 @@ class _MediaPreview extends StatelessWidget {
     final label = switch (media.kind) {
       _ => media.fileName ?? 'Файл',
     };
-    return Container(
+    return _GlassSurface(
       width: 260,
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF242A33),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: border),
-      ),
+      radius: 18,
+      color: const Color(0xA8242A33),
       child: Row(
         children: [
           Container(
@@ -1799,14 +2122,11 @@ class _VoicePreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return _GlassSurface(
       width: 286,
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF242A33),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: border),
-      ),
+      radius: 20,
+      color: const Color(0xAA242A33),
       child: Row(
         children: [
           IconButton.filled(
@@ -1831,7 +2151,7 @@ class _VoicePreview extends StatelessWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(999),
                   child: LinearProgressIndicator(
-                    minHeight: 5,
+                    minHeight: 6,
                     value: 0.44,
                     backgroundColor: Colors.white.withValues(alpha: 0.08),
                     valueColor: AlwaysStoppedAnimation<Color>(
@@ -1860,14 +2180,11 @@ class _VideoNotePreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 220,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF242A33),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: border),
-      ),
+    return _GlassSurface(
+      width: 190,
+      padding: const EdgeInsets.all(12),
+      radius: 30,
+      color: const Color(0x94242A33),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1942,14 +2259,22 @@ class _ImagePreview extends StatelessWidget {
           _openNetworkImageViewer(context, url!);
         }
       },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 320),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 18,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
         child: bytes != null
-            ? Image.memory(
-                bytes,
-                width: 320,
-                fit: BoxFit.cover,
-              )
+            ? Image.memory(bytes, width: 320, fit: BoxFit.cover)
             : Image.network(
                 url!,
                 width: 320,

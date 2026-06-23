@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 
-const bg = Color(0xFF20242B);
-const panel = Color(0xFF272C35);
-const panelSoft = Color(0xFF303744);
-const panelStrong = Color(0xFF3A4352);
-const text = Color(0xFFF4F7FB);
-const muted = Color(0xFFABB5C4);
-const border = Color(0xFF465061);
-const accent = Color(0xFF5CC8F5);
+const bg = Color(0xFF23272F);
+const panel = Color(0xFF2D323C);
+const panelSoft = Color(0xFF39404C);
+const panelStrong = Color(0xFF48505E);
+const text = Color(0xFFF1F5F9);
+const muted = Color(0xFFB2BBC8);
+const border = Color(0xFF4B525E);
+const accent = Color(0xFF7DD3FC);
+const hover = Color(0xFF39404C);
+const bubbleIn = Color(0xFF48505E);
+const bubbleOut = Color(0xFF435260);
 const danger = Color(0xFFFF7474);
 
 ThemeData buildBrenksTheme() {
@@ -27,26 +30,53 @@ ThemeData buildBrenksTheme() {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: const Color(0xFF1D2027),
-      hintStyle: const TextStyle(color: Color(0xFF7F8CA0)),
+      fillColor: const Color(0x8018181B),
+      hintStyle: const TextStyle(color: Color(0xFF71717A)),
       labelStyle: const TextStyle(color: muted),
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
-        borderSide: const BorderSide(color: Color(0xFF3A4250)),
+        borderRadius: BorderRadius.circular(20),
+        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
-        borderSide: const BorderSide(color: accent, width: 1.4),
+        borderRadius: BorderRadius.circular(20),
+        borderSide:
+            BorderSide(color: accent.withValues(alpha: 0.18), width: 1.4),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         borderSide: const BorderSide(color: danger),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         borderSide: const BorderSide(color: danger, width: 1.4),
       ),
+    ),
+    iconButtonTheme: IconButtonThemeData(
+      style: IconButton.styleFrom(
+        foregroundColor: muted,
+        shape: const CircleBorder(),
+      ),
+    ),
+    popupMenuTheme: PopupMenuThemeData(
+      color: const Color(0xF227272A),
+      elevation: 18,
+      shadowColor: Colors.black.withValues(alpha: 0.35),
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+    ),
+    dividerTheme: DividerThemeData(
+      color: Colors.white.withValues(alpha: 0.08),
+      thickness: 1,
+    ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: const Color(0xF227272A),
+      contentTextStyle: const TextStyle(color: text),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
     ),
   );
 }

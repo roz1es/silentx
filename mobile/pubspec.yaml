@@ -1,0 +1,29 @@
+name: brenkschat_mobile
+description: Мобильный клиент BrenksChat для Android и iOS (Flutter).
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+# Версии зависимостей совпадают с desktop-клиентом (desktop/pubspec.yaml),
+# чтобы общий код вёл себя одинаково на всех платформах.
+dependencies:
+  audioplayers: ^6.5.1
+  file_picker: ^11.0.2
+  flutter:
+    sdk: flutter
+  http: ^1.2.2
+  mime: ^2.0.0
+  path_provider: ^2.1.5
+  record: ^6.1.2
+  shared_preferences: ^2.3.2
+  socket_io_client: ^3.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

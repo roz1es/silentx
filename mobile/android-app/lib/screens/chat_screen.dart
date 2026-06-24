@@ -5,6 +5,7 @@ import 'dart:io' as io;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:mime/mime.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../format.dart';
 import '../models.dart';
@@ -45,6 +46,7 @@ class _ChatScreenState extends State<ChatScreen> {
   int _recordingMs = 0;
   Timer? _recordingTimer;
   int _lastTick = -1;
+  int _bgIndex = 0;
 
   MessengerController get _controller => widget.controller;
 
@@ -57,6 +59,7 @@ class _ChatScreenState extends State<ChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(_controller.openChat(widget.chatId));
     });
+    _loadBg();
   }
 
   @override
@@ -68,6 +71,18 @@ class _ChatScreenState extends State<ChatScreen> {
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadBg() async {
+    final prefs = await SharedPreferences.getInstance();
+    final val = prefs.getInt('chat_bg_${widget.chatId}') ?? 0;
+    if (mounted) setState(() => _bgIndex = val);
+  }
+
+  Future<void> _saveBg(int idx) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('chat_bg_${widget.chatId}', idx);
+    if (mounted) setState(() => _bgIndex = idx);
   }
 
   void _onControllerChanged() {
@@ -300,8 +315,12 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: Stack(
               children: [
-                const Positioned.fill(
-                  child: CustomPaint(painter: _PatternPainter()),
+                Positioned.fill(
+                  child: _bgIndex == 5
+                      ? const SizedBox.shrink()
+                      : _bgIndex == 0
+                          ? const CustomPaint(painter: _PatternPainter())
+                          : Container(decoration: BoxDecoration(gradient: _bgGradient(_bgIndex))),
                 ),
                 _controller.loadingMessages
                     ? const Center(child: CircularProgressIndicator())
@@ -416,6 +435,7 @@ class _ChatScreenState extends State<ChatScreen> {
           onSelected: (value) => _onMenu(value, chat),
           itemBuilder: (context) => [
             const PopupMenuItem(value: 'profile', child: Text('Профиль')),
+            const PopupMenuItem(value: 'bg', child: Text('Изменить фон')),
             PopupMenuItem(
               value: 'mute',
               child: Text(chat.muted ? 'Включить звук' : 'Выключить звук'),
@@ -439,6 +459,8 @@ class _ChatScreenState extends State<ChatScreen> {
     switch (value) {
       case 'profile':
         _openProfile(chat);
+      case 'bg':
+        _pickBackground();
       case 'mute':
         await _controller.toggleMute(chat);
       case 'pin':
@@ -455,10 +477,121 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  void _openProfile(Chat chat) {
+  void _pickBackground() {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    const options = [
+      ('По умолчанию', 0),
+      ('Синий', 1),
+      ('Фиолетовый', 2),
+      ('Тёмный', 3),
+      ('Зелёный', 4),
+      ('Без фона', 5),
+    ];
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: panel,
+      backgroundColor: isLight ? Colors.white : panel,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: Text('Фон чата',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+              ),
+              GridView.count(
+                crossAxisCount: 3,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 1.4,
+                children: options.map(((String label, int idx) opt) {
+                  final selected = _bgIndex == opt.$2;
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.pop(context);
+                      _saveBg(opt.$2);
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: selected ? accent : (isLight ? const Color(0xFFD4DAE3) : border),
+                          width: selected ? 2.5 : 1,
+                        ),
+                        gradient: _bgGradient(opt.$2),
+                        color: opt.$2 == 5
+                            ? (isLight ? const Color(0xFFF3F5F8) : bg)
+                            : null,
+                      ),
+                      child: Center(
+                        child: Text(
+                          opt.$1,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: opt.$2 >= 1 && opt.$2 <= 4
+                                ? Colors.white
+                                : (isLight ? const Color(0xFF17202B) : text),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static LinearGradient? _bgGradient(int idx) {
+    switch (idx) {
+      case 1:
+        return const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1A3A5C), Color(0xFF0D2137)],
+        );
+      case 2:
+        return const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF2D1B69), Color(0xFF1A0A3C)],
+        );
+      case 3:
+        return const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1C2128), Color(0xFF0D1117)],
+        );
+      case 4:
+        return const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1B3A2D), Color(0xFF0A2218)],
+        );
+      default:
+        return null;
+    }
+  }
+
+  void _openProfile(Chat chat) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: isLight ? Colors.white : panel,
       showDragHandle: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),

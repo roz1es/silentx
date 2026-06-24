@@ -41,6 +41,14 @@ class MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final ownBg = isLight ? const Color(0xFFD0EAFE) : const Color(0xFF3B5568);
+    final otherBg = isLight ? Colors.white : panelSoft;
+    final ownBorder = isLight ? const Color(0xFFADD4F7) : accent.withValues(alpha: 0.2);
+    final otherBorder = isLight ? const Color(0xFFE2E7EF) : Colors.white.withValues(alpha: 0.06);
+    final msgTextColor = isLight ? const Color(0xFF17202B) : text;
+    final timeColor = isLight ? const Color(0xFF8A9BB0) : muted;
+
     return GestureDetector(
       onLongPress: () => _openMenu(context),
       child: Align(
@@ -57,18 +65,14 @@ class MessageBubble extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
                 decoration: BoxDecoration(
-                  color: own ? const Color(0xFF3B5568) : panelSoft,
+                  color: own ? ownBg : otherBg,
                   borderRadius: BorderRadius.only(
                     topLeft: const Radius.circular(18),
                     topRight: const Radius.circular(18),
                     bottomLeft: Radius.circular(own ? 18 : 6),
                     bottomRight: Radius.circular(own ? 6 : 18),
                   ),
-                  border: Border.all(
-                    color: own
-                        ? accent.withValues(alpha: 0.2)
-                        : Colors.white.withValues(alpha: 0.06),
-                  ),
+                  border: Border.all(color: own ? ownBorder : otherBorder),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -87,28 +91,27 @@ class MessageBubble extends StatelessWidget {
                         ),
                       ),
                     if (replyPreview != null && !message.deleted)
-                      _ReplyChip(preview: replyPreview!),
-                    _content(),
+                      _ReplyChip(preview: replyPreview!, isLight: isLight),
+                    _content(msgTextColor, timeColor),
                     const SizedBox(height: 4),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         if (message.editedAt != null && !message.deleted) ...[
-                          const Text('изм.',
-                              style: TextStyle(color: muted, fontSize: 11)),
+                          Text('изм.', style: TextStyle(color: timeColor, fontSize: 11)),
                           const SizedBox(width: 6),
                         ],
                         Text(
                           formatTime(message.createdAt),
-                          style: const TextStyle(color: muted, fontSize: 11),
+                          style: TextStyle(color: timeColor, fontSize: 11),
                         ),
                       ],
                     ),
                   ],
                 ),
               ),
-              if (message.reactions.isNotEmpty) _reactions(),
+              if (message.reactions.isNotEmpty) _reactions(isLight),
             ],
           ),
         ),
@@ -116,15 +119,11 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _content() {
+  Widget _content(Color textColor, Color mutedColor) {
     if (message.deleted) {
-      return const Text(
+      return Text(
         'Сообщение удалено',
-        style: TextStyle(
-          color: muted,
-          fontSize: 15,
-          fontStyle: FontStyle.italic,
-        ),
+        style: TextStyle(color: mutedColor, fontSize: 15, fontStyle: FontStyle.italic),
       );
     }
 
@@ -140,15 +139,15 @@ class MessageBubble extends StatelessWidget {
           ImagePreview(source: message.imageUrl!, serverUrl: serverUrl),
         if (body.isNotEmpty) ...[
           if (hasMedia) const SizedBox(height: 8),
-          Text(body, style: const TextStyle(color: text, fontSize: 15.5)),
+          Text(body, style: TextStyle(color: textColor, fontSize: 15.5)),
         ],
         if (!hasMedia && body.isEmpty)
-          const Text('Сообщение', style: TextStyle(color: text, fontSize: 15.5)),
+          Text('Сообщение', style: TextStyle(color: textColor, fontSize: 15.5)),
       ],
     );
   }
 
-  Widget _reactions() {
+  Widget _reactions(bool isLight) {
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: Wrap(
@@ -156,20 +155,23 @@ class MessageBubble extends StatelessWidget {
         runSpacing: 4,
         children: message.reactions.entries.map((entry) {
           final reacted = entry.value.contains(currentUserId);
+          final reactBg = reacted
+              ? accent.withValues(alpha: 0.22)
+              : (isLight ? const Color(0xFFE8EEF5) : panelStrong);
+          final reactBorder = reacted ? accent : (isLight ? const Color(0xFFD4DAE3) : border);
+          final reactText = isLight ? const Color(0xFF17202B) : text;
           return GestureDetector(
             onTap: () => onReaction(entry.key),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: reacted ? accent.withValues(alpha: 0.22) : panelStrong,
+                color: reactBg,
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: reacted ? accent : border,
-                ),
+                border: Border.all(color: reactBorder),
               ),
               child: Text(
                 '${entry.key} ${entry.value.length}',
-                style: const TextStyle(fontSize: 13, color: text),
+                style: TextStyle(fontSize: 13, color: reactText),
               ),
             ),
           );
@@ -179,9 +181,12 @@ class MessageBubble extends StatelessWidget {
   }
 
   Future<void> _openMenu(BuildContext context) async {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final sheetBg = isLight ? Colors.white : panel;
+    final actionColor = isLight ? const Color(0xFF17202B) : text;
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: panel,
+      backgroundColor: sheetBg,
       showDragHandle: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -211,27 +216,27 @@ class MessageBubble extends StatelessWidget {
                     }).toList(growable: false),
                   ),
                 ),
-              const Divider(height: 1, color: border),
-              _action(sheetContext, Icons.reply_rounded, 'Ответить', onReply),
+              Divider(height: 1, color: isLight ? const Color(0xFFE2E7EF) : border),
+              _action(sheetContext, Icons.reply_rounded, 'Ответить', onReply, actionColor),
               if (own && !message.deleted)
-                _action(sheetContext, Icons.edit_rounded, 'Изменить', onEdit),
+                _action(sheetContext, Icons.edit_rounded, 'Изменить', onEdit, actionColor),
               if (!message.deleted)
                 _action(
                   sheetContext,
                   Icons.copy_rounded,
                   'Копировать текст',
-                  () => Clipboard.setData(
-                      ClipboardData(text: message.text.trim())),
+                  () => Clipboard.setData(ClipboardData(text: message.text.trim())),
+                  actionColor,
                 ),
               if (!message.deleted)
-                _action(sheetContext, Icons.push_pin_rounded, 'Закрепить', onPin),
+                _action(sheetContext, Icons.push_pin_rounded, 'Закрепить', onPin, actionColor),
               if (own)
                 _action(
                   sheetContext,
                   Icons.delete_outline_rounded,
                   'Удалить',
                   onDelete,
-                  isDanger: true,
+                  danger,
                 ),
             ],
           ),
@@ -244,10 +249,9 @@ class MessageBubble extends StatelessWidget {
     BuildContext sheetContext,
     IconData icon,
     String label,
-    VoidCallback onTap, {
-    bool isDanger = false,
-  }) {
-    final color = isDanger ? danger : text;
+    VoidCallback onTap,
+    Color color,
+  ) {
     return ListTile(
       leading: Icon(icon, color: color),
       title: Text(label, style: TextStyle(color: color)),
@@ -260,9 +264,10 @@ class MessageBubble extends StatelessWidget {
 }
 
 class _ReplyChip extends StatelessWidget {
-  const _ReplyChip({required this.preview});
+  const _ReplyChip({required this.preview, required this.isLight});
 
   final String preview;
+  final bool isLight;
 
   @override
   Widget build(BuildContext context) {
@@ -270,7 +275,9 @@ class _ReplyChip extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.18),
+        color: isLight
+            ? const Color(0xFF96BFDF).withValues(alpha: 0.25)
+            : Colors.black.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(10),
         border: Border(left: BorderSide(color: accent, width: 3)),
       ),
@@ -278,7 +285,10 @@ class _ReplyChip extends StatelessWidget {
         preview,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(color: muted, fontSize: 13),
+        style: TextStyle(
+          color: isLight ? const Color(0xFF637083) : muted,
+          fontSize: 13,
+        ),
       ),
     );
   }

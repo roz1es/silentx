@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_theme.dart';
-
 /// Круглый аватар с поддержкой сетевых картинок, data-url и буквы-заглушки.
 class BrenksAvatar extends StatelessWidget {
   const BrenksAvatar({
@@ -17,23 +15,43 @@ class BrenksAvatar extends StatelessWidget {
   final String? baseUrl;
   final double size;
 
+  static const _palette = [
+    Color(0xFF5CC8F5),
+    Color(0xFF4CAF50),
+    Color(0xFFFF9800),
+    Color(0xFFE91E63),
+    Color(0xFF9C27B0),
+    Color(0xFFFF5722),
+    Color(0xFF00BCD4),
+    Color(0xFF3F51B5),
+    Color(0xFF009688),
+    Color(0xFF8BC34A),
+  ];
+
+  Color _avatarColor() {
+    if (title.trim().isEmpty) return _palette[0];
+    final code = title.trim().codeUnitAt(0);
+    return _palette[code % _palette.length];
+  }
+
   @override
   Widget build(BuildContext context) {
     final first = title.trim().isEmpty ? 'B' : title.trim()[0].toUpperCase();
     final url = _resolveUrl(imageUrl, baseUrl);
+    final color = _avatarColor();
     return Container(
       width: size,
       height: size,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: accent.withValues(alpha: 0.9),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+        color: color,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.16),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: color.withValues(alpha: 0.35),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),

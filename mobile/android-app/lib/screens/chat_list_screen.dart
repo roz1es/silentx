@@ -92,9 +92,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Future<void> _chatOptions(Chat chat) async {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: panel,
+      backgroundColor: isLight ? Colors.white : panel,
       showDragHandle: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -138,10 +139,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   void _openAccount() {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final surfaceBg = isLight ? Colors.white : panel;
+    final cardColor = isLight ? const Color(0xFFF3F5F8) : panelSoft.withValues(alpha: 0.64);
+    final cardBorder = isLight ? const Color(0xFFD4DAE3) : border;
     final user = _controller.currentUser;
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: panel,
+      backgroundColor: surfaceBg,
       showDragHandle: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -176,13 +181,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           ),
                         ),
                         Text('@${user.username}',
-                            style: const TextStyle(color: muted)),
+                            style: TextStyle(color: isLight ? const Color(0xFF637083) : muted)),
                         if (user.email?.isNotEmpty == true)
                           Text(
                             user.email!,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: muted, fontSize: 13),
+                            style: TextStyle(color: isLight ? const Color(0xFF637083) : muted, fontSize: 13),
                           ),
                       ],
                     ),
@@ -193,9 +198,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: panelSoft.withValues(alpha: 0.64),
+                  color: cardColor,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: border),
+                  border: Border.all(color: cardBorder),
                 ),
                 child: Row(
                   children: [

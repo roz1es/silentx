@@ -176,28 +176,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
-  Widget _circleAction({
-    required String tooltip,
-    required IconData icon,
-    required VoidCallback onTap,
-    required bool isLight,
-    bool accented = false,
-  }) {
-    final fg = accented ? accent : (isLight ? lightText : text);
-    return IconButton(
-      tooltip: tooltip,
-      onPressed: onTap,
-      icon: Icon(icon, color: fg, size: 22),
-      style: IconButton.styleFrom(
-        backgroundColor: accented
-            ? accent.withValues(alpha: isLight ? 0.16 : 0.18)
-            : Colors.white.withValues(alpha: isLight ? 0.55 : 0.08),
-        shape: const CircleBorder(),
-        minimumSize: const Size(42, 42),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
@@ -278,7 +256,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 ],
               ),
         actions: [
-          _circleAction(
+          _AnimatedCircleAction(
             tooltip: _searching ? 'Закрыть поиск' : 'Поиск',
             icon: _searching ? Icons.close_rounded : Icons.search_rounded,
             onTap: () => setState(() {
@@ -288,7 +266,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
             isLight: isLight,
           ),
           const SizedBox(width: 6),
-          _circleAction(
+          _AnimatedCircleAction(
             tooltip: 'Новый чат',
             icon: Icons.maps_ugc_rounded,
             onTap: _newChat,
@@ -848,6 +826,80 @@ class _ProfileSheetState extends State<_ProfileSheet> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Анимированная круглая кнопка AppBar ──────────────────────────────────
+
+class _AnimatedCircleAction extends StatefulWidget {
+  const _AnimatedCircleAction({
+    required this.tooltip,
+    required this.icon,
+    required this.onTap,
+    required this.isLight,
+    this.accented = false,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool isLight;
+  final bool accented;
+
+  @override
+  State<_AnimatedCircleAction> createState() => _AnimatedCircleActionState();
+}
+
+class _AnimatedCircleActionState extends State<_AnimatedCircleAction> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed != value) setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = widget.accented
+        ? accent
+        : (widget.isLight ? lightText : text);
+    final bg = widget.accented
+        ? accent.withValues(alpha: widget.isLight ? 0.16 : 0.18)
+        : Colors.white.withValues(alpha: widget.isLight ? 0.55 : 0.08);
+    return Tooltip(
+      message: widget.tooltip,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => _setPressed(true),
+        onTapUp: (_) => _setPressed(false),
+        onTapCancel: () => _setPressed(false),
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: _pressed ? 0.82 : 1.0,
+          duration: const Duration(milliseconds: 130),
+          curve: Curves.easeOut,
+          child: Container(
+            width: 42,
+            height: 42,
+            margin: const EdgeInsets.symmetric(vertical: 7),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              transitionBuilder: (child, animation) => RotationTransition(
+                turns: Tween<double>(begin: 0.5, end: 1.0).animate(animation),
+                child: ScaleTransition(scale: animation, child: child),
+              ),
+              child: Icon(
+                widget.icon,
+                key: ValueKey(widget.icon.codePoint),
+                color: fg,
+                size: 22,
+              ),
+            ),
+          ),
         ),
       ),
     );

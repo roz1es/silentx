@@ -48,14 +48,7 @@ class BrenksAvatar extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: color,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.22), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.35),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 1),
       ),
       child: _image(url, first),
     );

@@ -79,8 +79,95 @@ class _NewChatSheetState extends State<_NewChatSheet> {
     );
   }
 
+  static const _types = [
+    (ChatType.direct, 'Личный', Icons.person_rounded),
+    (ChatType.group, 'Группа', Icons.groups_rounded),
+    (ChatType.channel, 'Канал', Icons.campaign_rounded),
+  ];
+
+  /// Переключатель типа чата со скользящим индикатором — как на экране входа.
+  Widget _typeSwitch(bool isLight) {
+    final index = _types.indexWhere((e) => e.$1 == _type);
+    final alignX = (index / (_types.length - 1)) * 2 - 1;
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: (isLight ? Colors.black : Colors.white).withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Stack(
+        children: [
+          // Скользящий индикатор
+          AnimatedAlign(
+            alignment: Alignment(alignX, 0),
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOutCubic,
+            child: FractionallySizedBox(
+              widthFactor: 1 / _types.length,
+              child: Container(
+                height: 44,
+                decoration: BoxDecoration(
+                  color: isLight ? Colors.white : panelStrong,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              for (final item in _types) _typeTab(item.$1, item.$2, item.$3, isLight),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _typeTab(ChatType type, String label, IconData icon, bool isLight) {
+    final selected = _type == type;
+    final selectedColor = isLight ? const Color(0xFF1A1A2E) : text;
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => setState(() {
+          _type = type;
+          _selected = {};
+        }),
+        child: SizedBox(
+          height: 44,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: selected ? selectedColor : muted),
+              const SizedBox(width: 6),
+              Flexible(
+                child: AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 200),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13.5,
+                    color: selected ? selectedColor : muted,
+                  ),
+                  child: Text(label, overflow: TextOverflow.ellipsis),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final query = _searchController.text.trim().toLowerCase();
     final users = query.isEmpty
         ? widget.users
@@ -124,30 +211,7 @@ class _NewChatSheetState extends State<_NewChatSheet> {
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: SegmentedButton<ChatType>(
-              segments: const [
-                ButtonSegment(
-                  value: ChatType.direct,
-                  label: Text('Личный'),
-                  icon: Icon(Icons.person_rounded, size: 18),
-                ),
-                ButtonSegment(
-                  value: ChatType.group,
-                  label: Text('Группа'),
-                  icon: Icon(Icons.groups_rounded, size: 18),
-                ),
-                ButtonSegment(
-                  value: ChatType.channel,
-                  label: Text('Канал'),
-                  icon: Icon(Icons.campaign_rounded, size: 18),
-                ),
-              ],
-              selected: {_type},
-              onSelectionChanged: (value) => setState(() {
-                _type = value.first;
-                _selected = {};
-              }),
-            ),
+            child: _typeSwitch(isLight),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),

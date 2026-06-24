@@ -191,12 +191,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
+        toolbarHeight: 70,
         flexibleSpace: const GlassBar(bottomBorder: true),
         leading: Padding(
-          padding: const EdgeInsets.only(left: 12),
+          padding: const EdgeInsets.only(left: 12, top: 6),
           child: Align(
-            // Чуть ниже центра — иначе аватар прижат к статус-бару.
-            alignment: const Alignment(0, 0.45),
+            // Ниже центра — иначе аватар прижат к статус-бару.
+            alignment: const Alignment(0, 0.6),
             child: InkWell(
               onTap: _openAccount,
               customBorder: const CircleBorder(),
@@ -468,12 +469,12 @@ class _ProfileSheetState extends State<_ProfileSheet> {
   Widget build(BuildContext context) {
     final user = _ctrl.currentUser;
     return DraggableScrollableSheet(
-      initialChildSize: 0.94,
-      maxChildSize: 0.98,
+      initialChildSize: 1.0,
+      maxChildSize: 1.0,
       minChildSize: 0.5,
       expand: false,
       builder: (_, scrollCtrl) => ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         child: Stack(
           children: [
             const Positioned.fill(
@@ -862,19 +863,19 @@ class _AnimatedCircleActionState extends State<_AnimatedCircleAction>
     with SingleTickerProviderStateMixin {
   late final AnimationController _tap = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 360),
+    duration: const Duration(milliseconds: 240),
   );
-  // Одноразовый «отскок» при нажатии: 1 → 1.3 → 1. В покое кнопка статична.
+  // Одноразовый мягкий «поп» при нажатии: 1 → 1.12 → 1. В покое кнопка статична.
   late final Animation<double> _bounce = TweenSequence<double>([
     TweenSequenceItem(
-      tween: Tween(begin: 1.0, end: 1.30)
+      tween: Tween(begin: 1.0, end: 1.12)
           .chain(CurveTween(curve: Curves.easeOut)),
-      weight: 35,
+      weight: 45,
     ),
     TweenSequenceItem(
-      tween: Tween(begin: 1.30, end: 1.0)
-          .chain(CurveTween(curve: Curves.elasticOut)),
-      weight: 65,
+      tween: Tween(begin: 1.12, end: 1.0)
+          .chain(CurveTween(curve: Curves.easeIn)),
+      weight: 55,
     ),
   ]).animate(_tap);
 

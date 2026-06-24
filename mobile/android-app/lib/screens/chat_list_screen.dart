@@ -194,10 +194,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
         flexibleSpace: const GlassBar(bottomBorder: true),
         leading: Padding(
           padding: const EdgeInsets.only(left: 12),
-          child: InkWell(
-            onTap: _openAccount,
-            customBorder: const CircleBorder(),
-            child: Center(
+          child: Align(
+            // Чуть ниже центра — иначе аватар прижат к статус-бару.
+            alignment: const Alignment(0, 0.45),
+            child: InkWell(
+              onTap: _openAccount,
+              customBorder: const CircleBorder(),
               child: BrenksAvatar(
                 title: _controller.currentUser.title,
                 imageUrl: _controller.currentUser.avatarUrl,
@@ -466,36 +468,38 @@ class _ProfileSheetState extends State<_ProfileSheet> {
   Widget build(BuildContext context) {
     final user = _ctrl.currentUser;
     return DraggableScrollableSheet(
-      initialChildSize: 0.86,
-      maxChildSize: 0.96,
+      initialChildSize: 0.94,
+      maxChildSize: 0.98,
       minChildSize: 0.5,
       expand: false,
       builder: (_, scrollCtrl) => ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
         child: Stack(
           children: [
             const Positioned.fill(
               child: GlassBackground(child: SizedBox.expand()),
             ),
-            SingleChildScrollView(
-              controller: scrollCtrl,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 10, 18, 28),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Drag handle
-                    Center(
-                      child: Container(
-                        width: 44,
-                        height: 5,
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: _mutedColor.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(99),
+            SafeArea(
+              bottom: false,
+              child: SingleChildScrollView(
+                controller: scrollCtrl,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Drag handle
+                      Center(
+                        child: Container(
+                          width: 44,
+                          height: 5,
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: _mutedColor.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(99),
+                          ),
                         ),
                       ),
-                    ),
                     // Hero card: avatar + name + status
                     GlassCard(
                       borderRadius: 26,
@@ -726,6 +730,7 @@ class _ProfileSheetState extends State<_ProfileSheet> {
                 ),
               ),
             ),
+            ),
           ],
         ),
       ),
@@ -855,26 +860,33 @@ class _AnimatedCircleAction extends StatefulWidget {
 
 class _AnimatedCircleActionState extends State<_AnimatedCircleAction>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _pulse = AnimationController(
+  late final AnimationController _tap = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1500),
+    duration: const Duration(milliseconds: 360),
   );
-  bool _pressed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.accented) _pulse.repeat(reverse: true);
-  }
+  // Одноразовый «отскок» при нажатии: 1 → 1.3 → 1. В покое кнопка статична.
+  late final Animation<double> _bounce = TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween(begin: 1.0, end: 1.30)
+          .chain(CurveTween(curve: Curves.easeOut)),
+      weight: 35,
+    ),
+    TweenSequenceItem(
+      tween: Tween(begin: 1.30, end: 1.0)
+          .chain(CurveTween(curve: Curves.elasticOut)),
+      weight: 65,
+    ),
+  ]).animate(_tap);
 
   @override
   void dispose() {
-    _pulse.dispose();
+    _tap.dispose();
     super.dispose();
   }
 
-  void _setPressed(bool value) {
-    if (_pressed != value) setState(() => _pressed = value);
+  void _handleTap() {
+    _tap.forward(from: 0);
+    widget.onTap();
   }
 
   @override
@@ -889,61 +901,26 @@ class _AnimatedCircleActionState extends State<_AnimatedCircleAction>
       message: widget.tooltip,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTapDown: (_) => _setPressed(true),
-        onTapUp: (_) => _setPressed(false),
-        onTapCancel: () => _setPressed(false),
-        onTap: widget.onTap,
-        // Плавное сжатие при нажатии…
-        child: AnimatedScale(
-          scale: _pressed ? 0.82 : 1.0,
-          duration: const Duration(milliseconds: 130),
-          curve: Curves.easeOut,
-          // …и непрерывная «дышащая» пульсация + свечение у кнопки нового чата.
-          child: AnimatedBuilder(
-            animation: _pulse,
-            builder: (context, child) {
-              final t = Curves.easeInOut.transform(_pulse.value);
-              return Transform.scale(
-                scale: widget.accented ? 1.0 + 0.09 * t : 1.0,
-                child: child,
-              );
-            },
-            child: AnimatedBuilder(
-              animation: _pulse,
-              builder: (context, child) {
-                final t = Curves.easeInOut.transform(_pulse.value);
-                return Container(
-                  width: 42,
-                  height: 42,
-                  margin: const EdgeInsets.symmetric(vertical: 7),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: bg,
-                    shape: BoxShape.circle,
-                    boxShadow: widget.accented
-                        ? [
-                            BoxShadow(
-                              color: accent.withValues(alpha: 0.25 + 0.30 * t),
-                              blurRadius: 8 + 10 * t,
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: child,
-                );
-              },
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                transitionBuilder: (child, animation) => RotationTransition(
-                  turns: Tween<double>(begin: 0.5, end: 1.0).animate(animation),
-                  child: ScaleTransition(scale: animation, child: child),
-                ),
-                child: Icon(
-                  widget.icon,
-                  key: ValueKey(widget.icon.codePoint),
-                  color: fg,
-                  size: 22,
-                ),
+        onTap: _handleTap,
+        child: ScaleTransition(
+          scale: _bounce,
+          child: Container(
+            width: 42,
+            height: 42,
+            margin: const EdgeInsets.symmetric(vertical: 7),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              transitionBuilder: (child, animation) => RotationTransition(
+                turns: Tween<double>(begin: 0.5, end: 1.0).animate(animation),
+                child: ScaleTransition(scale: animation, child: child),
+              ),
+              child: Icon(
+                widget.icon,
+                key: ValueKey(widget.icon.codePoint),
+                color: fg,
+                size: 22,
               ),
             ),
           ),

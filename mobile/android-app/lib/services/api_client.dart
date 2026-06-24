@@ -277,6 +277,18 @@ class ApiClient {
     return User.fromJson((json['user'] as Map).cast<String, dynamic>());
   }
 
+  Future<User> updateProfile({String? displayName, String? avatarDataUrl}) async {
+    final body = <String, dynamic>{};
+    if (displayName != null) body['displayName'] = displayName;
+    if (avatarDataUrl != null) body['avatarUrl'] = avatarDataUrl;
+    final json = await _request('/api/me', method: 'PATCH', body: body);
+    return User.fromJson((json['user'] as Map).cast<String, dynamic>());
+  }
+
+  Future<void> removeAvatar() async {
+    await _request('/api/me', method: 'PATCH', body: {'avatarUrl': null});
+  }
+
   // --- Чаты ---
 
   Future<List<Chat>> fetchChats() async {

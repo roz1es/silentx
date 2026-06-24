@@ -1,6 +1,9 @@
+import 'dart:io' as io;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:video_player/video_player.dart';
 
 import '../format.dart';
 import '../models.dart';
@@ -145,42 +148,134 @@ class _VoiceWave extends StatelessWidget {
   }
 }
 
-class _VideoNotePreview extends StatelessWidget {
+class _VideoNotePreview extends StatefulWidget {
   const _VideoNotePreview({required this.media});
 
   final MessageMedia media;
 
   @override
+  State<_VideoNotePreview> createState() => _VideoNotePreviewState();
+}
+
+class _VideoNotePreviewState extends State<_VideoNotePreview> {
+  VideoPlayerController? _ctrl;
+  bool _playing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initPlayer();
+  }
+
+  Future<void> _initPlayer() async {
+    final bytes = bytesFromDataUrl(widget.media.dataUrl);
+    if (bytes == null || bytes.isEmpty) return;
+    try {
+      final dir = await getTemporaryDirectory();
+      final path = '${dir.path}/vnote_${widget.media.dataUrl.hashCode.abs()}.mp4';
+      await io.File(path).writeAsBytes(bytes);
+      final ctrl = VideoPlayerController.file(io.File(path));
+      await ctrl.initialize();
+      ctrl.addListener(() {
+        if (mounted) setState(() => _playing = ctrl.value.isPlaying);
+      });
+      if (mounted) setState(() => _ctrl = ctrl);
+    } on Object {
+      // Failed to init player — fallback to placeholder
+    }
+  }
+
+  Future<void> _togglePlay() async {
+    final ctrl = _ctrl;
+    if (ctrl == null) return;
+    if (ctrl.value.isPlaying) {
+      await ctrl.pause();
+    } else {
+      if (ctrl.value.position >= ctrl.value.duration) {
+        await ctrl.seekTo(Duration.zero);
+      }
+      await ctrl.play();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 200,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF242A33),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: border),
-      ),
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final ctrl = _ctrl;
+    final ready = ctrl != null && ctrl.value.isInitialized;
+
+    return GestureDetector(
+      onTap: _togglePlay,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 118,
-            height: 118,
-            alignment: Alignment.center,
+            width: 148,
+            height: 148,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: panelStrong,
-              border: Border.all(color: accent.withValues(alpha: 0.32), width: 3),
+              color: isLight ? const Color(0xFFD0EAFE) : panelStrong,
+              border: Border.all(color: accent.withValues(alpha: 0.5), width: 3),
             ),
-            child: const Icon(Icons.play_arrow_rounded, color: accent, size: 50),
+            child: ClipOval(
+              child: !ready
+                  ? Center(
+                      child: CircularProgressIndicator(
+                        color: accent,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        FittedBox(
+                          fit: BoxFit.cover,
+                          child: SizedBox(
+                            width: ctrl.value.size.width,
+                            height: ctrl.value.size.height,
+                            child: VideoPlayer(ctrl),
+                          ),
+                        ),
+                        if (!_playing)
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.48),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.play_arrow_rounded,
+                              color: Colors.white,
+                              size: 30,
+                            ),
+                          ),
+                      ],
+                    ),
+            ),
           ),
-          const SizedBox(height: 10),
-          const Text('Видеокружок',
-              style: TextStyle(fontWeight: FontWeight.w900, color: text)),
-          if ((media.durationMs ?? 0) > 0)
+          const SizedBox(height: 8),
+          Text(
+            'Видеокружок',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              color: isLight ? const Color(0xFF17202B) : text,
+              fontSize: 13,
+            ),
+          ),
+          if ((widget.media.durationMs ?? 0) > 0)
             Text(
-              formatDuration(media.durationMs ?? 0),
-              style: const TextStyle(color: muted, fontSize: 12),
+              formatDuration(widget.media.durationMs ?? 0),
+              style: TextStyle(
+                color: isLight ? const Color(0xFF637083) : muted,
+                fontSize: 12,
+              ),
             ),
         ],
       ),

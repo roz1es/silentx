@@ -10,6 +10,7 @@ environment:
 # чтобы общий код вёл себя одинаково на всех платформах.
 dependencies:
   audioplayers: ^6.5.1
+  camera: ^0.11.0
   file_picker: ^11.0.2
   flutter:
     sdk: flutter
@@ -19,6 +20,7 @@ dependencies:
   record: ^6.1.2
   shared_preferences: ^2.3.2
   socket_io_client: ^3.0.2
+  video_player: ^2.9.2
 
 dev_dependencies:
   flutter_test:

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../format.dart';
 import '../models.dart';
+import '../screens/video_recorder_screen.dart';
 import '../theme/app_theme.dart';
 
 const _emojis = [
@@ -35,6 +36,7 @@ class MessageComposer extends StatefulWidget {
     required this.onCancelVoice,
     required this.onCancelMode,
     required this.onTyping,
+    required this.onVideoCircle,
   });
 
   final TextEditingController controller;
@@ -50,6 +52,7 @@ class MessageComposer extends StatefulWidget {
   final VoidCallback onCancelVoice;
   final VoidCallback onCancelMode;
   final ValueChanged<bool> onTyping;
+  final ValueChanged<MessageMedia> onVideoCircle;
 
   @override
   State<MessageComposer> createState() => _MessageComposerState();
@@ -74,6 +77,18 @@ class _MessageComposerState extends State<MessageComposer> {
       SystemChannels.textInput.invokeMethod('TextInput.hide');
       setState(() => _showEmoji = true);
     }
+  }
+
+  Future<void> _openVideoCircle() async {
+    if (_showEmoji) setState(() => _showEmoji = false);
+    _focusNode.unfocus();
+    final result = await Navigator.of(context).push<MessageMedia>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => const VideoRecorderScreen(),
+      ),
+    );
+    if (result != null) widget.onVideoCircle(result);
   }
 
   void _insertEmoji(String emoji) {
@@ -124,6 +139,12 @@ class _MessageComposerState extends State<MessageComposer> {
                             ? Icons.keyboard_rounded
                             : Icons.emoji_emotions_rounded,
                       ),
+                    ),
+                    // Video circle
+                    IconButton(
+                      tooltip: 'Видеокружок',
+                      onPressed: widget.recordingVoice ? null : _openVideoCircle,
+                      icon: const Icon(Icons.videocam_rounded),
                     ),
                     // Attach
                     IconButton(

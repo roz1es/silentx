@@ -386,6 +386,7 @@ class _ChatScreenState extends State<ChatScreen> {
             onCancelVoice: _cancelVoice,
             onCancelMode: _cancelComposerMode,
             onTyping: _controller.notifyTyping,
+            onVideoCircle: (media) => _controller.sendMessage(media: media),
           ),
         ],
       ),

@@ -658,6 +658,7 @@ class _MessengerScreenState extends State<MessengerScreen> {
       builder: (_) => _ChatProfileDialog(
         serverUrl: widget.serverUrl,
         chat: chat,
+        currentUserId: widget.user.id,
         onlineUserIds: _onlineUserIds,
       ),
     );
@@ -1074,8 +1075,8 @@ class _ChatTile extends StatelessWidget {
                 Stack(
                   children: [
                     BrenksAvatar(
-                      title: chat.title,
-                      imageUrl: chat.avatarUrl,
+                      title: chat.titleFor(currentUserId),
+                      imageUrl: chat.avatarFor(currentUserId),
                       baseUrl: serverUrl,
                       size: 52,
                     ),
@@ -1115,7 +1116,7 @@ class _ChatTile extends StatelessWidget {
                           ],
                           Expanded(
                             child: Text(
-                              chat.title,
+                              chat.titleFor(currentUserId),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
@@ -1294,6 +1295,7 @@ class _ChatPane extends StatelessWidget {
               _ChatHeader(
                 chat: chat,
                 serverUrl: serverUrl,
+                currentUserId: user.id,
                 onOpenProfile: () => onOpenProfile(chat),
                 onToggleMute: () => onToggleMute(chat),
                 onTogglePinTop: () => onTogglePinTop(chat),
@@ -1380,6 +1382,7 @@ class _ChatHeader extends StatelessWidget {
   const _ChatHeader({
     required this.chat,
     required this.serverUrl,
+    required this.currentUserId,
     required this.onOpenProfile,
     required this.onToggleMute,
     required this.onTogglePinTop,
@@ -1389,6 +1392,7 @@ class _ChatHeader extends StatelessWidget {
 
   final Chat chat;
   final String serverUrl;
+  final String currentUserId;
   final VoidCallback onOpenProfile;
   final VoidCallback onToggleMute;
   final VoidCallback onTogglePinTop;
@@ -1415,8 +1419,8 @@ class _ChatHeader extends StatelessWidget {
                 onTap: onOpenProfile,
                 customBorder: const CircleBorder(),
                 child: BrenksAvatar(
-                  title: chat.title,
-                  imageUrl: chat.avatarUrl,
+                  title: chat.titleFor(currentUserId),
+                  imageUrl: chat.avatarFor(currentUserId),
                   baseUrl: serverUrl,
                 ),
               ),
@@ -1430,7 +1434,7 @@ class _ChatHeader extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        chat.title,
+                        chat.titleFor(currentUserId),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -2046,7 +2050,13 @@ class _MessageContent extends StatelessWidget {
         ],
         if (media == null &&
             message.imageUrl?.isNotEmpty != true &&
-            text.isEmpty)
+            text.isEmpty &&
+            message.encryptedText)
+          const _EncryptedMessageNotice(),
+        if (media == null &&
+            message.imageUrl?.isNotEmpty != true &&
+            text.isEmpty &&
+            !message.encryptedText)
           const Text('Сообщение', style: TextStyle(fontSize: 16)),
       ],
     );
@@ -2054,6 +2064,27 @@ class _MessageContent extends StatelessWidget {
 }
 
 const textColorAlias = text;
+
+class _EncryptedMessageNotice extends StatelessWidget {
+  const _EncryptedMessageNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.lock_outline_rounded, size: 17, color: muted),
+        SizedBox(width: 7),
+        Flexible(
+          child: Text(
+            'Старое зашифрованное сообщение',
+            style: TextStyle(color: muted, fontSize: 15),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class _MediaPreview extends StatelessWidget {
   const _MediaPreview({
@@ -2773,11 +2804,13 @@ class _ChatProfileDialog extends StatelessWidget {
   const _ChatProfileDialog({
     required this.serverUrl,
     required this.chat,
+    required this.currentUserId,
     required this.onlineUserIds,
   });
 
   final String serverUrl;
   final Chat chat;
+  final String currentUserId;
   final Set<String> onlineUserIds;
 
   @override
@@ -2814,14 +2847,14 @@ class _ChatProfileDialog extends StatelessWidget {
               child: Column(
                 children: [
                   BrenksAvatar(
-                    title: chat.title,
-                    imageUrl: chat.avatarUrl,
+                    title: chat.titleFor(currentUserId),
+                    imageUrl: chat.avatarFor(currentUserId),
                     baseUrl: serverUrl,
                     size: 92,
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    chat.title,
+                    chat.titleFor(currentUserId),
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w900,
@@ -2905,6 +2938,7 @@ String _messagePreview(Message message) {
     };
   }
   if (message.imageUrl?.isNotEmpty == true) return 'Фото';
+  if (message.encryptedText) return '🔒 Зашифровано';
   return message.text.trim().isEmpty ? 'Сообщение' : message.text.trim();
 }
 

@@ -382,6 +382,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         return ChatTile(
           chat: chat,
           serverUrl: _controller.serverUrl,
+          currentUserId: _controller.currentUser.id,
           unread: _controller.unreadFor(chat),
           peerOnline: _controller.isPeerOnline(chat),
           onTap: () => _openChat(chat),

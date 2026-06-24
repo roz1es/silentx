@@ -110,6 +110,24 @@ class Chat {
     return custom == null || custom.isEmpty ? name : custom;
   }
 
+  ChatParticipant? peerFor(String viewerId) {
+    if (type != ChatType.direct) return null;
+    for (final participant in participants) {
+      if (participant.id != viewerId) return participant;
+    }
+    return null;
+  }
+
+  String titleFor(String viewerId) {
+    final peer = peerFor(viewerId);
+    return peer?.title ?? title;
+  }
+
+  String? avatarFor(String viewerId) {
+    final peer = peerFor(viewerId);
+    return peer?.avatarUrl ?? avatarUrl;
+  }
+
   factory Chat.fromJson(Map<String, dynamic> json) {
     final participantsJson = json['participants'];
     final idsJson = json['participantIds'];
@@ -239,6 +257,7 @@ class Message {
     required this.senderId,
     required this.text,
     required this.createdAt,
+    this.encryptedText = false,
     this.imageUrl,
     this.media,
     this.deleted = false,
@@ -252,6 +271,7 @@ class Message {
   final String senderId;
   final String text;
   final int createdAt;
+  final bool encryptedText;
   final String? imageUrl;
   final MessageMedia? media;
   final bool deleted;
@@ -266,6 +286,7 @@ class Message {
       senderId: json['senderId']?.toString() ?? '',
       text: json['text']?.toString() ?? '',
       createdAt: _intFromJson(json['createdAt']),
+      encryptedText: json['encryptedText'] != null,
       imageUrl: json['imageUrl']?.toString(),
       media: json['media'] is Map
           ? MessageMedia.fromJson(

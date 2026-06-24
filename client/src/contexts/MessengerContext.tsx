@@ -80,6 +80,11 @@ type MessengerContextValue = {
 
 const MessengerContext = createContext<MessengerContextValue | null>(null);
 
+// Пока desktop/mobile клиенты не поддерживают E2EE-ключи веб-версии,
+// новые текстовые сообщения отправляем открытым текстом, чтобы все приложения
+// BrenksChat показывали одинаковое содержимое вместо заглушки "Сообщение".
+const directTextE2eeEnabled = false;
+
 function playIncomingMessageSound() {
   try {
     const AC =
@@ -644,13 +649,15 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
       const t = (p.text ?? '').trim();
       if (!t && !p.imageUrl && !p.media) return;
       const encryptedText =
-        activeChat.type === 'direct' && t
+        directTextE2eeEnabled && activeChat.type === 'direct' && t
           ? await encryptDirectText(activeChatId, user.id, t)
           : undefined;
-      if (activeChat.type === 'direct' && t) {
+      if (directTextE2eeEnabled && activeChat.type === 'direct' && t) {
         setTextEncryptionStatus(
           encryptedText ? 'protected' : 'waiting'
         );
+      } else if (t) {
+        setTextEncryptionStatus('none');
       }
       socketRef.current?.emit('send_message', {
         chatId: activeChatId,
@@ -716,11 +723,13 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
       const t = text.trim();
       if (!t) return;
       const encryptedText =
-        activeChat.type === 'direct'
+        directTextE2eeEnabled && activeChat.type === 'direct'
           ? await encryptDirectText(activeChatId, user.id, t)
           : undefined;
-      if (activeChat.type === 'direct') {
+      if (directTextE2eeEnabled && activeChat.type === 'direct') {
         setTextEncryptionStatus(encryptedText ? 'protected' : 'waiting');
+      } else {
+        setTextEncryptionStatus('none');
       }
       setMessagesByChat((prev) => {
         const list = prev[activeChatId];

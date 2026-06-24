@@ -11,6 +11,7 @@ class ChatTile extends StatelessWidget {
     super.key,
     required this.chat,
     required this.serverUrl,
+    required this.currentUserId,
     required this.unread,
     required this.peerOnline,
     required this.onTap,
@@ -19,6 +20,7 @@ class ChatTile extends StatelessWidget {
 
   final Chat chat;
   final String serverUrl;
+  final String currentUserId;
   final int unread;
   final bool peerOnline;
   final VoidCallback onTap;
@@ -40,8 +42,8 @@ class ChatTile extends StatelessWidget {
               Stack(
                 children: [
                   BrenksAvatar(
-                    title: chat.title,
-                    imageUrl: chat.avatarUrl,
+                    title: chat.titleFor(currentUserId),
+                    imageUrl: chat.avatarFor(currentUserId),
                     baseUrl: serverUrl,
                     size: 54,
                   ),
@@ -78,7 +80,7 @@ class ChatTile extends StatelessWidget {
                         ],
                         Expanded(
                           child: Text(
-                            chat.title,
+                            chat.titleFor(currentUserId),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(

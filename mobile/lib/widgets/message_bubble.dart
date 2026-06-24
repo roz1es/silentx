@@ -142,8 +142,14 @@ class MessageBubble extends StatelessWidget {
           if (hasMedia) const SizedBox(height: 8),
           Text(body, style: const TextStyle(color: text, fontSize: 15.5)),
         ],
+        if (!hasMedia && body.isEmpty && message.encryptedText)
+          const _EncryptedMessageNotice(),
         if (!hasMedia && body.isEmpty)
-          const Text('Сообщение', style: TextStyle(color: text, fontSize: 15.5)),
+          if (!message.encryptedText)
+            const Text(
+              'Сообщение',
+              style: TextStyle(color: text, fontSize: 15.5),
+            ),
       ],
     );
   }
@@ -255,6 +261,27 @@ class MessageBubble extends StatelessWidget {
         Navigator.pop(sheetContext);
         onTap();
       },
+    );
+  }
+}
+
+class _EncryptedMessageNotice extends StatelessWidget {
+  const _EncryptedMessageNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.lock_outline_rounded, size: 16, color: muted),
+        SizedBox(width: 7),
+        Flexible(
+          child: Text(
+            'Старое зашифрованное сообщение',
+            style: TextStyle(color: muted, fontSize: 14.5),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -35,7 +35,7 @@ class _BrenksChatDesktopAppState extends State<BrenksChatDesktopApp> {
   User? _user;
   ApiClient? _api;
   ThemeMode _themeMode = ThemeMode.dark;
-  double _uiScale = 0.92;
+  double _uiScale = 0.9;
 
   @override
   void initState() {
@@ -49,7 +49,7 @@ class _BrenksChatDesktopAppState extends State<BrenksChatDesktopApp> {
     final token = await _authStore.loadToken();
     final serverUrl = normalizeServerUrl(defaultApiUrl);
     final themeMode = savedTheme == 'light' ? ThemeMode.light : ThemeMode.dark;
-    final uiScale = _clampUiScale(savedScale ?? 0.92);
+    final uiScale = _clampUiScale(savedScale ?? 0.9);
     if (token == null || token.isEmpty) {
       if (!mounted) return;
       setState(() {
@@ -147,7 +147,7 @@ class _BrenksChatDesktopAppState extends State<BrenksChatDesktopApp> {
     setState(() => _uiScale = next);
   }
 
-  double _clampUiScale(double scale) => scale.clamp(0.82, 1.08).toDouble();
+  double _clampUiScale(double scale) => scale.clamp(0.82, 1.0).toDouble();
 
   @override
   Widget build(BuildContext context) {
@@ -159,7 +159,15 @@ class _BrenksChatDesktopAppState extends State<BrenksChatDesktopApp> {
       darkTheme: buildBrenksTheme(),
       themeMode: _themeMode,
       themeAnimationDuration: const Duration(milliseconds: 220),
-      builder: (context, child) => _ScaledApp(scale: _uiScale, child: child),
+      builder: (context, child) {
+        final media = MediaQuery.of(context);
+        return MediaQuery(
+          data: media.copyWith(
+            textScaler: TextScaler.linear(_uiScale),
+          ),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       home: _buildHome(),
     );
   }
@@ -191,41 +199,6 @@ class _BrenksChatDesktopAppState extends State<BrenksChatDesktopApp> {
       uiScale: _uiScale,
       onUiScaleChanged: _setUiScale,
       onLogout: _logout,
-    );
-  }
-}
-
-class _ScaledApp extends StatelessWidget {
-  const _ScaledApp({
-    required this.scale,
-    required this.child,
-  });
-
-  final double scale;
-  final Widget? child;
-
-  @override
-  Widget build(BuildContext context) {
-    final media = MediaQuery.of(context);
-    final safeScale = scale.clamp(0.82, 1.08).toDouble();
-    final scaledSize = Size(
-      media.size.width / safeScale,
-      media.size.height / safeScale,
-    );
-
-    return MediaQuery(
-      data: media.copyWith(
-        size: scaledSize,
-      ),
-      child: Transform.scale(
-        scale: safeScale,
-        alignment: Alignment.topLeft,
-        child: SizedBox(
-          width: scaledSize.width,
-          height: scaledSize.height,
-          child: child,
-        ),
-      ),
     );
   }
 }

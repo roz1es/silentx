@@ -57,6 +57,7 @@ String messagePreview(Message message) {
     };
   }
   if (message.imageUrl?.isNotEmpty == true) return 'Фото';
+  if (message.encryptedText) return '🔒 Зашифровано';
   return message.text.trim().isEmpty ? 'Сообщение' : message.text.trim();
 }
 

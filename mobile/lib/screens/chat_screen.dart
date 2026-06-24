@@ -381,8 +381,8 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Row(
           children: [
             BrenksAvatar(
-              title: chat.title,
-              imageUrl: chat.avatarUrl,
+              title: chat.titleFor(_controller.currentUser.id),
+              imageUrl: chat.avatarFor(_controller.currentUser.id),
               baseUrl: _controller.serverUrl,
               size: 40,
             ),
@@ -393,7 +393,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    chat.title,
+                    chat.titleFor(_controller.currentUser.id),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(

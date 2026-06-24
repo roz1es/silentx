@@ -36,7 +36,7 @@ export type SerializedChat = Omit<Chat, 'pinnedMessageId'> & {
 };
 
 export function previewForMessage(msg: Message): string {
-  if (msg.encryptedText) return 'Сообщение';
+  if (msg.encryptedText) return '🔒 Зашифровано';
   if (msg.media) {
     switch (msg.media.kind) {
       case 'image':
@@ -159,7 +159,7 @@ export function serializeChatForViewer(
             chat.lastMessage.text === 'Не удалось расшифровать защищённое сообщение' ||
             chat.lastMessage.text === 'Не удалось расшифровать защищенное сообщение' ||
             chat.lastMessage.text === 'Новое сообщение'
-              ? 'Сообщение'
+              ? '🔒 Зашифровано'
               : chat.lastMessage.text,
         }
       : null,

@@ -19,3 +19,17 @@ desktop/build/
 desktop/release/
 desktop/macos/Flutter/ephemeral/
 desktop/windows/flutter/ephemeral/
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/.packages
+mobile/.idea/
+mobile/build/
+mobile/coverage/
+mobile/android/.gradle/
+mobile/android/app/build/
+mobile/android/local.properties
+mobile/android/key.properties
+mobile/ios/Flutter/ephemeral/
+mobile/ios/Pods/
+mobile/ios/.symlinks/

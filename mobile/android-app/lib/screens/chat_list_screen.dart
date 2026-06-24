@@ -35,6 +35,8 @@ class ChatListScreen extends StatefulWidget {
 class _ChatListScreenState extends State<ChatListScreen> {
   final _searchController = TextEditingController();
   bool _searching = false;
+  bool _showOffline = false;
+  DateTime? _disconnectedAt;
 
   MessengerController get _controller => widget.controller;
 
@@ -52,7 +54,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   void _onChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final connected = _controller.socketConnected;
+    if (!connected) {
+      _disconnectedAt ??= DateTime.now();
+      final secs = DateTime.now().difference(_disconnectedAt!).inSeconds;
+      setState(() => _showOffline = secs >= 3);
+    } else {
+      _disconnectedAt = null;
+      setState(() => _showOffline = false);
+    }
   }
 
   void _openChat(Chat chat) {
@@ -205,7 +216,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   filled: false,
                 ),
               )
-            : _connectionDot(),
+            : const SizedBox.shrink(),
         actions: [
           IconButton(
             tooltip: _searching ? 'Закрыть поиск' : 'Поиск',
@@ -222,33 +233,59 @@ class _ChatListScreenState extends State<ChatListScreen> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _controller.loadChats,
-        child: _buildBody(chats),
+      body: Column(
+        children: [
+          AnimatedSize(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOutCubic,
+            child: _showOffline
+                ? Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 16),
+                    color: const Color(0xFFFF9800).withValues(alpha: 0.14),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.wifi_off_rounded,
+                            color: Color(0xFFFF9800), size: 16),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Нет подключения к серверу — сообщения не доставляются',
+                            style: TextStyle(
+                              color: Color(0xFFFF9800),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: _controller.reconnect,
+                          child: const Text(
+                            'Повторить',
+                            style: TextStyle(
+                              color: Color(0xFFFF9800),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _controller.loadChats,
+              child: _buildBody(chats),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _connectionDot() {
-    final connected = _controller.socketConnected;
-    return Row(
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: connected ? const Color(0xFF4AAE8A) : muted,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 5),
-        Text(
-          connected ? 'онлайн' : 'связь...',
-          style: const TextStyle(color: muted, fontSize: 12),
-        ),
-      ],
-    );
-  }
 
   Widget _buildBody(List<Chat> chats) {
     if (_controller.loadingChats && _controller.chats.isEmpty) {

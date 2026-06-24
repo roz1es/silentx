@@ -96,6 +96,14 @@ class MessengerController extends ChangeNotifier {
     unawaited(loadChats());
   }
 
+  void reconnect() {
+    _socket?.dispose();
+    _socket = null;
+    _socketConnected = false;
+    notifyListeners();
+    _connectSocket();
+  }
+
   void _connectSocket() {
     final socket = BrenksSocket(baseUrl: serverUrl, token: token);
     socket.connect(

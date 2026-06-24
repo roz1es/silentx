@@ -392,17 +392,9 @@ class _ProfileSheetState extends State<_ProfileSheet> {
       final mime = file.extension?.toLowerCase() == 'png' ? 'image/png' : 'image/jpeg';
       final dataUrl = 'data:$mime;base64,${base64Encode(bytes)}';
       await _ctrl.api.updateProfile(avatarDataUrl: dataUrl);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Фото обновлено')),
-        );
-      }
+      if (mounted) showAppToast(context, 'Фото обновлено');
     } on Object catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e')),
-        );
-      }
+      if (mounted) showAppToast(context, 'Ошибка: $e', error: true);
     } finally {
       if (mounted) setState(() => _uploadingPhoto = false);
     }
@@ -411,33 +403,21 @@ class _ProfileSheetState extends State<_ProfileSheet> {
   Future<void> _removePhoto() async {
     try {
       await _ctrl.api.removeAvatar();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Фото удалено')),
-        );
-      }
+      if (mounted) showAppToast(context, 'Фото удалено');
     } on Object catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e')),
-        );
-      }
+      if (mounted) showAppToast(context, 'Ошибка: $e', error: true);
     }
   }
 
   void _copyUsername() {
     Clipboard.setData(ClipboardData(text: '@${_ctrl.currentUser.username}'));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Юзернейм скопирован')),
-    );
+    showAppToast(context, 'Имя скопировано');
   }
 
   void _copyProfileLink() {
     final link = '${_ctrl.serverUrl}/u/${_ctrl.currentUser.username}';
     Clipboard.setData(ClipboardData(text: link));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Ссылка скопирована')),
-    );
+    showAppToast(context, 'Ссылка скопирована');
   }
 
   @override

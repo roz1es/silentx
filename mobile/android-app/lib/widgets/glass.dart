@@ -2,6 +2,29 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+/// Аккуратный всплывающий тост с иконкой (стиль берётся из SnackBarTheme).
+void showAppToast(BuildContext context, String message, {bool error = false}) {
+  final messenger = ScaffoldMessenger.of(context);
+  messenger.hideCurrentSnackBar();
+  messenger.showSnackBar(
+    SnackBar(
+      duration: const Duration(milliseconds: 1800),
+      content: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            error ? Icons.error_outline_rounded : Icons.check_circle_rounded,
+            color: error ? const Color(0xFFFF7474) : const Color(0xFF5AD1A0),
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Flexible(child: Text(message)),
+        ],
+      ),
+    ),
+  );
+}
+
 /// Палитра градиентов «жидкого стекла» — совпадает с экраном авторизации.
 const _lightGradient = [
   Color(0xFFBDD8F0),

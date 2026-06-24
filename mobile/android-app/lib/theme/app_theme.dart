@@ -46,6 +46,11 @@ ThemeData buildBrenksTheme() {
       enabled: const Color(0xFF3A4250),
       focused: accent,
     ),
+    snackBarTheme: _snackBarTheme(
+      background: const Color(0xFF3A4352),
+      textColor: text,
+      action: accent,
+    ),
   );
 }
 
@@ -77,6 +82,27 @@ ThemeData buildBrenksLightTheme() {
       enabled: const Color(0xFFD4DAE3),
       focused: lightAccent,
     ),
+    snackBarTheme: _snackBarTheme(
+      background: const Color(0xFF222A35),
+      textColor: Colors.white,
+      action: const Color(0xFF7FD4FF),
+    ),
+  );
+}
+
+SnackBarThemeData _snackBarTheme({
+  required Color background,
+  required Color textColor,
+  required Color action,
+}) {
+  return SnackBarThemeData(
+    behavior: SnackBarBehavior.floating,
+    backgroundColor: background,
+    contentTextStyle: TextStyle(color: textColor, fontWeight: FontWeight.w600),
+    actionTextColor: action,
+    elevation: 6,
+    insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
   );
 }
 

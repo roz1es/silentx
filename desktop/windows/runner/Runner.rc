@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "БренксЧат" "\0"
-            VALUE "FileDescription", "БренксЧат" "\0"
+            VALUE "CompanyName", "BrenksChat" "\0"
+            VALUE "FileDescription", "BrenksChat" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "БренксЧат" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 БренксЧат. All rights reserved." "\0"
+            VALUE "InternalName", "BrenksChat" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 BrenksChat. All rights reserved." "\0"
             VALUE "OriginalFilename", "BrenksChat.exe" "\0"
-            VALUE "ProductName", "БренксЧат" "\0"
+            VALUE "ProductName", "BrenksChat" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

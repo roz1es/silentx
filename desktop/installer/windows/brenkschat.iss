@@ -1,4 +1,4 @@
-#define AppName "БренксЧат"
+#define AppName "BrenksChat"
 #define AppPublisher "BrenksChat"
 #define AppExeName "BrenksChat.exe"
 #ifndef AppVersion
@@ -60,15 +60,15 @@ Type: filesandordirs; Name: "{app}\data"
 [Code]
 procedure InitializeWizard();
 begin
-  WizardForm.Caption := 'Установка БренксЧат';
+  WizardForm.Caption := 'BrenksChat Setup';
   WizardForm.Color := $F6F7FB;
   WizardForm.InnerPage.Color := $F6F7FB;
   WizardForm.Bevel.Visible := False;
-  WizardForm.WelcomeLabel1.Caption := 'БренксЧат';
+  WizardForm.WelcomeLabel1.Caption := 'BrenksChat';
   WizardForm.WelcomeLabel2.Caption :=
-    'Установщик настольного мессенджера в стиле БренксЧат.' + #13#10 +
-    'Приложение подключается к серверу silentx.ru и работает как отдельный desktop-клиент.';
-  WizardForm.FinishedHeadingLabel.Caption := 'БренксЧат установлен';
+    'Desktop messenger installer.' + #13#10 +
+    'The app connects to silentx.ru and works as a native desktop client.';
+  WizardForm.FinishedHeadingLabel.Caption := 'BrenksChat installed';
   WizardForm.FinishedLabel.Caption :=
-    'Можно запускать приложение и входить в свой аккаунт.';
+    'You can launch the app and sign in to your account.';
 end;

@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 
-const bg = Color(0xFF23272F);
-const panel = Color(0xFF2D323C);
-const panelSoft = Color(0xFF39404C);
-const panelStrong = Color(0xFF48505E);
-const text = Color(0xFFF1F5F9);
-const muted = Color(0xFFB2BBC8);
-const border = Color(0xFF4B525E);
-const accent = Color(0xFF7DD3FC);
-const hover = Color(0xFF39404C);
-const bubbleIn = Color(0xFF48505E);
-const bubbleOut = Color(0xFF435260);
+const bg = Color(0xFF24272D);
+const panel = Color(0xFF2D3037);
+const panelSoft = Color(0xFF3A3E47);
+const panelStrong = Color(0xFF4A4F5A);
+const text = Color(0xFFF4F6FA);
+const muted = Color(0xFFB8C0CC);
+const border = Color(0xFF535866);
+const accent = Color(0xFFE2E8F0);
+const hover = Color(0xFF3A3E47);
+const bubbleIn = Color(0xFF505661);
+const bubbleOut = Color(0xFF474E58);
 const danger = Color(0xFFFF7474);
 
 ThemeData buildBrenksTheme() {
@@ -19,7 +19,7 @@ ThemeData buildBrenksTheme() {
     scaffoldBackgroundColor: bg,
     colorScheme: const ColorScheme.dark(
       primary: accent,
-      secondary: Color(0xFF8ED9B8),
+      secondary: Color(0xFFBFC7D2),
       surface: panel,
       error: danger,
     ),

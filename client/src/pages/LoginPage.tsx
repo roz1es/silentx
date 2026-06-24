@@ -11,7 +11,7 @@ type PendingCode = {
   emailMasked: string;
 };
 
-const windowsInstallerUrl = '/desktop/windows/BrenksChatSetup-0.1.0.exe';
+const windowsInstallerUrl = '/desktop/windows/BrenksChatSetup-latest.exe';
 
 type PlatformId = 'windows' | 'android' | 'macos' | 'iphone';
 

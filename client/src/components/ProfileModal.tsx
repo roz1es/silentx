@@ -11,7 +11,7 @@ import { participantLabel } from '@/lib/userDisplay';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 const MAX_AVATAR_BYTES = 6 * 1024 * 1024;
-const WINDOWS_INSTALLER_URL = '/desktop/windows/BrenksChatSetup-0.1.0.exe';
+const WINDOWS_INSTALLER_URL = '/desktop/windows/BrenksChatSetup-latest.exe';
 
 type Props = {
   open: boolean;

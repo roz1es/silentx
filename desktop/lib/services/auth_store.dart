@@ -4,6 +4,7 @@ class AuthStore {
   static const _tokenKey = 'brenkschat.token';
   static const _serverKey = 'brenkschat.server';
   static const _themeKey = 'brenkschat.theme';
+  static const _uiScaleKey = 'brenkschat.uiScale';
 
   Future<String?> loadToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -38,5 +39,15 @@ class AuthStore {
   Future<void> saveTheme(String theme) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_themeKey, theme);
+  }
+
+  Future<double?> loadUiScale() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getDouble(_uiScaleKey);
+  }
+
+  Future<void> saveUiScale(double scale) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_uiScaleKey, scale);
   }
 }

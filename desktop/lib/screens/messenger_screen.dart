@@ -130,6 +130,8 @@ class MessengerScreen extends StatefulWidget {
     required this.token,
     required this.themeMode,
     required this.onThemeModeChanged,
+    required this.uiScale,
+    required this.onUiScaleChanged,
     required this.onLogout,
   });
 
@@ -139,6 +141,8 @@ class MessengerScreen extends StatefulWidget {
   final String token;
   final ThemeMode themeMode;
   final ValueChanged<ThemeMode> onThemeModeChanged;
+  final double uiScale;
+  final ValueChanged<double> onUiScaleChanged;
   final VoidCallback onLogout;
 
   @override
@@ -667,6 +671,8 @@ class _MessengerScreenState extends State<MessengerScreen> {
         serverUrl: widget.serverUrl,
         themeMode: widget.themeMode,
         onThemeModeChanged: widget.onThemeModeChanged,
+        uiScale: widget.uiScale,
+        onUiScaleChanged: widget.onUiScaleChanged,
         onLogout: widget.onLogout,
       ),
     );
@@ -714,8 +720,8 @@ class _MessengerScreenState extends State<MessengerScreen> {
             end: Alignment.bottomRight,
             colors: [
               Color(0xFF262B34),
-              Color(0xFF20242B),
-              Color(0xFF1D2128),
+              Color(0xFF22252B),
+              Color(0xFF1E2026),
             ],
           ),
         ),
@@ -842,8 +848,8 @@ class _Sidebar extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF272B33).withValues(alpha: 0.96),
-            const Color(0xFF20242B).withValues(alpha: 0.92),
+            const Color(0xFF292C33).withValues(alpha: 0.96),
+            const Color(0xFF22252A).withValues(alpha: 0.92),
           ],
         ),
         boxShadow: [
@@ -1023,8 +1029,8 @@ class _ChatTile extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  const Color(0xFF3F4A59).withValues(alpha: 0.98),
-                  const Color(0xFF333943).withValues(alpha: 0.94),
+                  const Color(0xFF464B55).withValues(alpha: 0.98),
+                  const Color(0xFF383C44).withValues(alpha: 0.94),
                 ],
               )
             : LinearGradient(
@@ -1084,7 +1090,7 @@ class _ChatTile extends StatelessWidget {
                             color: accent,
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: const Color(0xFF22262E),
+                              color: const Color(0xFF24272D),
                               width: 2,
                             ),
                           ),
@@ -1274,9 +1280,9 @@ class _ChatPane extends StatelessWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Color(0xFF2C333D),
-            Color(0xFF242B34),
-            Color(0xFF20252D),
+            Color(0xFF2D3037),
+            Color(0xFF25282F),
+            Color(0xFF21242A),
           ],
         ),
       ),
@@ -1398,7 +1404,7 @@ class _ChatHeader extends StatelessWidget {
           height: 82,
           padding: const EdgeInsets.symmetric(horizontal: 22),
           decoration: BoxDecoration(
-            color: const Color(0xE0202329),
+            color: const Color(0xE0212328),
             border: Border(
               bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
             ),
@@ -1615,7 +1621,7 @@ class _Composer extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.fromLTRB(22, 10, 22, 18),
           decoration: BoxDecoration(
-            color: const Color(0xC8202329),
+            color: const Color(0xC8212328),
             border: Border(
               top: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
             ),
@@ -1849,12 +1855,12 @@ class _MessageBubble extends StatelessWidget {
                     end: Alignment.bottomRight,
                     colors: own
                         ? [
-                            const Color(0xFF4D6578).withValues(alpha: 0.98),
-                            const Color(0xFF3B4D5D).withValues(alpha: 0.98),
+                            const Color(0xFF545A64).withValues(alpha: 0.98),
+                            const Color(0xFF444952).withValues(alpha: 0.98),
                           ]
                         : [
-                            const Color(0xFF525B6A).withValues(alpha: 0.98),
-                            const Color(0xFF424A58).withValues(alpha: 0.98),
+                            const Color(0xFF565B64).withValues(alpha: 0.98),
+                            const Color(0xFF464A53).withValues(alpha: 0.98),
                           ],
                   ),
                   borderRadius: BorderRadius.only(
@@ -2536,6 +2542,8 @@ class _AccountDialog extends StatelessWidget {
     required this.serverUrl,
     required this.themeMode,
     required this.onThemeModeChanged,
+    required this.uiScale,
+    required this.onUiScaleChanged,
     required this.onLogout,
   });
 
@@ -2543,6 +2551,8 @@ class _AccountDialog extends StatelessWidget {
   final String serverUrl;
   final ThemeMode themeMode;
   final ValueChanged<ThemeMode> onThemeModeChanged;
+  final double uiScale;
+  final ValueChanged<double> onUiScaleChanged;
   final VoidCallback onLogout;
 
   @override
@@ -2661,6 +2671,68 @@ class _AccountDialog extends StatelessWidget {
                           onSelectionChanged: (value) {
                             onThemeModeChanged(value.first);
                           },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: panelSoft.withValues(alpha: 0.64),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: border),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.zoom_out_map_rounded, color: accent),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Expanded(
+                                    child: Text(
+                                      'Масштаб',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    '${(uiScale * 100).round()}%',
+                                    style: const TextStyle(
+                                      color: muted,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SliderTheme(
+                                data: SliderTheme.of(context).copyWith(
+                                  activeTrackColor: accent,
+                                  inactiveTrackColor:
+                                      Colors.white.withValues(alpha: 0.1),
+                                  thumbColor: text,
+                                  overlayColor: accent.withValues(alpha: 0.12),
+                                ),
+                                child: Slider(
+                                  value: uiScale,
+                                  min: 0.82,
+                                  max: 1.08,
+                                  divisions: 13,
+                                  onChanged: onUiScaleChanged,
+                                ),
+                              ),
+                              const Text(
+                                'По умолчанию интерфейс стал чуть компактнее.',
+                                style: TextStyle(color: muted, fontSize: 13),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),

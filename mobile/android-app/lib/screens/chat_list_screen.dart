@@ -176,8 +176,31 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
+  Widget _circleAction({
+    required String tooltip,
+    required IconData icon,
+    required VoidCallback onTap,
+    required bool isLight,
+    bool accented = false,
+  }) {
+    final fg = accented ? accent : (isLight ? lightText : text);
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onTap,
+      icon: Icon(icon, color: fg, size: 22),
+      style: IconButton.styleFrom(
+        backgroundColor: accented
+            ? accent.withValues(alpha: isLight ? 0.16 : 0.18)
+            : Colors.white.withValues(alpha: isLight ? 0.55 : 0.08),
+        shape: const CircleBorder(),
+        minimumSize: const Size(42, 42),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final query = _searchController.text.trim().toLowerCase();
     final chats = query.isEmpty
         ? _controller.chats
@@ -206,6 +229,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
             ),
           ),
         ),
+        titleSpacing: 4,
         title: _searching
             ? TextField(
                 controller: _searchController,
@@ -217,21 +241,61 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   filled: false,
                 ),
               )
-            : const SizedBox.shrink(),
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _controller.currentUser.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF4AAE8A),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        'онлайн',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isLight ? lightMuted : muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
         actions: [
-          IconButton(
+          _circleAction(
             tooltip: _searching ? 'Закрыть поиск' : 'Поиск',
-            onPressed: () => setState(() {
+            icon: _searching ? Icons.close_rounded : Icons.search_rounded,
+            onTap: () => setState(() {
               _searching = !_searching;
               if (!_searching) _searchController.clear();
             }),
-            icon: Icon(_searching ? Icons.close_rounded : Icons.search_rounded),
+            isLight: isLight,
           ),
-          IconButton(
+          const SizedBox(width: 6),
+          _circleAction(
             tooltip: 'Новый чат',
-            onPressed: _newChat,
-            icon: const Icon(Icons.add_comment_rounded),
+            icon: Icons.maps_ugc_rounded,
+            onTap: _newChat,
+            isLight: isLight,
+            accented: true,
           ),
+          const SizedBox(width: 10),
         ],
       ),
       body: Column(

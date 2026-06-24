@@ -25,16 +25,14 @@ void showAppToast(BuildContext context, String message, {bool error = false}) {
   );
 }
 
-/// Палитра градиентов «жидкого стекла» — совпадает с экраном авторизации.
+/// Палитра фона мессенджера — чистая, как в веб-версии (без ярких оттенков).
 const _lightGradient = [
-  Color(0xFFBDD8F0),
-  Color(0xFFCDD5E8),
-  Color(0xFFE8D5F0),
+  Color(0xFFF2F5F9),
+  Color(0xFFE8EDF4),
 ];
 const _darkGradient = [
-  Color(0xFF1A2540),
-  Color(0xFF0D1B2A),
-  Color(0xFF1E1030),
+  Color(0xFF20242B),
+  Color(0xFF14171D),
 ];
 
 /// Фон-градиент в стиле экрана авторизации. Кладётся под весь экран.

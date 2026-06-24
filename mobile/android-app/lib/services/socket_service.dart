@@ -38,13 +38,15 @@ class BrenksSocket {
       baseUrl,
       socket_io.OptionBuilder()
           .setPath('/socket.io')
-          .setTransports(['polling', 'websocket'])
+          .setTransports(['websocket', 'polling'])
           .setAuth({'token': token})
-          .disableAutoConnect()
+          .enableReconnection()
+          .enableAutoConnect()
           .build(),
     );
 
     socket.onConnect((_) => onConnectionChanged(true));
+    socket.onReconnect((_) => onConnectionChanged(true));
     socket.onDisconnect((_) => onConnectionChanged(false));
     socket.onConnectError((_) => onConnectionChanged(false));
 
@@ -107,7 +109,6 @@ class BrenksSocket {
     });
 
     _socket = socket;
-    socket.connect();
   }
 
   void joinChat(String chatId) {

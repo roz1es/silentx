@@ -108,6 +108,16 @@ class _ChatScreenState extends State<ChatScreen> {
           curve: Curves.easeOutCubic,
         );
       }
+      // Повторно прижимаем к низу на следующем кадре: новый пузырёк/картинка
+      // могли изменить высоту списка уже после расчёта maxScrollExtent —
+      // именно из-за этого после отправки «перекидывало чуть выше».
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_scrollController.hasClients) return;
+        final corrected = _scrollController.position.maxScrollExtent;
+        if ((corrected - _scrollController.offset).abs() > 4) {
+          _scrollController.jumpTo(corrected);
+        }
+      });
     });
   }
 
@@ -126,6 +136,7 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => _replyTo = null);
     _messageController.clear();
     _controller.notifyTyping(false);
+    _scrollToBottom();
   }
 
   Future<void> _attach() async {

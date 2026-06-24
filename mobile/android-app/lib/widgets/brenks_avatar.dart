@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../format.dart';
+
 /// Круглый аватар с поддержкой сетевых картинок, data-url и буквы-заглушки.
 class BrenksAvatar extends StatelessWidget {
   const BrenksAvatar({
@@ -55,13 +57,36 @@ class BrenksAvatar extends StatelessWidget {
           ),
         ],
       ),
-      child: url == null || url.isEmpty
-          ? Center(child: _initial(first))
-          : Image.network(
-              url,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Center(child: _initial(first)),
-            ),
+      child: _image(url, first),
+    );
+  }
+
+  Widget _image(String? url, String first) {
+    if (url == null || url.isEmpty) {
+      return Center(child: _initial(first));
+    }
+    // data:image/...;base64,... — Image.network не умеет, нужен Image.memory.
+    if (url.startsWith('data:')) {
+      final bytes = bytesFromDataUrl(url);
+      if (bytes == null || bytes.isEmpty) {
+        return Center(child: _initial(first));
+      }
+      return Image.memory(
+        bytes,
+        fit: BoxFit.cover,
+        width: size,
+        height: size,
+        gaplessPlayback: true,
+        errorBuilder: (_, __, ___) => Center(child: _initial(first)),
+      );
+    }
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      width: size,
+      height: size,
+      gaplessPlayback: true,
+      errorBuilder: (_, __, ___) => Center(child: _initial(first)),
     );
   }
 

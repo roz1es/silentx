@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../widgets/brenks_avatar.dart';
 import '../widgets/chat_tile.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/glass.dart';
 import '../widgets/new_chat_sheet.dart';
 import 'chat_screen.dart';
 
@@ -157,12 +158,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final isLight = Theme.of(context).brightness == Brightness.light;
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: isLight ? Colors.white : panel,
+      backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       builder: (sheetContext) => _ProfileSheet(
         controller: _controller,
         themeMode: widget.themeMode,
@@ -188,8 +185,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
             .where((chat) => chat.title.toLowerCase().contains(query))
             .toList(growable: false);
 
-    return Scaffold(
+    return GlassBackground(
+      child: Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        flexibleSpace: const GlassBar(bottomBorder: true),
         leading: Padding(
           padding: const EdgeInsets.only(left: 12),
           child: InkWell(
@@ -283,6 +284,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -322,17 +324,24 @@ class _ChatListScreenState extends State<ChatListScreen> {
       );
     }
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
       itemCount: chats.length,
       itemBuilder: (context, index) {
         final chat = chats[index];
-        return ChatTile(
-          chat: chat,
-          serverUrl: _controller.serverUrl,
-          unread: _controller.unreadFor(chat),
-          peerOnline: _controller.isPeerOnline(chat),
-          onTap: () => _openChat(chat),
-          onLongPress: () => _chatOptions(chat),
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: GlassCard(
+            borderRadius: 20,
+            padding: EdgeInsets.zero,
+            child: ChatTile(
+              chat: chat,
+              serverUrl: _controller.serverUrl,
+              unread: _controller.unreadFor(chat),
+              peerOnline: _controller.isPeerOnline(chat),
+              onTap: () => _openChat(chat),
+              onLongPress: () => _chatOptions(chat),
+            ),
+          ),
         );
       },
     );
@@ -368,8 +377,6 @@ class _ProfileSheetState extends State<_ProfileSheet> {
 
   Color get _textColor => _isLight ? const Color(0xFF17202B) : text;
   Color get _mutedColor => _isLight ? const Color(0xFF637083) : muted;
-  Color get _cardBg => _isLight ? const Color(0xFFF3F5F8) : panelSoft;
-  Color get _cardBorder => _isLight ? const Color(0xFFD4DAE3) : border;
 
   Future<void> _changePhoto() async {
     setState(() => _uploadingPhoto = true);
@@ -437,201 +444,297 @@ class _ProfileSheetState extends State<_ProfileSheet> {
   Widget build(BuildContext context) {
     final user = _ctrl.currentUser;
     return DraggableScrollableSheet(
-      initialChildSize: 0.78,
+      initialChildSize: 0.86,
       maxChildSize: 0.96,
-      minChildSize: 0.4,
+      minChildSize: 0.5,
       expand: false,
-      builder: (_, scrollCtrl) => SingleChildScrollView(
-        controller: scrollCtrl,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Title
-              Text(
-                'Мой профиль',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: _textColor,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Аккаунт, приватность и уведомления',
-                style: TextStyle(color: _mutedColor, fontSize: 13),
-              ),
-              const SizedBox(height: 20),
-              // Avatar + name
-              Center(
+      builder: (_, scrollCtrl) => ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        child: Stack(
+          children: [
+            const Positioned.fill(
+              child: GlassBackground(child: SizedBox.expand()),
+            ),
+            SingleChildScrollView(
+              controller: scrollCtrl,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 10, 18, 28),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    BrenksAvatar(
-                      title: user.title,
-                      imageUrl: user.avatarUrl,
-                      baseUrl: _ctrl.serverUrl,
-                      size: 84,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      user.title,
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        color: _textColor,
+                    // Drag handle
+                    Center(
+                      child: Container(
+                        width: 44,
+                        height: 5,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: _mutedColor.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '@${user.username}',
-                      style: TextStyle(color: _mutedColor, fontSize: 15),
+                    // Hero card: avatar + name + status
+                    GlassCard(
+                      borderRadius: 26,
+                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 22),
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [accent, Color(0xFF7C5CF5)],
+                              ),
+                            ),
+                            child: Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: _isLight ? Colors.white : bg,
+                              ),
+                              child: BrenksAvatar(
+                                title: user.title,
+                                imageUrl: user.avatarUrl,
+                                baseUrl: _ctrl.serverUrl,
+                                size: 88,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            user.title,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 23,
+                              fontWeight: FontWeight.w900,
+                              color: _textColor,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            '@${user.username}',
+                            style: TextStyle(color: _mutedColor, fontSize: 15),
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF4AAE8A).withValues(alpha: 0.16),
+                              borderRadius: BorderRadius.circular(99),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  width: 7,
+                                  height: 7,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: Color(0xFF4AAE8A),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 6),
+                                Text(
+                                  'в сети',
+                                  style: TextStyle(
+                                    color: Color(0xFF4AAE8A),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              // 3 action buttons
-              Row(
-                children: [
-                  _actionBtn(
-                    icon: Icons.link_rounded,
-                    label: 'Ссылка\nпрофиля',
-                    onTap: _copyProfileLink,
-                  ),
-                  const SizedBox(width: 10),
-                  _actionBtn(
-                    icon: Icons.share_rounded,
-                    label: 'Поде-\nлиться',
-                    onTap: _copyProfileLink,
-                  ),
-                  const SizedBox(width: 10),
-                  _actionBtn(
-                    icon: Icons.alternate_email_rounded,
-                    label: '@${user.username}',
-                    onTap: _copyUsername,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              // Email
-              if (user.email?.isNotEmpty == true)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: _cardBg,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: _cardBorder),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.email_rounded, color: accent, size: 20),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                    const SizedBox(height: 14),
+                    // Quick action buttons
+                    Row(
+                      children: [
+                        _actionBtn(
+                          icon: Icons.link_rounded,
+                          label: 'Ссылка',
+                          onTap: _copyProfileLink,
+                        ),
+                        const SizedBox(width: 10),
+                        _actionBtn(
+                          icon: Icons.ios_share_rounded,
+                          label: 'Поделиться',
+                          onTap: _copyProfileLink,
+                        ),
+                        const SizedBox(width: 10),
+                        _actionBtn(
+                          icon: Icons.alternate_email_rounded,
+                          label: 'Юзернейм',
+                          onTap: _copyUsername,
+                        ),
+                      ],
+                    ),
+                    if (user.email?.isNotEmpty == true) ...[
+                      const SizedBox(height: 20),
+                      _sectionLabel('ИНФОРМАЦИЯ'),
+                      const SizedBox(height: 8),
+                      GlassCard(
+                        borderRadius: 18,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 14),
+                        child: Row(
                           children: [
-                            Text('Почта для входа',
-                                style: TextStyle(color: _mutedColor, fontSize: 12)),
-                            const SizedBox(height: 2),
-                            Text(user.email!,
-                                style: TextStyle(color: _textColor, fontWeight: FontWeight.w700)),
+                            _miniIcon(Icons.mail_outline_rounded),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Почта для входа',
+                                      style: TextStyle(
+                                          color: _mutedColor, fontSize: 12)),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    user.email!,
+                                    style: TextStyle(
+                                      color: _textColor,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       ),
                     ],
-                  ),
-                ),
-              const SizedBox(height: 14),
-              // Photo buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _uploadingPhoto ? null : _changePhoto,
-                      icon: _uploadingPhoto
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.camera_alt_rounded, size: 18),
-                      label: const Text('Сменить фото'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _removePhoto,
-                      icon: const Icon(Icons.no_photography_rounded, size: 18, color: danger),
-                      label: const Text('Убрать фото',
-                          style: TextStyle(color: danger)),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: danger),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              // Theme toggle
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: _cardBg,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: _cardBorder),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.contrast_rounded, color: accent),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text('Тема',
-                          style: TextStyle(fontWeight: FontWeight.w800, color: _textColor)),
-                    ),
-                    SegmentedButton<ThemeMode>(
-                      showSelectedIcon: false,
-                      segments: const [
-                        ButtonSegment(
-                          value: ThemeMode.dark,
-                          icon: Icon(Icons.dark_mode_rounded, size: 18),
+                    const SizedBox(height: 20),
+                    _sectionLabel('ФОТОГРАФИЯ'),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _photoBtn(
+                            icon: Icons.camera_alt_rounded,
+                            label: 'Сменить',
+                            onTap: _uploadingPhoto ? null : _changePhoto,
+                            loading: _uploadingPhoto,
+                          ),
                         ),
-                        ButtonSegment(
-                          value: ThemeMode.light,
-                          icon: Icon(Icons.light_mode_rounded, size: 18),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _photoBtn(
+                            icon: Icons.delete_outline_rounded,
+                            label: 'Убрать',
+                            onTap: _removePhoto,
+                            danger: true,
+                          ),
                         ),
                       ],
-                      selected: {widget.themeMode},
-                      onSelectionChanged: (v) => widget.onThemeModeChanged(v.first),
+                    ),
+                    const SizedBox(height: 20),
+                    _sectionLabel('ОФОРМЛЕНИЕ'),
+                    const SizedBox(height: 8),
+                    GlassCard(
+                      borderRadius: 18,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      child: Row(
+                        children: [
+                          _miniIcon(Icons.contrast_rounded),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text('Тема оформления',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: _textColor)),
+                          ),
+                          SegmentedButton<ThemeMode>(
+                            showSelectedIcon: false,
+                            style: ButtonStyle(
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            segments: const [
+                              ButtonSegment(
+                                value: ThemeMode.dark,
+                                icon: Icon(Icons.dark_mode_rounded, size: 18),
+                              ),
+                              ButtonSegment(
+                                value: ThemeMode.light,
+                                icon: Icon(Icons.light_mode_rounded, size: 18),
+                              ),
+                            ],
+                            selected: {widget.themeMode},
+                            onSelectionChanged: (v) =>
+                                widget.onThemeModeChanged(v.first),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton.tonalIcon(
+                      onPressed: widget.onLogout,
+                      icon: const Icon(Icons.check_rounded),
+                      label: const Text('Готово'),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(50),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: widget.onLogout,
+                      icon: const Icon(Icons.logout_rounded, color: danger),
+                      label: const Text('Выйти из аккаунта',
+                          style: TextStyle(color: danger)),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: danger.withValues(alpha: 0.6)),
+                        minimumSize: const Size.fromHeight(50),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
+                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 14),
-              // Logout
-              FilledButton.tonalIcon(
-                onPressed: widget.onLogout,
-                icon: const Icon(Icons.logout_rounded),
-                label: const Text('Закрыть'),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48),
-                ),
-              ),
-              const SizedBox(height: 4),
-              OutlinedButton.icon(
-                onPressed: widget.onLogout,
-                icon: const Icon(Icons.exit_to_app_rounded, color: danger),
-                label: const Text('Выйти из аккаунта', style: TextStyle(color: danger)),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: danger),
-                  minimumSize: const Size.fromHeight(48),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _sectionLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 6),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: _mutedColor,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+
+  Widget _miniIcon(IconData icon) {
+    return Container(
+      width: 38,
+      height: 38,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(icon, color: accent, size: 20),
     );
   }
 
@@ -643,29 +746,64 @@ class _ProfileSheetState extends State<_ProfileSheet> {
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: _cardBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: _cardBorder),
-          ),
+        behavior: HitTestBehavior.opaque,
+        child: GlassCard(
+          borderRadius: 18,
+          padding: const EdgeInsets.symmetric(vertical: 14),
           child: Column(
             children: [
-              Icon(icon, color: accent, size: 22),
-              const SizedBox(height: 6),
+              Icon(icon, color: accent, size: 24),
+              const SizedBox(height: 7),
               Text(
                 label,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: _textColor,
-                  height: 1.2,
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _photoBtn({
+    required IconData icon,
+    required String label,
+    required VoidCallback? onTap,
+    bool danger = false,
+    bool loading = false,
+  }) {
+    final color = danger ? const Color(0xFFFF7474) : accent;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: GlassCard(
+        borderRadius: 16,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (loading)
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: color),
+              )
+            else
+              Icon(icon, color: color, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: danger ? color : _textColor,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ),
       ),
     );

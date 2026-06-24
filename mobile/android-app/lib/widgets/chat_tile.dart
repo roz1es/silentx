@@ -27,12 +27,13 @@ class ChatTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
+    final mutedColor = isLight ? lightMuted : muted;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: Row(
@@ -72,8 +73,8 @@ class ChatTile extends StatelessWidget {
                     Row(
                       children: [
                         if (chat.pinnedToTop) ...[
-                          const Icon(Icons.push_pin_rounded,
-                              size: 14, color: muted),
+                          Icon(Icons.push_pin_rounded,
+                              size: 14, color: mutedColor),
                           const SizedBox(width: 4),
                         ],
                         Expanded(
@@ -90,7 +91,7 @@ class ChatTile extends StatelessWidget {
                         if (chat.lastMessage != null)
                           Text(
                             formatChatTimestamp(chat.lastMessage!.time),
-                            style: const TextStyle(color: muted, fontSize: 12),
+                            style: TextStyle(color: mutedColor, fontSize: 12),
                           ),
                       ],
                     ),
@@ -98,8 +99,8 @@ class ChatTile extends StatelessWidget {
                     Row(
                       children: [
                         if (chat.muted) ...[
-                          const Icon(Icons.volume_off_rounded,
-                              size: 14, color: muted),
+                          Icon(Icons.volume_off_rounded,
+                              size: 14, color: mutedColor),
                           const SizedBox(width: 4),
                         ],
                         Expanded(
@@ -107,7 +108,7 @@ class ChatTile extends StatelessWidget {
                             lastMessageLabel(chat.lastMessage?.text),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: muted, fontSize: 14),
+                            style: TextStyle(color: mutedColor, fontSize: 14),
                           ),
                         ),
                         if (unread > 0) ...[

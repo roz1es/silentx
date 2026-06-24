@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -109,12 +111,15 @@ class _MessageComposerState extends State<MessageComposer> {
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
     final modeMessage = widget.editing ?? widget.replyTo;
-    final panelBg = isLight ? Colors.white : const Color(0xFF202329);
-    final topBorder = isLight ? const Color(0xFFE2E7EF) : const Color(0xFF323946);
+    final panelBg = Colors.white.withValues(alpha: isLight ? 0.55 : 0.07);
+    final topBorder = Colors.white.withValues(alpha: isLight ? 0.6 : 0.12);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
+        ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+            child: Container(
           padding: const EdgeInsets.fromLTRB(8, 8, 12, 10),
           decoration: BoxDecoration(
             color: panelBg,
@@ -191,6 +196,8 @@ class _MessageComposerState extends State<MessageComposer> {
               ],
             ),
           ),
+            ),
+          ),
         ),
         // Emoji panel
         AnimatedSize(
@@ -205,9 +212,12 @@ class _MessageComposerState extends State<MessageComposer> {
   }
 
   Widget _emojiPanel(bool isLight, Color bg) {
-    return Container(
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+        child: Container(
       height: 260,
-      color: bg,
+      color: Colors.white.withValues(alpha: isLight ? 0.6 : 0.08),
       child: GridView.builder(
         padding: const EdgeInsets.all(8),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -222,6 +232,8 @@ class _MessageComposerState extends State<MessageComposer> {
           child: Center(
             child: Text(_emojis[i], style: const TextStyle(fontSize: 22)),
           ),
+        ),
+      ),
         ),
       ),
     );

@@ -14,6 +14,7 @@ import '../services/messenger_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/brenks_avatar.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/glass.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/message_composer.dart';
 
@@ -299,7 +300,9 @@ class _ChatScreenState extends State<ChatScreen> {
     final pinned = _controller.pinnedMessage;
     final typing = _controller.typingNames;
 
-    return Scaffold(
+    return GlassBackground(
+      child: Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: _appBar(chat),
       body: Column(
         children: [
@@ -390,11 +393,14 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ],
       ),
+      ),
     );
   }
 
   PreferredSizeWidget _appBar(Chat chat) {
     return AppBar(
+      backgroundColor: Colors.transparent,
+      flexibleSpace: const GlassBar(bottomBorder: true),
       titleSpacing: 0,
       title: InkWell(
         onTap: () => _openProfile(chat),

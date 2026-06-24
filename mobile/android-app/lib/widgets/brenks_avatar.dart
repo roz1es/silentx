@@ -40,14 +40,20 @@ class BrenksAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final first = title.trim().isEmpty ? 'B' : title.trim()[0].toUpperCase();
     final url = _resolveUrl(imageUrl, baseUrl);
-    final color = _avatarColor();
+    final hasImage = url != null && url.isNotEmpty;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    // Под картинкой — нейтральный фон. Если аватар PNG с прозрачными краями,
+    // цветная хеш-заливка раньше «вылезала» зелёным ободком из-под фото.
+    final bgColor = hasImage
+        ? (isLight ? const Color(0xFFE6EAF0) : const Color(0xFF2A2F38))
+        : _avatarColor();
     return Container(
       width: size,
       height: size,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: color,
+        color: bgColor,
         border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 1),
       ),
       child: _image(url, first),

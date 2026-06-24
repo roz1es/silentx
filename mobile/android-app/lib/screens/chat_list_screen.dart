@@ -853,8 +853,25 @@ class _AnimatedCircleAction extends StatefulWidget {
   State<_AnimatedCircleAction> createState() => _AnimatedCircleActionState();
 }
 
-class _AnimatedCircleActionState extends State<_AnimatedCircleAction> {
+class _AnimatedCircleActionState extends State<_AnimatedCircleAction>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1500),
+  );
   bool _pressed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.accented) _pulse.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
 
   void _setPressed(bool value) {
     if (_pressed != value) setState(() => _pressed = value);
@@ -876,27 +893,57 @@ class _AnimatedCircleActionState extends State<_AnimatedCircleAction> {
         onTapUp: (_) => _setPressed(false),
         onTapCancel: () => _setPressed(false),
         onTap: widget.onTap,
+        // Плавное сжатие при нажатии…
         child: AnimatedScale(
           scale: _pressed ? 0.82 : 1.0,
           duration: const Duration(milliseconds: 130),
           curve: Curves.easeOut,
-          child: Container(
-            width: 42,
-            height: 42,
-            margin: const EdgeInsets.symmetric(vertical: 7),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              transitionBuilder: (child, animation) => RotationTransition(
-                turns: Tween<double>(begin: 0.5, end: 1.0).animate(animation),
-                child: ScaleTransition(scale: animation, child: child),
-              ),
-              child: Icon(
-                widget.icon,
-                key: ValueKey(widget.icon.codePoint),
-                color: fg,
-                size: 22,
+          // …и непрерывная «дышащая» пульсация + свечение у кнопки нового чата.
+          child: AnimatedBuilder(
+            animation: _pulse,
+            builder: (context, child) {
+              final t = Curves.easeInOut.transform(_pulse.value);
+              return Transform.scale(
+                scale: widget.accented ? 1.0 + 0.09 * t : 1.0,
+                child: child,
+              );
+            },
+            child: AnimatedBuilder(
+              animation: _pulse,
+              builder: (context, child) {
+                final t = Curves.easeInOut.transform(_pulse.value);
+                return Container(
+                  width: 42,
+                  height: 42,
+                  margin: const EdgeInsets.symmetric(vertical: 7),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: bg,
+                    shape: BoxShape.circle,
+                    boxShadow: widget.accented
+                        ? [
+                            BoxShadow(
+                              color: accent.withValues(alpha: 0.25 + 0.30 * t),
+                              blurRadius: 8 + 10 * t,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: child,
+                );
+              },
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                transitionBuilder: (child, animation) => RotationTransition(
+                  turns: Tween<double>(begin: 0.5, end: 1.0).animate(animation),
+                  child: ScaleTransition(scale: animation, child: child),
+                ),
+                child: Icon(
+                  widget.icon,
+                  key: ValueKey(widget.icon.codePoint),
+                  color: fg,
+                  size: 22,
+                ),
               ),
             ),
           ),

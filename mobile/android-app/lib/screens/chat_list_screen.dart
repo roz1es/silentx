@@ -360,7 +360,7 @@ class _ChatListScreenState extends State<ChatListScreen>
           ),
           // Лента: последние сообщения чата (подгружаем при открытии меню).
           SizedBox(
-            height: 208,
+            height: 220,
             width: double.infinity,
             child: Container(
               color: bodyBg,
@@ -391,10 +391,14 @@ class _ChatListScreenState extends State<ChatListScreen>
                               fontSize: 13)),
                     );
                   }
-                  return Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: rows,
+                  return SingleChildScrollView(
+                    reverse: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: rows,
+                    ),
                   );
                 },
               ),

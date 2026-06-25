@@ -20,6 +20,7 @@ import '../widgets/glass.dart';
 import '../widgets/ios_context_menu.dart';
 import '../widgets/night_mode_switch.dart';
 import '../widgets/new_chat_sheet.dart';
+import 'chat_profile_screen.dart';
 import 'chat_screen.dart';
 import 'folders_screen.dart';
 
@@ -273,6 +274,17 @@ class _ChatListScreenState extends State<ChatListScreen>
     );
   }
 
+  /// Закрывает меню-предпросмотр и открывает профиль собеседника.
+  void _openProfileFromMenu(Chat chat) {
+    Navigator.of(context, rootNavigator: true).pop();
+    Navigator.of(context).push(
+      CupertinoPageRoute(
+        builder: (_) =>
+            ChatProfileScreen(controller: _controller, chatId: chat.id),
+      ),
+    );
+  }
+
   /// Предпросмотр окна чата: шапка (имя + статус) и последнее сообщение.
   Widget _chatPreview(Chat chat, double width) {
     final isLight = Theme.of(context).brightness == Brightness.light;
@@ -302,8 +314,11 @@ class _ChatListScreenState extends State<ChatListScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Шапка как в окне чата.
-          Container(
+          // Шапка как в окне чата — тап открывает профиль собеседника.
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _openProfileFromMenu(chat),
+            child: Container(
             color: headerBg,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
@@ -357,6 +372,7 @@ class _ChatListScreenState extends State<ChatListScreen>
                 ),
               ],
             ),
+          ),
           ),
           // Лента: последние сообщения чата (подгружаем при открытии меню).
           SizedBox(

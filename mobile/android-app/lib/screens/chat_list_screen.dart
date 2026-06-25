@@ -41,7 +41,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
   bool _showOffline = false;
   DateTime? _disconnectedAt;
   int _tabIndex = 1; // 0 = Контакты, 1 = Чаты, 2 = Настройки
-  int _filter = 0; // 0 = Все, 1 = Личные, 2 = Группы
   bool _editMode = false;
   List<String> _manualOrder = const [];
 
@@ -237,27 +236,23 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   height: 58,
                   child: Stack(
                     children: [
-                      // Скользящий стеклянный индикатор выбранной вкладки
+                      // Скользящий индикатор из настоящего матового стекла
                       Positioned.fill(
                         child: Padding(
                           padding: const EdgeInsets.all(6),
                           child: AnimatedAlign(
                             alignment: Alignment((_tabIndex / 2) * 2 - 1, 0),
-                            duration: const Duration(milliseconds: 320),
+                            duration: const Duration(milliseconds: 340),
                             curve: Curves.easeOutCubic,
                             child: FractionallySizedBox(
                               widthFactor: 1 / 3,
                               heightFactor: 1,
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: accent
-                                      .withValues(alpha: isLight ? 0.18 : 0.22),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(
-                                        alpha: isLight ? 0.55 : 0.18),
-                                  ),
-                                ),
+                              child: GlassPanel(
+                                borderRadius: 20,
+                                blur: 14,
+                                strength: 1.6,
+                                shadow: true,
+                                child: const SizedBox.expand(),
                               ),
                             ),
                           ),
@@ -267,6 +262,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                         children: [
                           _NavItem(
                             icon: Icons.person_rounded,
+                            iconOutline: Icons.person_outline_rounded,
                             label: 'Контакты',
                             selected: _tabIndex == 0,
                             isLight: isLight,
@@ -274,6 +270,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           ),
                           _NavItem(
                             icon: Icons.chat_bubble_rounded,
+                            iconOutline: Icons.chat_bubble_outline_rounded,
                             label: 'Чаты',
                             selected: _tabIndex == 1,
                             isLight: isLight,
@@ -281,6 +278,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           ),
                           _NavItem(
                             icon: Icons.settings_rounded,
+                            iconOutline: Icons.settings_outlined,
                             label: 'Настройки',
                             selected: _tabIndex == 2,
                             isLight: isLight,
@@ -400,10 +398,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       body: Column(
         children: [
           _offlineBanner(),
-          if (!_editMode) ...[
-            _searchBar(isLight),
-            _filterTabs(isLight),
-          ],
+          if (!_editMode) _searchBar(isLight),
           Expanded(
             child: _editMode
                 ? _buildEditList()
@@ -472,12 +467,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
   List<Chat> _filteredChats() {
     final query = _searchController.text.trim().toLowerCase();
     Iterable<Chat> list = _controller.chats;
-    if (_filter == 1) {
-      list = list.where((c) => c.type == ChatType.direct);
-    } else if (_filter == 2) {
-      list = list.where(
-          (c) => c.type == ChatType.group || c.type == ChatType.channel);
-    }
     if (query.isNotEmpty) {
       list = list.where((c) => c.title.toLowerCase().contains(query));
     }
@@ -575,71 +564,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 child: Icon(Icons.close_rounded,
                     size: 18, color: isLight ? lightMuted : muted),
               ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _filterTabs(bool isLight) {
-    final groupCount = _controller.chats
-        .where((c) => c.type == ChatType.group || c.type == ChatType.channel)
-        .length;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-      child: Row(
-        children: [
-          _filterPill('Все', 0, isLight, null),
-          const SizedBox(width: 8),
-          _filterPill('Личные', 1, isLight, null),
-          const SizedBox(width: 8),
-          _filterPill('Группы', 2, isLight, groupCount),
-        ],
-      ),
-    );
-  }
-
-  Widget _filterPill(String label, int index, bool isLight, int? count) {
-    final selected = _filter == index;
-    final bg = selected
-        ? accent
-        : Colors.white.withValues(alpha: isLight ? 0.55 : 0.07);
-    final fg =
-        selected ? const Color(0xFF08131A) : (isLight ? lightText : text);
-    return GestureDetector(
-      onTap: () => setState(() => _filter = index),
-      child: Container(
-        height: 34,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: isLight ? 0.6 : 0.10),
-          ),
-        ),
-        child: Row(
-          children: [
-            Text(label,
-                style: TextStyle(
-                    color: fg, fontWeight: FontWeight.w800, fontSize: 14)),
-            if (count != null && count > 0) ...[
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? Colors.black.withValues(alpha: 0.18)
-                      : (isLight ? lightMuted : muted).withValues(alpha: 0.25),
-                  borderRadius: BorderRadius.circular(99),
-                ),
-                child: Text('$count',
-                    style: TextStyle(
-                        color: fg, fontSize: 12, fontWeight: FontWeight.w800)),
-              ),
-            ],
           ],
         ),
       ),
@@ -1223,81 +1147,65 @@ class _ContactsViewState extends State<_ContactsView> {
 
 // ─── Элемент нижней навигации с анимацией иконки при выборе ────────────────
 
-class _NavItem extends StatefulWidget {
+class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.icon,
+    required this.iconOutline,
     required this.label,
     required this.selected,
     required this.isLight,
     required this.onTap,
   });
 
-  final IconData icon;
+  final IconData icon; // заполненная (выбрано)
+  final IconData iconOutline; // контурная (не выбрано)
   final String label;
   final bool selected;
   final bool isLight;
   final VoidCallback onTap;
 
   @override
-  State<_NavItem> createState() => _NavItemState();
-}
-
-class _NavItemState extends State<_NavItem>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 420),
-  );
-  // Чистый «поп» иконки, когда вкладка становится выбранной (без раскачки).
-  late final Animation<double> _scale = TweenSequence<double>([
-    TweenSequenceItem(
-      tween: Tween(begin: 1.0, end: 1.25)
-          .chain(CurveTween(curve: Curves.easeOut)),
-      weight: 45,
-    ),
-    TweenSequenceItem(
-      tween: Tween(begin: 1.25, end: 1.0)
-          .chain(CurveTween(curve: Curves.easeOutBack)),
-      weight: 55,
-    ),
-  ]).animate(_c);
-
-  @override
-  void didUpdateWidget(_NavItem old) {
-    super.didUpdateWidget(old);
-    if (widget.selected && !old.selected) _c.forward(from: 0);
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final color =
-        widget.selected ? accent : (widget.isLight ? lightMuted : muted);
+        selected ? (isLight ? lightText : text) : (isLight ? lightMuted : muted);
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
+        onTap: onTap,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            ScaleTransition(
-              scale: _scale,
-              child: Icon(widget.icon, color: color, size: 24),
+            // Иконка «перетекает» contour ↔ fill с поворотом и масштабом.
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 340),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 0.55, end: 1.0).animate(animation),
+                  child: RotationTransition(
+                    turns: Tween<double>(begin: -0.18, end: 0.0).animate(animation),
+                    child: child,
+                  ),
+                ),
+              ),
+              child: Icon(
+                selected ? icon : iconOutline,
+                key: ValueKey(selected),
+                color: color,
+                size: 24,
+              ),
             ),
             const SizedBox(height: 3),
-            Text(
-              widget.label,
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 260),
               style: TextStyle(
                 color: color,
                 fontSize: 11,
-                fontWeight:
-                    widget.selected ? FontWeight.w800 : FontWeight.w600,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
               ),
+              child: Text(label),
             ),
           ],
         ),

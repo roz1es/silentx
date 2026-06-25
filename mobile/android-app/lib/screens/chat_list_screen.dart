@@ -583,8 +583,32 @@ class _ChatListScreenState extends State<ChatListScreen>
     );
   }
 
+  /// Сумма непрочитанных сообщений по всем чатам, попадающим в папку.
+  int _folderUnread(int index) {
+    Iterable<Chat> list = _controller.chats;
+    if (index > 0 && index <= _folders.length) {
+      final folder = _folders[index - 1];
+      switch (folder.filterType) {
+        case FolderFilter.direct:
+          list = list.where((c) => c.type == ChatType.direct);
+        case FolderFilter.groups:
+          list = list.where((c) =>
+              c.type == ChatType.group || c.type == ChatType.channel);
+        default:
+          final ids = folder.chatIds.toSet();
+          list = list.where((c) => ids.contains(c.id));
+      }
+    }
+    var sum = 0;
+    for (final c in list) {
+      sum += _controller.unreadFor(c);
+    }
+    return sum;
+  }
+
   Widget _folderTab(String name, int index, bool isLight) {
     final selected = _activeFolder == index;
+    final unread = _folderUnread(index);
     return GestureDetector(
       onTap: () => setState(() => _activeFolder = index),
       child: AnimatedContainer(
@@ -604,13 +628,39 @@ class _ChatListScreenState extends State<ChatListScreen>
                 : Colors.white.withValues(alpha: isLight ? 0.5 : 0.08),
           ),
         ),
-        child: Text(
-          name,
-          style: TextStyle(
-            color: selected ? accent : (isLight ? lightMuted : muted),
-            fontWeight: FontWeight.w800,
-            fontSize: 14,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              name,
+              style: TextStyle(
+                color: selected ? accent : (isLight ? lightMuted : muted),
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+              ),
+            ),
+            if (unread > 0) ...[
+              const SizedBox(width: 7),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                constraints: const BoxConstraints(minWidth: 18),
+                decoration: BoxDecoration(
+                  color: accent,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Text(
+                  unread > 99 ? '99+' : '$unread',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(0xFF08131A),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );

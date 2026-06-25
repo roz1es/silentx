@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../format.dart';
 import '../models.dart';
+import '../services/folders_store.dart';
 import '../services/messenger_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/brenks_avatar.dart';
@@ -18,6 +19,7 @@ import '../widgets/glass.dart';
 import '../widgets/night_mode_switch.dart';
 import '../widgets/new_chat_sheet.dart';
 import 'chat_screen.dart';
+import 'folders_screen.dart';
 
 /// Главный экран после входа: список чатов.
 class ChatListScreen extends StatefulWidget {
@@ -52,8 +54,29 @@ class _ChatListScreenState extends State<ChatListScreen>
   bool _editMode = false;
   bool _searchVisible = false;
   List<String> _manualOrder = const [];
+  List<ChatFolder> _folders = const [];
+  int _activeFolder = 0; // 0 = «Все»
 
   MessengerController get _controller => widget.controller;
+
+  Future<void> _loadFolders() async {
+    final folders = await FoldersStore.load();
+    if (mounted) {
+      setState(() {
+        _folders = folders;
+        if (_activeFolder > folders.length) _activeFolder = 0;
+      });
+    }
+  }
+
+  Future<void> _openFolders() async {
+    await Navigator.of(context).push(
+      CupertinoPageRoute(
+        builder: (_) => FoldersScreen(controller: _controller),
+      ),
+    );
+    await _loadFolders();
+  }
 
   void _toggleSearch() {
     final show = !_searchVisible;
@@ -78,6 +101,7 @@ class _ChatListScreenState extends State<ChatListScreen>
     super.initState();
     _controller.addListener(_onChanged);
     _loadOrder();
+    _loadFolders();
   }
 
   @override
@@ -360,6 +384,7 @@ class _ChatListScreenState extends State<ChatListScreen>
         themeMode: widget.themeMode,
         onThemeModeChanged: widget.onThemeModeChanged,
         onLogout: widget.onLogout,
+        onManageFolders: _openFolders,
         isLight: isLight,
       ),
     );
@@ -442,6 +467,7 @@ class _ChatListScreenState extends State<ChatListScreen>
                 ),
               ),
             ),
+          if (!_editMode && _folders.isNotEmpty) _folderTabs(isLight),
           Expanded(
             child: _editMode
                 ? _buildEditList()
@@ -451,6 +477,74 @@ class _ChatListScreenState extends State<ChatListScreen>
                   ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _folderTabs(bool isLight) {
+    final names = ['Все', ..._folders.map((f) => f.name)];
+    return SizedBox(
+      height: 46,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        itemCount: names.length + 1,
+        itemBuilder: (context, index) {
+          if (index == names.length) {
+            // Кнопка управления папками в конце.
+            return Padding(
+              padding: const EdgeInsets.only(left: 2),
+              child: _TapBounce(
+                onTap: _openFolders,
+                child: Container(
+                  height: 34,
+                  width: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: isLight ? 0.55 : 0.07),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: Colors.white
+                            .withValues(alpha: isLight ? 0.6 : 0.10)),
+                  ),
+                  child: Icon(Icons.tune_rounded,
+                      size: 18, color: isLight ? lightMuted : muted),
+                ),
+              ),
+            );
+          }
+          final selected = _activeFolder == index;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onTap: () => setState(() => _activeFolder = index),
+              child: Container(
+                height: 34,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? accent
+                      : Colors.white.withValues(alpha: isLight ? 0.55 : 0.07),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                      color: Colors.white
+                          .withValues(alpha: isLight ? 0.6 : 0.10)),
+                ),
+                child: Text(
+                  names[index],
+                  style: TextStyle(
+                    color: selected
+                        ? const Color(0xFF08131A)
+                        : (isLight ? lightText : text),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -511,6 +605,11 @@ class _ChatListScreenState extends State<ChatListScreen>
   List<Chat> _filteredChats() {
     final query = _searchController.text.trim().toLowerCase();
     Iterable<Chat> list = _controller.chats;
+    // Фильтр по активной папке (0 = «Все»).
+    if (_activeFolder > 0 && _activeFolder <= _folders.length) {
+      final ids = _folders[_activeFolder - 1].chatIds.toSet();
+      list = list.where((c) => ids.contains(c.id));
+    }
     if (query.isNotEmpty) {
       list = list.where((c) => c.title.toLowerCase().contains(query));
     }
@@ -682,6 +781,7 @@ class _SettingsView extends StatefulWidget {
     required this.themeMode,
     required this.onThemeModeChanged,
     required this.onLogout,
+    required this.onManageFolders,
     required this.isLight,
   });
 
@@ -689,6 +789,7 @@ class _SettingsView extends StatefulWidget {
   final ThemeMode themeMode;
   final ValueChanged<ThemeMode> onThemeModeChanged;
   final Future<void> Function() onLogout;
+  final VoidCallback onManageFolders;
   final bool isLight;
 
   @override
@@ -1049,6 +1150,32 @@ class _SettingsViewState extends State<_SettingsView> {
                             style: TextStyle(color: _mutedColor, fontSize: 13),
                           ),
                         ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    _sectionLabel('ЧАТЫ'),
+                    const SizedBox(height: 8),
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: widget.onManageFolders,
+                      child: GlassCard(
+                        borderRadius: 18,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 14),
+                        child: Row(
+                          children: [
+                            _miniIcon(Icons.folder_rounded),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text('Папки чатов',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: _textColor)),
+                            ),
+                            Icon(Icons.chevron_right_rounded,
+                                color: _mutedColor),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 20),

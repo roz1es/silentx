@@ -38,6 +38,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   bool _searching = false;
   bool _showOffline = false;
   DateTime? _disconnectedAt;
+  int _tabIndex = 0;
 
   MessengerController get _controller => widget.controller;
 
@@ -154,31 +155,94 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
-  void _openAccount() {
+  void _openAccount() => setState(() => _tabIndex = 1);
+
+  @override
+  Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
-    showModalBottomSheet<void>(
-      context: context,
+    return GlassBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: IndexedStack(
+          index: _tabIndex,
+          children: [
+            _chatTab(isLight),
+            _settingsTab(isLight),
+          ],
+        ),
+        bottomNavigationBar: _bottomNav(isLight),
+      ),
+    );
+  }
+
+  Widget _bottomNav(bool isLight) {
+    return GlassBar(
+      topBorder: true,
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 62,
+          child: Row(
+            children: [
+              _navItem(0, Icons.forum_rounded, 'Главная', isLight),
+              _navItem(1, Icons.settings_rounded, 'Настройки', isLight),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _navItem(int index, IconData icon, String label, bool isLight) {
+    final selected = _tabIndex == index;
+    final color = selected ? accent : (isLight ? lightMuted : muted);
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _tabIndex = index),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 25),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _settingsTab(bool isLight) {
+    return Scaffold(
       backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (sheetContext) => _ProfileSheet(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        toolbarHeight: 70,
+        automaticallyImplyLeading: false,
+        flexibleSpace: const GlassBar(bottomBorder: true),
+        titleSpacing: 20,
+        title: const Text(
+          'Настройки',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+        ),
+      ),
+      body: _SettingsView(
         controller: _controller,
         themeMode: widget.themeMode,
-        onThemeModeChanged: (mode) {
-          widget.onThemeModeChanged(mode);
-          Navigator.pop(sheetContext);
-        },
-        onLogout: () async {
-          Navigator.pop(sheetContext);
-          await widget.onLogout();
-        },
+        onThemeModeChanged: widget.onThemeModeChanged,
+        onLogout: widget.onLogout,
         isLight: isLight,
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
+  Widget _chatTab(bool isLight) {
     final query = _searchController.text.trim().toLowerCase();
     final chats = query.isEmpty
         ? _controller.chats
@@ -186,8 +250,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
             .where((chat) => chat.title.toLowerCase().contains(query))
             .toList(growable: false);
 
-    return GlassBackground(
-      child: Scaffold(
+    return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -329,10 +392,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
           ),
         ],
       ),
-      ),
     );
   }
-
 
   Widget _buildBody(List<Chat> chats) {
     if (_controller.loadingChats && _controller.chats.isEmpty) {
@@ -393,10 +454,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 }
 
-// ─── Профиль-шит (как в веб-версии) ───────────────────────────────────────
+// ─── Вкладка «Настройки» (профиль) ────────────────────────────────────────
 
-class _ProfileSheet extends StatefulWidget {
-  const _ProfileSheet({
+class _SettingsView extends StatefulWidget {
+  const _SettingsView({
     required this.controller,
     required this.themeMode,
     required this.onThemeModeChanged,
@@ -407,14 +468,14 @@ class _ProfileSheet extends StatefulWidget {
   final MessengerController controller;
   final ThemeMode themeMode;
   final ValueChanged<ThemeMode> onThemeModeChanged;
-  final VoidCallback onLogout;
+  final Future<void> Function() onLogout;
   final bool isLight;
 
   @override
-  State<_ProfileSheet> createState() => _ProfileSheetState();
+  State<_SettingsView> createState() => _SettingsViewState();
 }
 
-class _ProfileSheetState extends State<_ProfileSheet> {
+class _SettingsViewState extends State<_SettingsView> {
   bool _uploadingPhoto = false;
 
   MessengerController get _ctrl => widget.controller;
@@ -468,39 +529,11 @@ class _ProfileSheetState extends State<_ProfileSheet> {
   @override
   Widget build(BuildContext context) {
     final user = _ctrl.currentUser;
-    return DraggableScrollableSheet(
-      initialChildSize: 1.0,
-      maxChildSize: 1.0,
-      minChildSize: 0.5,
-      expand: false,
-      builder: (_, scrollCtrl) => ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        child: Stack(
-          children: [
-            const Positioned.fill(
-              child: GlassBackground(child: SizedBox.expand()),
-            ),
-            SafeArea(
-              bottom: false,
-              child: SingleChildScrollView(
-                controller: scrollCtrl,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Drag handle
-                      Center(
-                        child: Container(
-                          width: 44,
-                          height: 5,
-                          margin: const EdgeInsets.only(bottom: 16),
-                          decoration: BoxDecoration(
-                            color: _mutedColor.withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(99),
-                          ),
-                        ),
-                      ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
                     // Hero card: avatar + name + status
                     GlassCard(
                       borderRadius: 26,
@@ -704,17 +737,6 @@ class _ProfileSheetState extends State<_ProfileSheet> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    FilledButton.tonalIcon(
-                      onPressed: widget.onLogout,
-                      icon: const Icon(Icons.check_rounded),
-                      label: const Text('Готово'),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(50),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16)),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
                     OutlinedButton.icon(
                       onPressed: widget.onLogout,
                       icon: const Icon(Icons.logout_rounded, color: danger),
@@ -727,13 +749,7 @@ class _ProfileSheetState extends State<_ProfileSheet> {
                             borderRadius: BorderRadius.circular(16)),
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }

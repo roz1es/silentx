@@ -149,11 +149,13 @@ class GlassBar extends StatelessWidget {
     this.blur = 22,
     this.bottomBorder = false,
     this.topBorder = false,
+    this.child,
   });
 
   final double blur;
   final bool bottomBorder;
   final bool topBorder;
+  final Widget? child;
 
   @override
   Widget build(BuildContext context) {
@@ -170,6 +172,7 @@ class GlassBar extends StatelessWidget {
               top: topBorder ? BorderSide(color: line) : BorderSide.none,
             ),
           ),
+          child: child,
         ),
       ),
     );

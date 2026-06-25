@@ -42,9 +42,26 @@ class _ChatListScreenState extends State<ChatListScreen> {
   DateTime? _disconnectedAt;
   int _tabIndex = 1; // 0 = Контакты, 1 = Чаты, 2 = Настройки
   bool _editMode = false;
+  bool _searchVisible = false;
   List<String> _manualOrder = const [];
 
   MessengerController get _controller => widget.controller;
+
+  void _toggleSearch() {
+    final show = !_searchVisible;
+    setState(() {
+      _tabIndex = 1;
+      _searchVisible = show;
+      if (!show) _searchController.clear();
+    });
+    if (show) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _searchFocus.requestFocus();
+      });
+    } else {
+      _searchFocus.unfocus();
+    }
+  }
 
   @override
   void initState() {
@@ -292,20 +309,27 @@ class _ChatListScreenState extends State<ChatListScreen> {
               ),
             ),
             const SizedBox(width: 10),
-            GlassPanel(
-              borderRadius: 28,
-              shadow: true,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () {
-                  setState(() => _tabIndex = 1);
-                  _searchFocus.requestFocus();
-                },
+            _TapBounce(
+              onTap: _toggleSearch,
+              child: GlassPanel(
+                borderRadius: 28,
+                shadow: true,
                 child: SizedBox(
                   width: 58,
                   height: 58,
-                  child: Icon(Icons.search_rounded,
-                      color: isLight ? lightText : text, size: 25),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 220),
+                    transitionBuilder: (child, animation) => ScaleTransition(
+                      scale: animation,
+                      child: FadeTransition(opacity: animation, child: child),
+                    ),
+                    child: Icon(
+                      _searchVisible ? Icons.close_rounded : Icons.search_rounded,
+                      key: ValueKey(_searchVisible),
+                      color: _searchVisible ? accent : (isLight ? lightText : text),
+                      size: 25,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -398,7 +422,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
       body: Column(
         children: [
           _offlineBanner(),
-          if (!_editMode) _searchBar(isLight),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: (_searchVisible && !_editMode)
+                ? _searchBar(isLight)
+                : const SizedBox(width: double.infinity),
+          ),
           Expanded(
             child: _editMode
                 ? _buildEditList()
@@ -1210,6 +1241,58 @@ class _NavItem extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ─── Обёртка: «поп» любого виджета при нажатии ────────────────────────────
+
+class _TapBounce extends StatefulWidget {
+  const _TapBounce({required this.onTap, required this.child});
+
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  State<_TapBounce> createState() => _TapBounceState();
+}
+
+class _TapBounceState extends State<_TapBounce>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 260),
+  );
+  late final Animation<double> _scale = TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween(begin: 1.0, end: 1.18)
+          .chain(CurveTween(curve: Curves.easeOut)),
+      weight: 45,
+    ),
+    TweenSequenceItem(
+      tween: Tween(begin: 1.18, end: 1.0)
+          .chain(CurveTween(curve: Curves.easeIn)),
+      weight: 55,
+    ),
+  ]).animate(_c);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  void _handleTap() {
+    _c.forward(from: 0);
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _handleTap,
+      child: ScaleTransition(scale: _scale, child: widget.child),
     );
   }
 }

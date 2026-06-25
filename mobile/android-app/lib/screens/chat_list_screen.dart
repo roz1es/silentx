@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models.dart';
 import '../services/messenger_controller.dart';
@@ -35,10 +36,13 @@ class ChatListScreen extends StatefulWidget {
 
 class _ChatListScreenState extends State<ChatListScreen> {
   final _searchController = TextEditingController();
+  final _searchFocus = FocusNode();
   bool _showOffline = false;
   DateTime? _disconnectedAt;
   int _tabIndex = 1; // 0 = Контакты, 1 = Чаты, 2 = Настройки
   int _filter = 0; // 0 = Все, 1 = Личные, 2 = Группы
+  bool _editMode = false;
+  List<String> _manualOrder = const [];
 
   MessengerController get _controller => widget.controller;
 
@@ -46,13 +50,55 @@ class _ChatListScreenState extends State<ChatListScreen> {
   void initState() {
     super.initState();
     _controller.addListener(_onChanged);
+    _loadOrder();
   }
 
   @override
   void dispose() {
     _controller.removeListener(_onChanged);
     _searchController.dispose();
+    _searchFocus.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadOrder() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getStringList('chat_manual_order');
+    if (raw != null && mounted) setState(() => _manualOrder = raw);
+  }
+
+  Future<void> _saveOrder(List<String> order) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('chat_manual_order', order);
+  }
+
+  /// Применяет ручной порядок: вручную упорядоченные чаты идут первыми,
+  /// остальные — следом в исходном порядке (стабильно).
+  List<Chat> _applyManualOrder(List<Chat> chats) {
+    if (_manualOrder.isEmpty) return chats;
+    final byId = {for (final c in chats) c.id: c};
+    final used = <String>{};
+    final result = <Chat>[];
+    for (final id in _manualOrder) {
+      final c = byId[id];
+      if (c != null) {
+        result.add(c);
+        used.add(id);
+      }
+    }
+    for (final c in chats) {
+      if (!used.contains(c.id)) result.add(c);
+    }
+    return result;
+  }
+
+  void _onReorder(List<Chat> display, int oldIndex, int newIndex) {
+    if (newIndex > oldIndex) newIndex -= 1;
+    final ids = display.map((c) => c.id).toList();
+    final moved = ids.removeAt(oldIndex);
+    ids.insert(newIndex, moved);
+    setState(() => _manualOrder = ids);
+    _saveOrder(ids);
   }
 
   void _onChanged() {
@@ -175,19 +221,47 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Widget _bottomNav(bool isLight) {
-    return GlassBar(
-      topBorder: true,
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 60,
-          child: Row(
-            children: [
-              _navItem(0, Icons.person_rounded, 'Контакты', isLight),
-              _navItem(1, Icons.chat_bubble_rounded, 'Чаты', isLight),
-              _navItem(2, Icons.settings_rounded, 'Настройки', isLight),
-            ],
-          ),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 4, 10, 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: GlassPanel(
+                borderRadius: 28,
+                shadow: true,
+                child: SizedBox(
+                  height: 58,
+                  child: Row(
+                    children: [
+                      _navItem(0, Icons.person_rounded, 'Контакты', isLight),
+                      _navItem(1, Icons.chat_bubble_rounded, 'Чаты', isLight),
+                      _navItem(2, Icons.settings_rounded, 'Настройки', isLight),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            GlassPanel(
+              borderRadius: 28,
+              shadow: true,
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () {
+                  setState(() => _tabIndex = 1);
+                  _searchFocus.requestFocus();
+                },
+                child: SizedBox(
+                  width: 58,
+                  height: 58,
+                  child: Icon(Icons.search_rounded,
+                      color: isLight ? lightText : text, size: 25),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -275,28 +349,25 @@ class _ChatListScreenState extends State<ChatListScreen> {
         titleSpacing: 0,
         automaticallyImplyLeading: false,
         flexibleSpace: const GlassBar(),
-        leadingWidth: 84,
+        leadingWidth: 96,
         leading: Center(
-          child: _pillButton(
+          child: _PillButton(
             isLight: isLight,
-            onTap: () => showAppToast(context, 'Редактирование списка — скоро'),
-            child: const Text('Изм.',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+            onTap: () => setState(() => _editMode = !_editMode),
+            child: Text(_editMode ? 'Готово' : 'Изм.',
+                style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    color: _editMode ? accent : (isLight ? lightText : text))),
           ),
         ),
         title: const Text('Чаты',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
         actions: [
-          _pillButton(
+          _PillButton(
             isLight: isLight,
             onTap: _newChat,
-            child: const Icon(Icons.add_rounded, size: 22),
-          ),
-          const SizedBox(width: 8),
-          _pillButton(
-            isLight: isLight,
-            onTap: _newChat,
-            child: const Icon(Icons.edit_square, size: 19),
+            child: const Icon(Icons.add_rounded, size: 24),
           ),
           const SizedBox(width: 12),
         ],
@@ -304,16 +375,72 @@ class _ChatListScreenState extends State<ChatListScreen> {
       body: Column(
         children: [
           _offlineBanner(),
-          _searchBar(isLight),
-          _filterTabs(isLight),
+          if (!_editMode) ...[
+            _searchBar(isLight),
+            _filterTabs(isLight),
+          ],
           Expanded(
-            child: RefreshIndicator(
-              onRefresh: _controller.loadChats,
-              child: _buildBody(chats),
-            ),
+            child: _editMode
+                ? _buildEditList()
+                : RefreshIndicator(
+                    onRefresh: _controller.loadChats,
+                    child: _buildBody(chats),
+                  ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildEditList() {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final handleColor = isLight ? lightMuted : muted;
+    final chats = _applyManualOrder(_controller.chats);
+    if (chats.isEmpty) {
+      return const Center(
+        child: EmptyState(
+          title: 'Чатов пока нет',
+          subtitle: 'Создайте чат кнопкой «+».',
+        ),
+      );
+    }
+    return ReorderableListView.builder(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
+      itemCount: chats.length,
+      // ignore: deprecated_member_use
+      onReorder: (oldIndex, newIndex) => _onReorder(chats, oldIndex, newIndex),
+      itemBuilder: (context, index) {
+        final chat = chats[index];
+        return Padding(
+          key: ValueKey(chat.id),
+          padding: const EdgeInsets.only(bottom: 8),
+          child: GlassCard(
+            borderRadius: 20,
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ChatTile(
+                    chat: chat,
+                    serverUrl: _controller.serverUrl,
+                    unread: _controller.unreadFor(chat),
+                    peerOnline: _controller.isPeerOnline(chat),
+                    onTap: () {},
+                    onLongPress: () {},
+                  ),
+                ),
+                ReorderableDragStartListener(
+                  index: index,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Icon(Icons.drag_handle_rounded, color: handleColor),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -329,7 +456,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     if (query.isNotEmpty) {
       list = list.where((c) => c.title.toLowerCase().contains(query));
     }
-    return list.toList(growable: false);
+    return _applyManualOrder(list.toList(growable: false));
   }
 
   Widget _offlineBanner() {
@@ -396,15 +523,24 @@ class _ChatListScreenState extends State<ChatListScreen> {
             Expanded(
               child: TextField(
                 controller: _searchController,
+                focusNode: _searchFocus,
                 onChanged: (_) => setState(() {}),
                 textAlignVertical: TextAlignVertical.center,
+                style: const TextStyle(fontSize: 15),
+                cursorColor: accent,
                 decoration: InputDecoration(
                   isCollapsed: true,
+                  contentPadding: EdgeInsets.zero,
                   hintText: 'Поиск',
                   hintStyle: TextStyle(
                       color: isLight ? lightMuted : muted, fontSize: 15),
-                  border: InputBorder.none,
                   filled: false,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  focusedErrorBorder: InputBorder.none,
                 ),
               ),
             ),
@@ -481,30 +617,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
             ],
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _pillButton({
-    required bool isLight,
-    required VoidCallback onTap,
-    required Widget child,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 36,
-        constraints: const BoxConstraints(minWidth: 44),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: isLight ? 0.7 : 0.09),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: isLight ? 0.6 : 0.10),
-          ),
-        ),
-        child: child,
       ),
     );
   }
@@ -1079,6 +1191,79 @@ class _ContactsViewState extends State<_ContactsView> {
             onTap: () => _startChat(user),
           );
         },
+      ),
+    );
+  }
+}
+
+// ─── Пилюля-кнопка шапки с «попом» при нажатии ────────────────────────────
+
+class _PillButton extends StatefulWidget {
+  const _PillButton({
+    required this.isLight,
+    required this.onTap,
+    required this.child,
+  });
+
+  final bool isLight;
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  State<_PillButton> createState() => _PillButtonState();
+}
+
+class _PillButtonState extends State<_PillButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _tap = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 240),
+  );
+  late final Animation<double> _bounce = TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween(begin: 1.0, end: 1.14)
+          .chain(CurveTween(curve: Curves.easeOut)),
+      weight: 45,
+    ),
+    TweenSequenceItem(
+      tween: Tween(begin: 1.14, end: 1.0)
+          .chain(CurveTween(curve: Curves.easeIn)),
+      weight: 55,
+    ),
+  ]).animate(_tap);
+
+  @override
+  void dispose() {
+    _tap.dispose();
+    super.dispose();
+  }
+
+  void _handleTap() {
+    _tap.forward(from: 0);
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _handleTap,
+      behavior: HitTestBehavior.opaque,
+      child: ScaleTransition(
+        scale: _bounce,
+        child: Container(
+          height: 36,
+          constraints: const BoxConstraints(minWidth: 44),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: widget.isLight ? 0.7 : 0.09),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: widget.isLight ? 0.6 : 0.10),
+            ),
+          ),
+          child: widget.child,
+        ),
       ),
     );
   }

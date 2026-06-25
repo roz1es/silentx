@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
@@ -333,6 +334,7 @@ class _ChatListScreenState extends State<ChatListScreen>
                             label: 'Чаты',
                             selected: _tabIndex == 0,
                             isLight: isLight,
+                            effect: _NavEffect.bounce,
                             onTap: () {
                               _maybeCloseEmptySearch();
                               setState(() => _tabIndex = 0);
@@ -344,6 +346,7 @@ class _ChatListScreenState extends State<ChatListScreen>
                             label: 'Настройки',
                             selected: _tabIndex == 1,
                             isLight: isLight,
+                            effect: _NavEffect.spin,
                             onTap: () {
                               _maybeCloseEmptySearch();
                               setState(() => _tabIndex = 1);
@@ -1390,7 +1393,9 @@ class _SettingsViewState extends State<_SettingsView> {
 
 // ─── Элемент нижней навигации с анимацией иконки при выборе ────────────────
 
-class _NavItem extends StatelessWidget {
+enum _NavEffect { bounce, spin }
+
+class _NavItem extends StatefulWidget {
   const _NavItem({
     required this.icon,
     required this.iconOutline,
@@ -1398,6 +1403,7 @@ class _NavItem extends StatelessWidget {
     required this.selected,
     required this.isLight,
     required this.onTap,
+    this.effect = _NavEffect.bounce,
   });
 
   final IconData icon; // заполненная (выбрано)
@@ -1406,36 +1412,78 @@ class _NavItem extends StatelessWidget {
   final bool selected;
   final bool isLight;
   final VoidCallback onTap;
+  final _NavEffect effect;
+
+  @override
+  State<_NavItem> createState() => _NavItemState();
+}
+
+class _NavItemState extends State<_NavItem>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+  );
+
+  @override
+  void didUpdateWidget(_NavItem old) {
+    super.didUpdateWidget(old);
+    if (widget.selected && !old.selected) _c.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  // Преобразование иконки по ходу анимации выбора.
+  Widget _transform(Widget child) {
+    final t = _c.value;
+    if (t == 0) return child;
+    if (widget.effect == _NavEffect.spin) {
+      // Шестерёнка: полный оборот на 360° (возвращается на место) + «дыхание».
+      final turns = Curves.easeInOutCubic.transform(t);
+      final scale = 1 + 0.22 * math.sin(t * math.pi);
+      return Transform.rotate(
+        angle: turns * 2 * math.pi,
+        child: Transform.scale(scale: scale, child: child),
+      );
+    }
+    // Чаты: упругий «желейный» отскок с лёгким покачиванием.
+    final scale =
+        (1 + 0.4 * math.sin(t * math.pi) - 0.12 * math.sin(t * 2 * math.pi))
+            .clamp(0.8, 1.5);
+    final wobble = math.sin(t * math.pi * 3) * 0.14 * (1 - t);
+    return Transform.rotate(
+      angle: wobble,
+      child: Transform.scale(scale: scale.toDouble(), child: child),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? accent : accent.withValues(alpha: 0.5);
+    final color =
+        widget.selected ? accent : accent.withValues(alpha: 0.5);
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: onTap,
+        onTap: widget.onTap,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Плавно: иконка чуть подрастает + контур мягко перетекает в заливку.
-            AnimatedScale(
-              scale: selected ? 1.14 : 1.0,
-              duration: const Duration(milliseconds: 240),
-              curve: Curves.easeOutCubic,
-              child: AnimatedSlide(
-                offset: selected ? const Offset(0, -0.05) : Offset.zero,
-                duration: const Duration(milliseconds: 240),
-                curve: Curves.easeOutCubic,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
-                  transitionBuilder: (child, animation) =>
-                      FadeTransition(opacity: animation, child: child),
-                  child: Icon(
-                    selected ? icon : iconOutline,
-                    key: ValueKey(selected),
-                    color: color,
-                    size: 24,
-                  ),
+            AnimatedBuilder(
+              animation: _c,
+              builder: (context, child) => _transform(child!),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                transitionBuilder: (child, animation) =>
+                    FadeTransition(opacity: animation, child: child),
+                child: Icon(
+                  widget.selected ? widget.icon : widget.iconOutline,
+                  key: ValueKey(widget.selected),
+                  color: color,
+                  size: 24,
                 ),
               ),
             ),
@@ -1445,9 +1493,10 @@ class _NavItem extends StatelessWidget {
               style: TextStyle(
                 color: color,
                 fontSize: 11,
-                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                fontWeight:
+                    widget.selected ? FontWeight.w800 : FontWeight.w600,
               ),
-              child: Text(label),
+              child: Text(widget.label),
             ),
           ],
         ),

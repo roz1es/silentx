@@ -264,15 +264,12 @@ class _MessageComposerState extends State<MessageComposer> {
       );
     }
     if (hasText || widget.editing != null) {
-      return _blob(
-        color: accent,
+      return _SendButton(
+        icon: widget.editing != null
+            ? Icons.check_rounded
+            : Icons.send_rounded,
         isLight: isLight,
         onTap: widget.onSend,
-        child: Icon(
-          widget.editing != null ? Icons.check_rounded : Icons.send_rounded,
-          color: const Color(0xFF08131A),
-          size: 24,
-        ),
       );
     }
     // Пусто → кнопка режима: тап переключает голос/кружок,
@@ -427,6 +424,87 @@ class _MessageComposerState extends State<MessageComposer> {
             icon: const Icon(Icons.close_rounded),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Кнопка отправки с анимацией «вылета» самолётика при нажатии.
+class _SendButton extends StatefulWidget {
+  const _SendButton({
+    required this.icon,
+    required this.isLight,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final bool isLight;
+  final VoidCallback onTap;
+
+  @override
+  State<_SendButton> createState() => _SendButtonState();
+}
+
+class _SendButtonState extends State<_SendButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 460),
+  );
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  void _handleTap() {
+    _c.forward(from: 0);
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: accent,
+      shape: const CircleBorder(),
+      elevation: widget.isLight ? 2 : 1,
+      shadowColor: Colors.black.withValues(alpha: 0.25),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: _handleTap,
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: Center(
+            child: AnimatedBuilder(
+              animation: _c,
+              builder: (context, child) {
+                final t = _c.value;
+                double dx, dy, op;
+                if (t < 0.5) {
+                  // улетает вправо-вверх и затухает
+                  final p = t / 0.5;
+                  dx = p * 26;
+                  dy = -p * 14;
+                  op = 1 - p;
+                } else {
+                  // прилетает обратно слева-снизу
+                  final p = Curves.easeOutBack.transform((t - 0.5) / 0.5);
+                  dx = (1 - p) * -12;
+                  dy = (1 - p) * 8;
+                  op = ((t - 0.5) / 0.5).clamp(0.0, 1.0);
+                }
+                return Transform.translate(
+                  offset: Offset(dx, dy),
+                  child: Opacity(opacity: op.clamp(0.0, 1.0), child: child),
+                );
+              },
+              child: Icon(widget.icon,
+                  color: const Color(0xFF08131A), size: 24),
+            ),
+          ),
+        ),
       ),
     );
   }

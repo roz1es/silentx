@@ -76,7 +76,8 @@ class MessageBubble extends StatelessWidget {
                   ),
                   border: Border.all(color: own ? ownBorder : otherBorder),
                 ),
-                child: Column(
+                child: IntrinsicWidth(
+                  child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -96,33 +97,40 @@ class MessageBubble extends StatelessWidget {
                       _ReplyChip(preview: replyPreview!, isLight: isLight),
                     _content(msgTextColor, timeColor),
                     const SizedBox(height: 4),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        if (message.editedAt != null && !message.deleted) ...[
-                          Text('изм.', style: TextStyle(color: timeColor, fontSize: 11)),
-                          const SizedBox(width: 6),
-                        ],
-                        Text(
-                          formatTime(message.createdAt),
-                          style: TextStyle(color: timeColor, fontSize: 11),
-                        ),
-                        if (own && !message.deleted) ...[
-                          const SizedBox(width: 3),
-                          Icon(
-                            read ? Icons.done_all_rounded : Icons.done_rounded,
-                            size: 15,
-                            color: read
-                                ? (isLight
-                                    ? const Color(0xFF34A0F0)
-                                    : const Color(0xFF6FD0FF))
-                                : timeColor,
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (message.editedAt != null && !message.deleted) ...[
+                            Text('изм.',
+                                style:
+                                    TextStyle(color: timeColor, fontSize: 11)),
+                            const SizedBox(width: 6),
+                          ],
+                          Text(
+                            formatTime(message.createdAt),
+                            style: TextStyle(color: timeColor, fontSize: 11),
                           ),
+                          if (own && !message.deleted) ...[
+                            const SizedBox(width: 3),
+                            Icon(
+                              read
+                                  ? Icons.done_all_rounded
+                                  : Icons.done_rounded,
+                              size: 15,
+                              color: read
+                                  ? (isLight
+                                      ? const Color(0xFF34A0F0)
+                                      : const Color(0xFF6FD0FF))
+                                  : timeColor,
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ],
+                ),
                 ),
               ),
               if (message.reactions.isNotEmpty) _reactions(isLight),

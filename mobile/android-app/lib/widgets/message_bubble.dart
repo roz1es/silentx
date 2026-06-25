@@ -1,9 +1,12 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../format.dart';
 import '../models.dart';
 import '../theme/app_theme.dart';
+import 'glass.dart';
 import 'media_preview.dart';
 
 const quickReactions = ['👍', '❤️', '😂', '🔥', '😮', '😢'];
@@ -43,6 +46,14 @@ class MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return GestureDetector(
+      onLongPressStart: (d) => _openMenu(context, d.globalPosition),
+      child: _bubbleBody(context),
+    );
+  }
+
+  /// Тело пузыря без жестов — переиспользуется как «приподнятая» копия в меню.
+  Widget _bubbleBody(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
     // Исходящее — тёплый тёмный (лёгкий золотой оттенок), входящее — графит.
     final ownBg = isLight ? const Color(0xFFF0E7D6) : const Color(0xFF34312A);
@@ -55,9 +66,7 @@ class MessageBubble extends StatelessWidget {
     final msgTextColor = isLight ? lightText : text;
     final timeColor = isLight ? lightMuted : muted;
 
-    return GestureDetector(
-      onLongPressStart: (d) => _openMenu(context, d.globalPosition),
-      child: Align(
+    return Align(
         alignment: own ? Alignment.centerRight : Alignment.centerLeft,
         child: Container(
           constraints: BoxConstraints(
@@ -139,7 +148,6 @@ class MessageBubble extends StatelessWidget {
             ],
           ),
         ),
-      ),
     );
   }
 
@@ -206,18 +214,20 @@ class MessageBubble extends StatelessWidget {
 
   Future<void> _openMenu(BuildContext context, Offset pos) async {
     final isLight = Theme.of(context).brightness == Brightness.light;
+    final bubble = _bubbleBody(context);
     await showGeneralDialog<void>(
       context: context,
       barrierDismissible: true,
       barrierLabel: 'menu',
-      barrierColor: Colors.black.withValues(alpha: 0.5),
-      transitionDuration: const Duration(milliseconds: 170),
+      barrierColor: Colors.transparent,
+      transitionDuration: const Duration(milliseconds: 180),
       pageBuilder: (ctx, _, __) => _ContextMenu(
         pos: pos,
         isLight: isLight,
         own: own,
         deleted: message.deleted,
         messageText: message.text,
+        bubble: bubble,
         onReply: onReply,
         onEdit: onEdit,
         onPin: onPin,
@@ -226,27 +236,22 @@ class MessageBubble extends StatelessWidget {
       ),
       transitionBuilder: (ctx, anim, _, child) {
         final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
-        return FadeTransition(
-          opacity: curved,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.94, end: 1.0).animate(curved),
-            alignment: own ? Alignment.bottomRight : Alignment.bottomLeft,
-            child: child,
-          ),
-        );
+        return FadeTransition(opacity: curved, child: child);
       },
     );
   }
 }
 
-/// Всплывающее контекстное меню сообщения (iOS-стиль): пилюля реакций + меню.
-class _ContextMenu extends StatelessWidget {
+/// Всплывающее контекстное меню сообщения (iOS-стиль):
+/// размытый фон + приподнятое сообщение + пилюля реакций + действия.
+class _ContextMenu extends StatefulWidget {
   const _ContextMenu({
     required this.pos,
     required this.isLight,
     required this.own,
     required this.deleted,
     required this.messageText,
+    required this.bubble,
     required this.onReply,
     required this.onEdit,
     required this.onPin,
@@ -259,6 +264,7 @@ class _ContextMenu extends StatelessWidget {
   final bool own;
   final bool deleted;
   final String messageText;
+  final Widget bubble;
   final VoidCallback onReply;
   final VoidCallback onEdit;
   final VoidCallback onPin;
@@ -266,120 +272,216 @@ class _ContextMenu extends StatelessWidget {
   final ValueChanged<String> onReaction;
 
   @override
+  State<_ContextMenu> createState() => _ContextMenuState();
+}
+
+class _ContextMenuState extends State<_ContextMenu> {
+  static const _primary = ['❤️', '👍', '👎', '😂', '😮', '🔥'];
+  static const _secondary = ['😢', '🎉', '🙏', '💯', '😡', '👏'];
+
+  bool _more = false;
+
+  void _close() => Navigator.of(context).pop();
+
+  @override
   Widget build(BuildContext context) {
-    final screen = MediaQuery.of(context).size;
-    final cardBg = isLight ? Colors.white : panel;
-    final actionColor = isLight ? lightText : text;
-    // Размещаем меню около точки нажатия, прижимая к нужному краю.
-    final top = pos.dy.clamp(110.0, screen.height - 380.0);
-    return Stack(
-      children: [
-        Positioned(
-          top: top,
-          left: own ? null : 14,
-          right: own ? 14 : null,
-          child: Column(
-            crossAxisAlignment:
-                own ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (!deleted) ...[
-                _reactionsBar(context, cardBg),
-                const SizedBox(height: 10),
-              ],
-              _menuCard(context, cardBg, actionColor),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+    final size = MediaQuery.of(context).size;
+    final cardBg = widget.isLight ? Colors.white : panel;
+    final actionColor = widget.isLight ? lightText : text;
+    final scrim = widget.isLight
+        ? Colors.black.withValues(alpha: 0.18)
+        : Colors.black.withValues(alpha: 0.34);
+    // Привязываем «остров» к точке нажатия, оставляя запас у краёв.
+    final alignY = ((widget.pos.dy / size.height) * 2 - 1).clamp(-0.82, 0.82);
 
-  Widget _reactionsBar(BuildContext context, Color cardBg) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: border),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3), blurRadius: 16),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: quickReactions.map((emoji) {
-          return InkWell(
-            borderRadius: BorderRadius.circular(999),
-            onTap: () {
-              Navigator.pop(context);
-              onReaction(emoji);
-            },
-            child: Padding(
-              padding: const EdgeInsets.all(7),
-              child: Text(emoji, style: const TextStyle(fontSize: 25)),
-            ),
-          );
-        }).toList(growable: false),
-      ),
-    );
-  }
-
-  Widget _menuCard(BuildContext context, Color cardBg, Color actionColor) {
-    return Container(
-      width: 230,
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: border),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.35), blurRadius: 24),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+    return Material(
+      type: MaterialType.transparency,
+      child: Stack(
         children: [
-          _item(context, Icons.reply_rounded, 'Ответить', onReply, actionColor),
-          if (own && !deleted)
-            _item(context, Icons.edit_rounded, 'Изменить', onEdit, actionColor),
-          if (!deleted)
-            _item(
-              context,
-              Icons.copy_rounded,
-              'Копировать',
-              () =>
-                  Clipboard.setData(ClipboardData(text: messageText.trim())),
-              actionColor,
+          // Размытие + лёгкое затемнение фона чата.
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _close,
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                child: Container(color: scrim),
+              ),
             ),
-          if (!deleted)
-            _item(context, Icons.push_pin_rounded, 'Закрепить', onPin,
-                actionColor),
-          if (own)
-            _item(context, Icons.delete_outline_rounded, 'Удалить', onDelete,
-                danger),
+          ),
+          SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _close,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 12),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                          minHeight: constraints.maxHeight - 24),
+                      child: Align(
+                        alignment: Alignment(0, alignY),
+                        child: Column(
+                          crossAxisAlignment: widget.own
+                              ? CrossAxisAlignment.end
+                              : CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (!widget.deleted) ...[
+                              _reactionsBar(cardBg),
+                              const SizedBox(height: 12),
+                            ],
+                            // Само сообщение «всплывает» над размытием.
+                            GestureDetector(
+                              onTap: () {},
+                              child: widget.bubble,
+                            ),
+                            const SizedBox(height: 10),
+                            GestureDetector(
+                              onTap: () {},
+                              child: _menuCard(cardBg, actionColor),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _item(BuildContext context, IconData icon, String label,
-      VoidCallback onTap, Color color) {
+  Widget _reactionsBar(Color cardBg) {
+    final emojis = _more ? _secondary : _primary;
+    return Align(
+      alignment: widget.own ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: border),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.3), blurRadius: 16),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final emoji in emojis)
+              InkWell(
+                borderRadius: BorderRadius.circular(999),
+                onTap: () {
+                  _close();
+                  widget.onReaction(emoji);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(7),
+                  child: Text(emoji, style: const TextStyle(fontSize: 25)),
+                ),
+              ),
+            // Кнопка «ещё реакции».
+            InkWell(
+              borderRadius: BorderRadius.circular(999),
+              onTap: () => setState(() => _more = !_more),
+              child: Container(
+                margin: const EdgeInsets.only(left: 2),
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color:
+                      widget.isLight ? const Color(0xFFEDEDED) : panelStrong,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  _more
+                      ? Icons.expand_less_rounded
+                      : Icons.expand_more_rounded,
+                  size: 22,
+                  color: widget.isLight ? lightMuted : muted,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _menuCard(Color cardBg, Color actionColor) {
+    return Align(
+      alignment: widget.own ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        width: 248,
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: border),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.4),
+                blurRadius: 26,
+                offset: const Offset(0, 10)),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _item(Icons.reply_rounded, 'Ответить', () {
+              _close();
+              widget.onReply();
+            }, actionColor),
+            if (!widget.deleted)
+              _item(Icons.copy_rounded, 'Скопировать', () {
+                Clipboard.setData(
+                    ClipboardData(text: widget.messageText.trim()));
+                showAppToast(context, 'Скопировано');
+                _close();
+              }, actionColor),
+            if (widget.own && !widget.deleted)
+              _item(Icons.edit_rounded, 'Изменить', () {
+                _close();
+                widget.onEdit();
+              }, actionColor),
+            if (!widget.deleted)
+              _item(Icons.push_pin_rounded, 'Закрепить', () {
+                _close();
+                widget.onPin();
+              }, actionColor),
+            if (widget.own) ...[
+              Container(height: 1, color: border),
+              _item(Icons.delete_outline_rounded, 'Удалить', () {
+                _close();
+                widget.onDelete();
+              }, danger),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _item(IconData icon, String label, VoidCallback onTap, Color color) {
     return InkWell(
-      onTap: () {
-        Navigator.pop(context);
-        onTap();
-      },
+      onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            Icon(icon, color: color, size: 21),
+            Icon(icon, color: color, size: 22),
             const SizedBox(width: 14),
             Text(label,
                 style: TextStyle(
-                    color: color, fontSize: 15, fontWeight: FontWeight.w500)),
+                    color: color,
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w500)),
           ],
         ),
       ),

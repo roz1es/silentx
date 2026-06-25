@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 
 import '../format.dart';
 import '../models.dart';
-import '../screens/video_recorder_screen.dart';
 import '../theme/app_theme.dart';
 
 const _emojis = [
@@ -38,7 +37,7 @@ class MessageComposer extends StatefulWidget {
     required this.onCancelVoice,
     required this.onCancelMode,
     required this.onTyping,
-    required this.onVideoCircle,
+    required this.onStartVideoCircle,
   });
 
   final TextEditingController controller;
@@ -54,7 +53,7 @@ class MessageComposer extends StatefulWidget {
   final VoidCallback onCancelVoice;
   final VoidCallback onCancelMode;
   final ValueChanged<bool> onTyping;
-  final ValueChanged<MessageMedia> onVideoCircle;
+  final VoidCallback onStartVideoCircle;
 
   @override
   State<MessageComposer> createState() => _MessageComposerState();
@@ -83,16 +82,10 @@ class _MessageComposerState extends State<MessageComposer> {
     }
   }
 
-  Future<void> _openVideoCircle() async {
+  void _startVideoCircle() {
     if (_showEmoji) setState(() => _showEmoji = false);
     _focusNode.unfocus();
-    final result = await Navigator.of(context).push<MessageMedia>(
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => const VideoRecorderScreen(),
-      ),
-    );
-    if (result != null) widget.onVideoCircle(result);
+    widget.onStartVideoCircle();
   }
 
   void _insertEmoji(String emoji) {
@@ -292,7 +285,7 @@ class _MessageComposerState extends State<MessageComposer> {
         color: blob,
         isLight: isLight,
         onTap: () => setState(() => _circleMode = !_circleMode),
-        onLongPress: _circleMode ? _openVideoCircle : widget.onStartVoice,
+        onLongPress: _circleMode ? _startVideoCircle : widget.onStartVoice,
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 240),
           transitionBuilder: (child, animation) => ScaleTransition(

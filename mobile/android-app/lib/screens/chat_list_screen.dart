@@ -471,9 +471,26 @@ class _ChatListScreenState extends State<ChatListScreen>
           Expanded(
             child: _editMode
                 ? _buildEditList()
-                : RefreshIndicator(
-                    onRefresh: _controller.loadChats,
-                    child: _buildBody(chats),
+                : GestureDetector(
+                    // Свайп влево/вправо переключает папки (как в Telegram).
+                    onHorizontalDragEnd: _folders.isEmpty
+                        ? null
+                        : (details) {
+                            final v = details.primaryVelocity ?? 0;
+                            if (v < -250) {
+                              setState(() => _activeFolder =
+                                  (_activeFolder + 1)
+                                      .clamp(0, _folders.length));
+                            } else if (v > 250) {
+                              setState(() => _activeFolder =
+                                  (_activeFolder - 1)
+                                      .clamp(0, _folders.length));
+                            }
+                          },
+                    child: RefreshIndicator(
+                      onRefresh: _controller.loadChats,
+                      child: _buildBody(chats),
+                    ),
                   ),
           ),
         ],
@@ -485,16 +502,20 @@ class _ChatListScreenState extends State<ChatListScreen>
     final names = ['Все', ..._folders.map((f) => f.name)];
     return SizedBox(
       height: 46,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        itemCount: names.length + 1,
-        itemBuilder: (context, index) {
-          if (index == names.length) {
-            // Кнопка управления папками в конце.
-            return Padding(
-              padding: const EdgeInsets.only(left: 2),
-              child: _TapBounce(
+      // Center центрирует вкладки, когда они умещаются; иначе включается скролл.
+      child: Center(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < names.length; i++)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: _folderTab(names[i], i, isLight),
+                ),
+              _TapBounce(
                 onTap: _openFolders,
                 child: Container(
                   height: 34,
@@ -511,40 +532,40 @@ class _ChatListScreenState extends State<ChatListScreen>
                       size: 18, color: isLight ? lightMuted : muted),
                 ),
               ),
-            );
-          }
-          final selected = _activeFolder == index;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: GestureDetector(
-              onTap: () => setState(() => _activeFolder = index),
-              child: Container(
-                height: 34,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: selected
-                      ? accent
-                      : Colors.white.withValues(alpha: isLight ? 0.55 : 0.07),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                      color: Colors.white
-                          .withValues(alpha: isLight ? 0.6 : 0.10)),
-                ),
-                child: Text(
-                  names[index],
-                  style: TextStyle(
-                    color: selected
-                        ? const Color(0xFF08131A)
-                        : (isLight ? lightText : text),
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _folderTab(String name, int index, bool isLight) {
+    final selected = _activeFolder == index;
+    return GestureDetector(
+      onTap: () => setState(() => _activeFolder = index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: 34,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected
+              ? accent
+              : Colors.white.withValues(alpha: isLight ? 0.55 : 0.07),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: Colors.white.withValues(alpha: isLight ? 0.6 : 0.10)),
+        ),
+        child: Text(
+          name,
+          style: TextStyle(
+            color: selected
+                ? const Color(0xFF08131A)
+                : (isLight ? lightText : text),
+            fontWeight: FontWeight.w800,
+            fontSize: 14,
+          ),
+        ),
       ),
     );
   }

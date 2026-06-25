@@ -17,6 +17,7 @@ import '../theme/app_theme.dart';
 import '../widgets/brenks_avatar.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/glass.dart';
+import '../widgets/inline_video_recorder.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/message_composer.dart';
 import 'chat_profile_screen.dart';
@@ -51,6 +52,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Timer? _recordingTimer;
   int _lastTick = -1;
   int _bgIndex = 0;
+  bool _recordingCircle = false;
 
   MessengerController get _controller => widget.controller;
 
@@ -399,12 +401,27 @@ class _ChatScreenState extends State<ChatScreen> {
                         onCancelVoice: _cancelVoice,
                         onCancelMode: _cancelComposerMode,
                         onTyping: _controller.notifyTyping,
-                        onVideoCircle: (media) =>
-                            _controller.sendMessage(media: media),
+                        onStartVideoCircle: () {
+                          FocusScope.of(context).unfocus();
+                          setState(() => _recordingCircle = true);
+                        },
                       ),
                     ],
                   ),
                 ),
+                // Инлайн-запись видеокружка поверх всего чата.
+                if (_recordingCircle)
+                  Positioned.fill(
+                    child: InlineVideoRecorder(
+                      onSend: (media) {
+                        setState(() => _recordingCircle = false);
+                        _controller.sendMessage(media: media);
+                        _scrollToBottom();
+                      },
+                      onCancel: () =>
+                          setState(() => _recordingCircle = false),
+                    ),
+                  ),
               ],
             ),
           ),

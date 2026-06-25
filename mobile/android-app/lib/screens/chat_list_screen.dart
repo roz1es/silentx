@@ -607,8 +607,17 @@ class _ChatListScreenState extends State<ChatListScreen>
     Iterable<Chat> list = _controller.chats;
     // Фильтр по активной папке (0 = «Все»).
     if (_activeFolder > 0 && _activeFolder <= _folders.length) {
-      final ids = _folders[_activeFolder - 1].chatIds.toSet();
-      list = list.where((c) => ids.contains(c.id));
+      final folder = _folders[_activeFolder - 1];
+      switch (folder.filterType) {
+        case FolderFilter.direct:
+          list = list.where((c) => c.type == ChatType.direct);
+        case FolderFilter.groups:
+          list = list.where((c) =>
+              c.type == ChatType.group || c.type == ChatType.channel);
+        default:
+          final ids = folder.chatIds.toSet();
+          list = list.where((c) => ids.contains(c.id));
+      }
     }
     if (query.isNotEmpty) {
       list = list.where((c) => c.title.toLowerCase().contains(query));

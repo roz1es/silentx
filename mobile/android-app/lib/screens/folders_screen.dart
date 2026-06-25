@@ -67,6 +67,42 @@ class _FoldersScreenState extends State<FoldersScreen> {
     await _save();
   }
 
+  /// Готовые папки по типу, которых ещё нет.
+  List<({String name, String filter})> get _recommended {
+    final existing = _folders.map((f) => f.filterType).toSet();
+    final all = [
+      (name: 'Личные', filter: FolderFilter.direct),
+      (name: 'Группы, беседы и боты', filter: FolderFilter.groups),
+    ];
+    return all.where((p) => !existing.contains(p.filter)).toList();
+  }
+
+  Future<void> _addPreset(String name, String filter) async {
+    setState(() {
+      _folders = [
+        ..._folders,
+        ChatFolder(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          name: name,
+          chatIds: [],
+          filterType: filter,
+        ),
+      ];
+    });
+    await _save();
+  }
+
+  String _folderSubtitle(ChatFolder f) {
+    switch (f.filterType) {
+      case FolderFilter.direct:
+        return 'Все личные чаты';
+      case FolderFilter.groups:
+        return 'Все группы, беседы и боты';
+      default:
+        return '${f.chatIds.length} чатов';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
@@ -110,7 +146,9 @@ class _FoldersScreenState extends State<FoldersScreen> {
                               horizontal: 8, vertical: 4),
                           child: Row(
                             children: [
-                              _miniIcon(Icons.folder_rounded),
+                              _miniIcon(folder.filterType == FolderFilter.manual
+                                  ? Icons.folder_rounded
+                                  : Icons.auto_awesome_rounded),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
@@ -120,23 +158,64 @@ class _FoldersScreenState extends State<FoldersScreen> {
                                         style: TextStyle(
                                             fontWeight: FontWeight.w700,
                                             color: textColor)),
-                                    Text('${folder.chatIds.length} чатов',
+                                    Text(_folderSubtitle(folder),
                                         style: TextStyle(
                                             color: mutedColor, fontSize: 12)),
                                   ],
                                 ),
                               ),
-                              IconButton(
-                                tooltip: 'Изменить',
-                                onPressed: () => _createOrEdit(folder),
-                                icon: Icon(Icons.edit_rounded,
-                                    color: mutedColor, size: 20),
-                              ),
+                              if (folder.filterType == FolderFilter.manual)
+                                IconButton(
+                                  tooltip: 'Изменить',
+                                  onPressed: () => _createOrEdit(folder),
+                                  icon: Icon(Icons.edit_rounded,
+                                      color: mutedColor, size: 20),
+                                ),
                               IconButton(
                                 tooltip: 'Удалить',
                                 onPressed: () => _delete(folder),
                                 icon: const Icon(Icons.delete_outline_rounded,
                                     color: danger, size: 20),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (_recommended.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(left: 6, bottom: 8),
+                      child: Text('ГОТОВЫЕ ПАПКИ',
+                          style: TextStyle(
+                              color: mutedColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.2)),
+                    ),
+                    ..._recommended.map(
+                      (preset) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: GlassCard(
+                          borderRadius: 16,
+                          padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                          child: Row(
+                            children: [
+                              _miniIcon(Icons.auto_awesome_rounded),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(preset.name,
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: textColor)),
+                              ),
+                              TextButton(
+                                onPressed: () =>
+                                    _addPreset(preset.name, preset.filter),
+                                child: const Text('Добавить',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.w800)),
                               ),
                             ],
                           ),

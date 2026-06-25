@@ -2,22 +2,35 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Папка чатов: имя + набор id чатов. Хранится локально на устройстве.
+/// Тип наполнения папки:
+/// - manual — выбранные вручную чаты (chatIds);
+/// - direct — все личные чаты (автоматически);
+/// - groups — все группы/каналы/беседы (автоматически).
+class FolderFilter {
+  static const manual = 'manual';
+  static const direct = 'direct';
+  static const groups = 'groups';
+}
+
+/// Папка чатов. Хранится локально на устройстве.
 class ChatFolder {
   ChatFolder({
     required this.id,
     required this.name,
     required this.chatIds,
+    this.filterType = FolderFilter.manual,
   });
 
   final String id;
   String name;
   List<String> chatIds;
+  String filterType;
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
         'chatIds': chatIds,
+        'filterType': filterType,
       };
 
   factory ChatFolder.fromJson(Map<String, dynamic> json) => ChatFolder(
@@ -27,6 +40,7 @@ class ChatFolder {
                 ?.map((e) => e.toString())
                 .toList(growable: true) ??
             <String>[],
+        filterType: json['filterType']?.toString() ?? FolderFilter.manual,
       );
 }
 

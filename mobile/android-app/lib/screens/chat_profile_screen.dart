@@ -9,8 +9,8 @@ import '../theme/app_theme.dart';
 import '../widgets/brenks_avatar.dart';
 import '../widgets/glass.dart';
 
-/// Экран профиля собеседника / чата: шапка + общие медиа, файлы и информация.
-class ChatProfileScreen extends StatelessWidget {
+/// Профиль собеседника/чата: сверху информация, ниже — Фото / Голосовые / Файлы.
+class ChatProfileScreen extends StatefulWidget {
   const ChatProfileScreen({
     super.key,
     required this.controller,
@@ -21,11 +21,50 @@ class ChatProfileScreen extends StatelessWidget {
   final String chatId;
 
   @override
+  State<ChatProfileScreen> createState() => _ChatProfileScreenState();
+}
+
+class _ChatProfileScreenState extends State<ChatProfileScreen> {
+  int _tab = 0; // 0 — Фото, 1 — Голосовые, 2 — Файлы
+
+  MessengerController get _ctrl => widget.controller;
+
+  ChatParticipant? _peer(Chat chat) {
+    for (final p in chat.participants) {
+      if (p.id != _ctrl.currentUser.id) return p;
+    }
+    return chat.participants.isNotEmpty ? chat.participants.first : null;
+  }
+
+  List<Message> _photos() => _ctrl.messages
+      .where((m) =>
+          !m.deleted &&
+          ((m.media != null &&
+                  (m.media!.kind == 'image' ||
+                      m.media!.kind == 'video_note')) ||
+              (m.media == null && (m.imageUrl?.isNotEmpty ?? false))))
+      .toList()
+      .reversed
+      .toList(growable: false);
+
+  List<Message> _voices() => _ctrl.messages
+      .where((m) => !m.deleted && m.media?.kind == 'voice')
+      .toList()
+      .reversed
+      .toList(growable: false);
+
+  List<Message> _files() => _ctrl.messages
+      .where((m) => !m.deleted && m.media?.kind == 'file')
+      .toList()
+      .reversed
+      .toList(growable: false);
+
+  @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: controller,
+      animation: _ctrl,
       builder: (context, _) {
-        final chat = controller.chatById(chatId);
+        final chat = _ctrl.chatById(widget.chatId);
         if (chat == null) {
           return const Scaffold(body: Center(child: Text('Чат недоступен')));
         }
@@ -34,78 +73,154 @@ class ChatProfileScreen extends StatelessWidget {
     );
   }
 
-  ChatParticipant? _peer(Chat chat) {
-    for (final p in chat.participants) {
-      if (p.id != controller.currentUser.id) return p;
-    }
-    return chat.participants.isNotEmpty ? chat.participants.first : null;
-  }
-
-  List<Message> _mediaMessages() {
-    return controller.messages
-        .where((m) =>
-            !m.deleted &&
-            ((m.media != null &&
-                    (m.media!.kind == 'image' || m.media!.kind == 'video_note')) ||
-                (m.media == null && (m.imageUrl?.isNotEmpty ?? false))))
-        .toList()
-        .reversed
-        .toList(growable: false);
-  }
-
-  List<Message> _fileMessages() {
-    return controller.messages
-        .where((m) => !m.deleted && m.media != null && m.media!.kind == 'file')
-        .toList()
-        .reversed
-        .toList(growable: false);
-  }
-
   Widget _build(BuildContext context, Chat chat) {
     final isLight = Theme.of(context).brightness == Brightness.light;
     final peer = _peer(chat);
     final isDirect = chat.type == ChatType.direct;
-    final online = peer != null && controller.onlineUserIds.contains(peer.id);
-    final media = _mediaMessages();
-    final files = _fileMessages();
+    final online = peer != null && _ctrl.onlineUserIds.contains(peer.id);
+    final textColor = isLight ? lightText : text;
+    final mutedColor = isLight ? lightMuted : muted;
+
+    final photos = _photos();
+    final voices = _voices();
+    final files = _files();
 
     return GlassBackground(
-      child: DefaultTabController(
-        length: 3,
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-          appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            flexibleSpace: const GlassBar(bottomBorder: true),
-            title: const Text('Профиль',
-                style: TextStyle(fontWeight: FontWeight.w900)),
-          ),
-          body: Column(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
+          child: Column(
             children: [
-              _header(context, chat, peer, isDirect, online, isLight),
-              Material(
-                color: Colors.transparent,
-                child: TabBar(
-                  labelColor: accent,
-                  unselectedLabelColor: isLight ? lightMuted : muted,
-                  indicatorColor: accent,
-                  indicatorSize: TabBarIndicatorSize.label,
-                  labelStyle: const TextStyle(
-                      fontWeight: FontWeight.w800, fontSize: 13),
-                  tabs: [
-                    Tab(text: 'Медиа ${media.isEmpty ? '' : media.length}'.trim()),
-                    Tab(text: 'Файлы ${files.isEmpty ? '' : files.length}'.trim()),
-                    const Tab(text: 'Инфо'),
-                  ],
+              // Шапка с кнопкой назад (свайп тоже работает).
+              Align(
+                alignment: Alignment.centerLeft,
+                child: IconButton(
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  icon: Icon(Icons.arrow_back_rounded, color: textColor),
                 ),
               ),
               Expanded(
-                child: TabBarView(
-                  children: [
-                    _mediaGrid(context, media),
-                    _fileList(context, files, isLight),
-                    _infoTab(context, chat, peer, isDirect, isLight),
-                  ],
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // ── Информация о пользователе ──
+                      Center(
+                        child: Column(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [softGold, goldDark],
+                                ),
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: isLight ? Colors.white : bg,
+                                ),
+                                child: BrenksAvatar(
+                                  title: chat.title,
+                                  imageUrl: _ctrl.displayAvatar(chat),
+                                  baseUrl: _ctrl.serverUrl,
+                                  size: 84,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              chat.title,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                  color: textColor),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              isDirect && peer != null
+                                  ? '@${peer.username}'
+                                  : chatSubtitle(chat),
+                              style:
+                                  TextStyle(color: mutedColor, fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      // ── Карточка статуса ──
+                      GlassCard(
+                        borderRadius: 16,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 16),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 9,
+                              height: 9,
+                              decoration: BoxDecoration(
+                                color: online
+                                    ? const Color(0xFF4AAE8A)
+                                    : mutedColor,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text('Статус',
+                                  style: TextStyle(
+                                      color: mutedColor,
+                                      fontWeight: FontWeight.w600)),
+                            ),
+                            Text(
+                              online ? 'онлайн' : 'не в сети',
+                              style: TextStyle(
+                                color: online ? accent : mutedColor,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      // ── Сегмент: Фото / Голосовые / Файлы ──
+                      Row(
+                        children: [
+                          _segItem('Фото ${photos.length}', 0, isLight),
+                          const SizedBox(width: 8),
+                          _segItem('Голосовые ${voices.length}', 1, isLight),
+                          const SizedBox(width: 8),
+                          _segItem('Файлы ${files.length}', 2, isLight),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      // ── Содержимое выбранной вкладки ──
+                      _tabContent(photos, voices, files, mutedColor),
+                    ],
+                  ),
+                ),
+              ),
+              // ── Кнопка «Закрыть» ──
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(50),
+                    foregroundColor: textColor,
+                    side: BorderSide(color: border),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                  ),
+                  child: const Text('Закрыть',
+                      style: TextStyle(fontWeight: FontWeight.w800)),
                 ),
               ),
             ],
@@ -115,268 +230,129 @@ class ChatProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _header(BuildContext context, Chat chat, ChatParticipant? peer,
-      bool isDirect, bool online, bool isLight) {
-    final textColor = isLight ? const Color(0xFF17202B) : text;
-    final mutedColor = isLight ? lightMuted : muted;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [softGold, goldDark],
-              ),
-            ),
-            child: Container(
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isLight ? Colors.white : bg,
-              ),
-              child: BrenksAvatar(
-                title: chat.title,
-                imageUrl: controller.displayAvatar(chat),
-                baseUrl: controller.serverUrl,
-                size: 92,
-              ),
+  Widget _segItem(String label, int index, bool isLight) {
+    final selected = _tab == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _tab = index),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          height: 42,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected
+                ? accent.withValues(alpha: 0.12)
+                : Colors.white.withValues(alpha: isLight ? 0.45 : 0.05),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected
+                  ? goldBorder
+                  : Colors.white.withValues(alpha: isLight ? 0.5 : 0.08),
             ),
           ),
-          const SizedBox(height: 12),
-          Text(
-            chat.title,
-            textAlign: TextAlign.center,
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
-                fontSize: 23, fontWeight: FontWeight.w900, color: textColor),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            isDirect && peer != null ? '@${peer.username}' : chatSubtitle(chat),
-            style: TextStyle(color: mutedColor, fontSize: 15),
-          ),
-          if (isDirect) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              decoration: BoxDecoration(
-                color: (online ? const Color(0xFF4AAE8A) : mutedColor)
-                    .withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(99),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 7,
-                    height: 7,
-                    decoration: BoxDecoration(
-                      color: online ? const Color(0xFF4AAE8A) : mutedColor,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    online ? 'в сети' : 'не в сети',
-                    style: TextStyle(
-                      color: online ? const Color(0xFF4AAE8A) : mutedColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _mediaGrid(BuildContext context, List<Message> media) {
-    final mutedColor =
-        Theme.of(context).brightness == Brightness.light ? lightMuted : muted;
-    if (media.isEmpty) {
-      return Center(
-        child: Text('Общих медиа пока нет',
-            style: TextStyle(color: mutedColor)),
-      );
-    }
-    return GridView.builder(
-      padding: const EdgeInsets.all(2),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 2,
-        crossAxisSpacing: 2,
-      ),
-      itemCount: media.length,
-      itemBuilder: (context, index) {
-        final m = media[index];
-        return _MediaTile(message: m, serverUrl: controller.serverUrl);
-      },
-    );
-  }
-
-  Widget _fileList(BuildContext context, List<Message> files, bool isLight) {
-    final mutedColor = isLight ? lightMuted : muted;
-    final textColor = isLight ? const Color(0xFF17202B) : text;
-    if (files.isEmpty) {
-      return Center(
-        child: Text('Файлов пока нет', style: TextStyle(color: mutedColor)),
-      );
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.all(10),
-      itemCount: files.length,
-      itemBuilder: (context, index) {
-        final media = files[index].media!;
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: GlassCard(
-            borderRadius: 16,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            child: Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.insert_drive_file_rounded,
-                      color: accent),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    media.fileName ?? 'Файл',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        fontWeight: FontWeight.w700, color: textColor),
-                  ),
-                ),
-              ],
+              color: selected ? accent : (isLight ? lightMuted : muted),
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
             ),
           ),
-        );
-      },
-    );
-  }
-
-  Widget _infoTab(BuildContext context, Chat chat, ChatParticipant? peer,
-      bool isDirect, bool isLight) {
-    final textColor = isLight ? const Color(0xFF17202B) : text;
-    final mutedColor = isLight ? lightMuted : muted;
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        if (isDirect && peer != null)
-          _infoRow(Icons.alternate_email_rounded, 'Имя пользователя',
-              '@${peer.username}', textColor, mutedColor),
-        _infoRow(
-          isDirect ? Icons.person_rounded : Icons.groups_rounded,
-          'Тип чата',
-          isDirect ? 'Личный чат' : (chat.type == ChatType.group ? 'Группа' : 'Канал'),
-          textColor,
-          mutedColor,
         ),
-        if (!isDirect)
-          _infoRow(Icons.people_rounded, 'Участники',
-              '${chat.participants.length}', textColor, mutedColor),
-        if (!isDirect && chat.participants.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          Padding(
-            padding: const EdgeInsets.only(left: 6, bottom: 6),
-            child: Text('УЧАСТНИКИ',
-                style: TextStyle(
-                    color: mutedColor,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.2)),
-          ),
-          ...chat.participants.map(
-            (p) => GlassCard(
-              borderRadius: 14,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              child: Row(
-                children: [
-                  BrenksAvatar(
-                    title: p.title,
-                    imageUrl: p.avatarUrl,
-                    baseUrl: controller.serverUrl,
-                    size: 40,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(p.title,
-                            style: TextStyle(
-                                fontWeight: FontWeight.w700, color: textColor)),
-                        Text(
-                          controller.onlineUserIds.contains(p.id)
-                              ? 'в сети'
-                              : '@${p.username}',
-                          style: TextStyle(color: mutedColor, fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ],
+      ),
     );
   }
 
-  Widget _infoRow(IconData icon, String label, String value, Color textColor,
-      Color mutedColor) {
+  Widget _tabContent(List<Message> photos, List<Message> voices,
+      List<Message> files, Color mutedColor) {
+    switch (_tab) {
+      case 0:
+        if (photos.isEmpty) return _empty(mutedColor);
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: 4,
+            crossAxisSpacing: 4,
+          ),
+          itemCount: photos.length,
+          itemBuilder: (context, i) =>
+              _MediaTile(message: photos[i], serverUrl: _ctrl.serverUrl),
+        );
+      case 1:
+        if (voices.isEmpty) return _empty(mutedColor);
+        return Column(
+          children: [
+            for (final m in voices)
+              _row(
+                Icons.mic_rounded,
+                'Голосовое',
+                formatDuration(m.media?.durationMs ?? 0),
+                mutedColor,
+              ),
+          ],
+        );
+      default:
+        if (files.isEmpty) return _empty(mutedColor);
+        return Column(
+          children: [
+            for (final m in files)
+              _row(
+                Icons.insert_drive_file_rounded,
+                m.media?.fileName ?? 'Файл',
+                '',
+                mutedColor,
+              ),
+          ],
+        );
+    }
+  }
+
+  Widget _row(IconData icon, String title, String trailing, Color mutedColor) {
+    final textColor = mutedColor == lightMuted ? lightText : text;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: GlassCard(
-        borderRadius: 16,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        borderRadius: 14,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         child: Row(
           children: [
             Container(
-              width: 38,
-              height: 38,
+              width: 40,
+              height: 40,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(12),
+                color: accent.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(11),
               ),
               child: Icon(icon, color: accent, size: 20),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label,
-                      style: TextStyle(color: mutedColor, fontSize: 12)),
-                  const SizedBox(height: 2),
-                  Text(value,
-                      style: TextStyle(
-                          color: textColor,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15)),
-                ],
-              ),
+              child: Text(title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontWeight: FontWeight.w700, color: textColor)),
             ),
+            if (trailing.isNotEmpty)
+              Text(trailing, style: TextStyle(color: mutedColor, fontSize: 12)),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _empty(Color mutedColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 40),
+      child: Center(
+        child: Text('Здесь пока пусто',
+            style: TextStyle(color: mutedColor, fontSize: 14)),
       ),
     );
   }
@@ -399,7 +375,8 @@ class _MediaTile extends StatelessWidget {
       return Container(
         color: Colors.black,
         alignment: Alignment.center,
-        child: const Icon(Icons.videocam_rounded, color: Colors.white70, size: 30),
+        child: const Icon(Icons.videocam_rounded,
+            color: Colors.white70, size: 28),
       );
     }
 
@@ -414,7 +391,10 @@ class _MediaTile extends StatelessWidget {
 
     return GestureDetector(
       onTap: () => _openViewer(context, bytes, url),
-      child: Container(color: Colors.black12, child: image),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Container(color: Colors.black26, child: image),
+      ),
     );
   }
 

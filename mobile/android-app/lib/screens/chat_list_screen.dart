@@ -389,7 +389,7 @@ class _ChatListScreenState extends State<ChatListScreen>
                   if (snap.hasData && snap.data!.isNotEmpty) {
                     final all = snap.data!;
                     final tail =
-                        all.length > 5 ? all.sublist(all.length - 5) : all;
+                        all.length > 50 ? all.sublist(all.length - 50) : all;
                     for (final m in tail) {
                       rows.add(_previewRow(messagePreview(m),
                           m.senderId == myId, isLight, width));
@@ -409,7 +409,7 @@ class _ChatListScreenState extends State<ChatListScreen>
                   }
                   return SingleChildScrollView(
                     reverse: true,
-                    physics: const NeverScrollableScrollPhysics(),
+                    physics: const ClampingScrollPhysics(),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       mainAxisSize: MainAxisSize.min,

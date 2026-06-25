@@ -17,17 +17,18 @@ class BrenksAvatar extends StatelessWidget {
   final String? baseUrl;
   final double size;
 
+  // Приглушённая палитра — не «кричит» и не бросается в глаза.
   static const _palette = [
-    Color(0xFF5CC8F5),
-    Color(0xFF4CAF50),
-    Color(0xFFFF9800),
-    Color(0xFFE91E63),
-    Color(0xFF9C27B0),
-    Color(0xFFFF5722),
-    Color(0xFF00BCD4),
-    Color(0xFF3F51B5),
-    Color(0xFF009688),
-    Color(0xFF8BC34A),
+    Color(0xFF5B7C99), // приглушённый синий
+    Color(0xFF5E927A), // приглушённый зелёный
+    Color(0xFFBE9266), // тёплый песочный
+    Color(0xFFA9707F), // приглушённый розово-лиловый
+    Color(0xFF836F9E), // приглушённый фиолетовый
+    Color(0xFFA87A66), // терракота
+    Color(0xFF5E97A0), // приглушённый бирюзовый
+    Color(0xFF6D77A1), // приглушённый индиго
+    Color(0xFF629285), // морская волна
+    Color(0xFF7E9468), // оливковый
   ];
 
   Color _avatarColor() {

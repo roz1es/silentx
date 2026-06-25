@@ -141,7 +141,7 @@ class ChatProfileScreen extends StatelessWidget {
               ),
               child: BrenksAvatar(
                 title: chat.title,
-                imageUrl: chat.avatarUrl,
+                imageUrl: controller.displayAvatar(chat),
                 baseUrl: controller.serverUrl,
                 size: 92,
               ),

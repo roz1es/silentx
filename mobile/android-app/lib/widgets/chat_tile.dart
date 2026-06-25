@@ -15,9 +15,11 @@ class ChatTile extends StatelessWidget {
     required this.peerOnline,
     required this.onTap,
     required this.onLongPress,
+    this.avatarUrl,
   });
 
   final Chat chat;
+  final String? avatarUrl;
   final String serverUrl;
   final int unread;
   final bool peerOnline;
@@ -42,7 +44,7 @@ class ChatTile extends StatelessWidget {
                 children: [
                   BrenksAvatar(
                     title: chat.title,
-                    imageUrl: chat.avatarUrl,
+                    imageUrl: avatarUrl ?? chat.avatarUrl,
                     baseUrl: serverUrl,
                     size: 54,
                   ),

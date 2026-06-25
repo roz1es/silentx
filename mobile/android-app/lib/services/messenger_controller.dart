@@ -89,6 +89,19 @@ class MessengerController extends ChangeNotifier {
         );
   }
 
+  /// Аватар для показа: у личного чата сервер не подставляет аватар собеседника
+  /// в [Chat.avatarUrl], поэтому берём его из участников.
+  String? displayAvatar(Chat chat) {
+    if (chat.type == ChatType.direct) {
+      for (final p in chat.participants) {
+        if (p.id != currentUser.id && (p.avatarUrl?.isNotEmpty ?? false)) {
+          return p.avatarUrl;
+        }
+      }
+    }
+    return chat.avatarUrl;
+  }
+
   // --- Жизненный цикл ---
 
   void start() {

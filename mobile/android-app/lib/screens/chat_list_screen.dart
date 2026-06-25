@@ -483,6 +483,7 @@ class _ChatListScreenState extends State<ChatListScreen>
                 Expanded(
                   child: ChatTile(
                     chat: chat,
+                    avatarUrl: _controller.displayAvatar(chat),
                     serverUrl: _controller.serverUrl,
                     unread: _controller.unreadFor(chat),
                     peerOnline: _controller.isPeerOnline(chat),
@@ -657,6 +658,7 @@ class _ChatListScreenState extends State<ChatListScreen>
             padding: EdgeInsets.zero,
             child: ChatTile(
               chat: chat,
+              avatarUrl: _controller.displayAvatar(chat),
               serverUrl: _controller.serverUrl,
               unread: _controller.unreadFor(chat),
               peerOnline: _controller.isPeerOnline(chat),
@@ -1175,12 +1177,12 @@ class _ThemeSwitch extends StatelessWidget {
     return _TapBounce(
       onTap: () => onChanged(isLight ? ThemeMode.dark : ThemeMode.light),
       child: Container(
-        width: 50,
-        height: 50,
+        width: 52,
+        height: 52,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: (isLight ? Colors.black : Colors.white).withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(16),
+          color: (isLight ? Colors.black : Colors.white).withValues(alpha: 0.07),
           border: Border.all(
             color: Colors.white.withValues(alpha: isLight ? 0.5 : 0.14),
           ),

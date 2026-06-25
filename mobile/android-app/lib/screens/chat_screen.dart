@@ -434,7 +434,7 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             BrenksAvatar(
               title: chat.title,
-              imageUrl: chat.avatarUrl,
+              imageUrl: _controller.displayAvatar(chat),
               baseUrl: _controller.serverUrl,
               size: 40,
             ),

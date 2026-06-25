@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io' as io;
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:mime/mime.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -17,6 +18,7 @@ import '../widgets/empty_state.dart';
 import '../widgets/glass.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/message_composer.dart';
+import 'chat_profile_screen.dart';
 
 const _maxMediaDataUrlLength = 14 * 1000 * 1000;
 
@@ -619,63 +621,10 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _openProfile(Chat chat) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: isLight ? Colors.white : panel,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              BrenksAvatar(
-                title: chat.title,
-                imageUrl: chat.avatarUrl,
-                baseUrl: _controller.serverUrl,
-                size: 84,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                chat.title,
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(height: 2),
-              Text(chatSubtitle(chat), style: const TextStyle(color: muted)),
-              if (chat.participants.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('Участники',
-                      style: TextStyle(fontWeight: FontWeight.w800)),
-                ),
-                const SizedBox(height: 4),
-                ...chat.participants.map(
-                  (p) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: BrenksAvatar(
-                      title: p.title,
-                      imageUrl: p.avatarUrl,
-                      baseUrl: _controller.serverUrl,
-                      size: 42,
-                    ),
-                    title: Text(p.title),
-                    subtitle: Text(
-                      _controller.onlineUserIds.contains(p.id)
-                          ? 'онлайн'
-                          : '@${p.username}',
-                      style: const TextStyle(color: muted),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
+    Navigator.of(context).push(
+      CupertinoPageRoute(
+        builder: (_) =>
+            ChatProfileScreen(controller: _controller, chatId: chat.id),
       ),
     );
   }

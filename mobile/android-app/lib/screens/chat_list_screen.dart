@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models.dart';
@@ -45,7 +46,7 @@ class _ChatListScreenState extends State<ChatListScreen>
   );
   bool _showOffline = false;
   DateTime? _disconnectedAt;
-  int _tabIndex = 1; // 0 = Контакты, 1 = Чаты, 2 = Настройки
+  int _tabIndex = 0; // 0 = Чаты, 1 = Настройки
   bool _editMode = false;
   bool _searchVisible = false;
   List<String> _manualOrder = const [];
@@ -55,7 +56,7 @@ class _ChatListScreenState extends State<ChatListScreen>
   void _toggleSearch() {
     final show = !_searchVisible;
     setState(() {
-      _tabIndex = 1;
+      _tabIndex = 0;
       _searchVisible = show;
       if (!show) _searchController.clear();
     });
@@ -236,7 +237,6 @@ class _ChatListScreenState extends State<ChatListScreen>
         body: IndexedStack(
           index: _tabIndex,
           children: [
-            _contactsTab(isLight),
             _chatTab(isLight),
             _settingsTab(isLight),
           ],
@@ -266,11 +266,11 @@ class _ChatListScreenState extends State<ChatListScreen>
                         child: Padding(
                           padding: const EdgeInsets.all(6),
                           child: AnimatedAlign(
-                            alignment: Alignment((_tabIndex / 2) * 2 - 1, 0),
+                            alignment: Alignment(_tabIndex * 2 - 1, 0),
                             duration: const Duration(milliseconds: 340),
                             curve: Curves.easeOutCubic,
                             child: FractionallySizedBox(
-                              widthFactor: 1 / 3,
+                              widthFactor: 1 / 2,
                               heightFactor: 1,
                               child: GlassPanel(
                                 borderRadius: 20,
@@ -286,28 +286,20 @@ class _ChatListScreenState extends State<ChatListScreen>
                       Row(
                         children: [
                           _NavItem(
-                            icon: Icons.person_rounded,
-                            iconOutline: Icons.person_outline_rounded,
-                            label: 'Контакты',
+                            icon: Icons.chat_bubble_rounded,
+                            iconOutline: Icons.chat_bubble_outline_rounded,
+                            label: 'Чаты',
                             selected: _tabIndex == 0,
                             isLight: isLight,
                             onTap: () => setState(() => _tabIndex = 0),
                           ),
                           _NavItem(
-                            icon: Icons.chat_bubble_rounded,
-                            iconOutline: Icons.chat_bubble_outline_rounded,
-                            label: 'Чаты',
-                            selected: _tabIndex == 1,
-                            isLight: isLight,
-                            onTap: () => setState(() => _tabIndex = 1),
-                          ),
-                          _NavItem(
                             icon: Icons.settings_rounded,
                             iconOutline: Icons.settings_outlined,
                             label: 'Настройки',
-                            selected: _tabIndex == 2,
+                            selected: _tabIndex == 1,
                             isLight: isLight,
-                            onTap: () => setState(() => _tabIndex = 2),
+                            onTap: () => setState(() => _tabIndex = 1),
                           ),
                         ],
                       ),
@@ -367,28 +359,6 @@ class _ChatListScreenState extends State<ChatListScreen>
         onThemeModeChanged: widget.onThemeModeChanged,
         onLogout: widget.onLogout,
         isLight: isLight,
-      ),
-    );
-  }
-
-  Widget _contactsTab(bool isLight) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        toolbarHeight: 64,
-        automaticallyImplyLeading: false,
-        flexibleSpace: const GlassBar(bottomBorder: true),
-        titleSpacing: 20,
-        title: const Text(
-          'Контакты',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-        ),
-      ),
-      body: _ContactsView(
-        controller: _controller,
-        isLight: isLight,
-        onOpenChat: _openChat,
       ),
     );
   }
@@ -944,12 +914,50 @@ class _SettingsViewState extends State<_SettingsView> {
                       ],
                     ),
                     const SizedBox(height: 20),
+                    _sectionLabel('QR-КОД'),
+                    const SizedBox(height: 8),
+                    GlassCard(
+                      borderRadius: 18,
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: QrImageView(
+                              data: '${_ctrl.serverUrl}/u/${user.username}',
+                              version: QrVersions.auto,
+                              size: 184,
+                              backgroundColor: Colors.white,
+                              eyeStyle: const QrEyeStyle(
+                                eyeShape: QrEyeShape.square,
+                                color: Color(0xFF101317),
+                              ),
+                              dataModuleStyle: const QrDataModuleStyle(
+                                dataModuleShape: QrDataModuleShape.square,
+                                color: Color(0xFF101317),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Отсканируйте, чтобы открыть чат со мной',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: _mutedColor, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
                     _sectionLabel('ОФОРМЛЕНИЕ'),
                     const SizedBox(height: 8),
                     GlassCard(
                       borderRadius: 18,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
+                          horizontal: 14, vertical: 12),
                       child: Row(
                         children: [
                           _miniIcon(Icons.contrast_rounded),
@@ -960,24 +968,9 @@ class _SettingsViewState extends State<_SettingsView> {
                                     fontWeight: FontWeight.w700,
                                     color: _textColor)),
                           ),
-                          SegmentedButton<ThemeMode>(
-                            showSelectedIcon: false,
-                            style: ButtonStyle(
-                              visualDensity: VisualDensity.compact,
-                            ),
-                            segments: const [
-                              ButtonSegment(
-                                value: ThemeMode.dark,
-                                icon: Icon(Icons.dark_mode_rounded, size: 18),
-                              ),
-                              ButtonSegment(
-                                value: ThemeMode.light,
-                                icon: Icon(Icons.light_mode_rounded, size: 18),
-                              ),
-                            ],
-                            selected: {widget.themeMode},
-                            onSelectionChanged: (v) =>
-                                widget.onThemeModeChanged(v.first),
+                          _ThemeSwitch(
+                            isLight: _isLight,
+                            onChanged: widget.onThemeModeChanged,
                           ),
                         ],
                       ),
@@ -1100,122 +1093,6 @@ class _SettingsViewState extends State<_SettingsView> {
   }
 }
 
-// ─── Вкладка «Контакты» ───────────────────────────────────────────────────
-
-class _ContactsView extends StatefulWidget {
-  const _ContactsView({
-    required this.controller,
-    required this.isLight,
-    required this.onOpenChat,
-  });
-
-  final MessengerController controller;
-  final bool isLight;
-  final void Function(Chat) onOpenChat;
-
-  @override
-  State<_ContactsView> createState() => _ContactsViewState();
-}
-
-class _ContactsViewState extends State<_ContactsView> {
-  List<DirectoryUser>? _users;
-  String? _error;
-  bool _creating = false;
-
-  MessengerController get _ctrl => widget.controller;
-  Color get _muted => widget.isLight ? lightMuted : muted;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    try {
-      final users = await _ctrl.api.fetchUserDirectory();
-      if (!mounted) return;
-      setState(() {
-        _users = users
-            .where((u) => u.id != _ctrl.currentUser.id)
-            .toList(growable: false);
-        _error = null;
-      });
-    } on Object catch (e) {
-      if (mounted) setState(() => _error = '$e');
-    }
-  }
-
-  Future<void> _startChat(DirectoryUser user) async {
-    if (_creating) return;
-    setState(() => _creating = true);
-    try {
-      final chat = await _ctrl.createDirectChat(user.id);
-      if (mounted) widget.onOpenChat(chat);
-    } on Object catch (e) {
-      if (mounted) showAppToast(context, 'Ошибка: $e', error: true);
-    } finally {
-      if (mounted) setState(() => _creating = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_error != null) {
-      return RefreshIndicator(
-        onRefresh: _load,
-        child: ListView(
-          children: [
-            const SizedBox(height: 120),
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  'Не удалось загрузить контакты\n$_error',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: _muted),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    final users = _users;
-    if (users == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (users.isEmpty) {
-      return Center(child: Text('Контактов нет', style: TextStyle(color: _muted)));
-    }
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        itemCount: users.length,
-        itemBuilder: (context, index) {
-          final user = users[index];
-          return ListTile(
-            leading: BrenksAvatar(
-              title: user.title,
-              imageUrl: user.avatarUrl,
-              baseUrl: _ctrl.serverUrl,
-              size: 46,
-            ),
-            title: Text(user.title,
-                style: const TextStyle(fontWeight: FontWeight.w700)),
-            subtitle:
-                Text('@${user.username}', style: TextStyle(color: _muted)),
-            trailing:
-                const Icon(Icons.chat_bubble_outline_rounded, color: accent, size: 20),
-            onTap: () => _startChat(user),
-          );
-        },
-      ),
-    );
-  }
-}
-
 // ─── Элемент нижней навигации с анимацией иконки при выборе ────────────────
 
 class _NavItem extends StatelessWidget {
@@ -1279,6 +1156,75 @@ class _NavItem extends StatelessWidget {
               child: Text(label),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Переключатель темы со скользящим стеклянным индикатором ───────────────
+
+class _ThemeSwitch extends StatelessWidget {
+  const _ThemeSwitch({required this.isLight, required this.onChanged});
+
+  final bool isLight;
+  final ValueChanged<ThemeMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = !isLight; // позиция индикатора по текущей теме
+    return Container(
+      width: 96,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: (isLight ? Colors.black : Colors.white).withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Stack(
+        children: [
+          // Скользящий индикатор — настоящее матовое стекло
+          Positioned.fill(
+            child: AnimatedAlign(
+              alignment: dark ? Alignment.centerLeft : Alignment.centerRight,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOutCubic,
+              child: FractionallySizedBox(
+                widthFactor: 0.5,
+                heightFactor: 1,
+                child: GlassPanel(
+                  borderRadius: 12,
+                  blur: 12,
+                  strength: 1.7,
+                  shadow: true,
+                  child: const SizedBox.expand(),
+                ),
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              _tab(Icons.dark_mode_rounded, dark,
+                  () => onChanged(ThemeMode.dark)),
+              _tab(Icons.light_mode_rounded, !dark,
+                  () => onChanged(ThemeMode.light)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tab(IconData icon, bool selected, VoidCallback onTap) {
+    final color = selected
+        ? (isLight ? lightText : text)
+        : (isLight ? lightMuted : muted);
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: SizedBox(
+          height: 34,
+          child: Icon(icon, size: 18, color: color),
         ),
       ),
     );

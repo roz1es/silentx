@@ -225,42 +225,13 @@ class _ChatListScreenState extends State<ChatListScreen>
     }
   }
 
-  Future<void> _chatOptions(Chat chat, Offset pos) async {
-    final isLight = Theme.of(context).brightness == Brightness.light;
+  Future<void> _chatOptions(Chat chat) async {
     final width =
         (MediaQuery.of(context).size.width - 40).clamp(240.0, 360.0);
     final unread = _controller.unreadFor(chat);
 
-    // «Приподнятая» карточка с самим чатом — превью над размытием.
-    final preview = Container(
-      width: width,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: isLight ? Colors.white : panel,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: border),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 8)),
-        ],
-      ),
-      child: ChatTile(
-        chat: chat,
-        avatarUrl: _controller.displayAvatar(chat),
-        serverUrl: _controller.serverUrl,
-        unread: unread,
-        peerOnline: _controller.isPeerOnline(chat),
-        onTap: () {},
-        onLongPress: (_) {},
-      ),
-    );
-
     await showIosContextMenu(
       context: context,
-      pos: pos,
-      preview: preview,
       menuWidth: width,
       actions: [
         if (unread > 0)
@@ -1080,7 +1051,7 @@ class _ChatListScreenState extends State<ChatListScreen>
               unread: _controller.unreadFor(chat),
               peerOnline: _controller.isPeerOnline(chat),
               onTap: () => _openChat(chat),
-              onLongPress: (pos) => _chatOptions(chat, pos),
+              onLongPress: (_) => _chatOptions(chat),
             ),
           ),
         );

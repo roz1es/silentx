@@ -27,9 +27,8 @@ class IosMenuAction {
 /// Превью и пункты строит вызывающая сторона — виджет универсальный.
 Future<void> showIosContextMenu({
   required BuildContext context,
-  required Offset pos,
-  required Widget preview,
   required List<IosMenuAction> actions,
+  Widget? preview,
   double menuWidth = 280,
 }) {
   final isLight = Theme.of(context).brightness == Brightness.light;
@@ -40,7 +39,6 @@ Future<void> showIosContextMenu({
     barrierColor: Colors.transparent,
     transitionDuration: const Duration(milliseconds: 180),
     pageBuilder: (ctx, _, __) => _IosContextMenuView(
-      pos: pos,
       isLight: isLight,
       preview: preview,
       actions: actions,
@@ -55,27 +53,22 @@ Future<void> showIosContextMenu({
 
 class _IosContextMenuView extends StatelessWidget {
   const _IosContextMenuView({
-    required this.pos,
     required this.isLight,
-    required this.preview,
     required this.actions,
     required this.menuWidth,
+    this.preview,
   });
 
-  final Offset pos;
   final bool isLight;
-  final Widget preview;
+  final Widget? preview;
   final List<IosMenuAction> actions;
   final double menuWidth;
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
     final scrim = isLight
         ? Colors.black.withValues(alpha: 0.18)
         : Colors.black.withValues(alpha: 0.34);
-    // Привязываем «остров» к точке нажатия, оставляя запас у краёв.
-    final alignY = ((pos.dy / size.height) * 2 - 1).clamp(-0.7, 0.7);
 
     return Material(
       type: MaterialType.transparency,
@@ -105,13 +98,16 @@ class _IosContextMenuView extends StatelessWidget {
                       constraints: BoxConstraints(
                           minHeight: constraints.maxHeight - 32),
                       child: Align(
-                        alignment: Alignment(0, alignY),
+                        alignment: Alignment.center,
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Превью «всплывает» над размытием.
-                            GestureDetector(onTap: () {}, child: preview),
-                            const SizedBox(height: 12),
+                            // Превью над размытием (опционально).
+                            if (preview != null) ...[
+                              GestureDetector(
+                                  onTap: () {}, child: preview!),
+                              const SizedBox(height: 12),
+                            ],
                             GestureDetector(
                               onTap: () {},
                               child: _menuCard(context),

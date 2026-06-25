@@ -226,13 +226,15 @@ class _ChatListScreenState extends State<ChatListScreen>
   }
 
   Future<void> _chatOptions(Chat chat) async {
-    final width =
-        (MediaQuery.of(context).size.width - 40).clamp(240.0, 360.0);
+    final screenW = MediaQuery.of(context).size.width;
+    final width = (screenW - 40).clamp(240.0, 360.0);
+    // Окно-предпросмотр крупнее меню (~+40%), но не шире экрана.
+    final previewWidth = math.min(width * 1.4, screenW - 32);
     final unread = _controller.unreadFor(chat);
 
     await showIosContextMenu(
       context: context,
-      preview: _chatPreview(chat, width),
+      preview: _chatPreview(chat, previewWidth),
       menuWidth: width,
       actions: [
         if (unread > 0)
@@ -312,15 +314,15 @@ class _ChatListScreenState extends State<ChatListScreen>
                       title: chat.title,
                       imageUrl: _controller.displayAvatar(chat),
                       baseUrl: _controller.serverUrl,
-                      size: 38,
+                      size: 46,
                     ),
                     if (online)
                       Positioned(
                         right: 0,
                         bottom: 0,
                         child: Container(
-                          width: 11,
-                          height: 11,
+                          width: 13,
+                          height: 13,
                           decoration: BoxDecoration(
                             color: const Color(0xFF4AAE8A),
                             shape: BoxShape.circle,
@@ -341,14 +343,14 @@ class _ChatListScreenState extends State<ChatListScreen>
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.w800),
+                            fontSize: 17, fontWeight: FontWeight.w800),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 3),
                       Text(
                         online ? 'в сети' : chatSubtitle(chat),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12, color: statusColor),
+                        style: TextStyle(fontSize: 13, color: statusColor),
                       ),
                     ],
                   ),
@@ -358,10 +360,10 @@ class _ChatListScreenState extends State<ChatListScreen>
           ),
           // Область переписки с последним сообщением.
           Container(
-            height: 124,
+            height: 174,
             width: double.infinity,
             color: bodyBg,
-            padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
             alignment: last == null
                 ? Alignment.center
                 : (ownLast ? Alignment.bottomRight : Alignment.bottomLeft),
@@ -382,7 +384,7 @@ class _ChatListScreenState extends State<ChatListScreen>
     final textColor = isLight ? lightText : text;
     final timeColor = isLight ? lightMuted : muted;
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 220),
+      constraints: const BoxConstraints(maxWidth: 300),
       child: Container(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
         decoration: BoxDecoration(
@@ -406,7 +408,7 @@ class _ChatListScreenState extends State<ChatListScreen>
               lastMessageLabel(last.text),
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: textColor, fontSize: 14.5),
+              style: TextStyle(color: textColor, fontSize: 15.5),
             ),
             const SizedBox(height: 2),
             Align(

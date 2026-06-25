@@ -1164,7 +1164,7 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-// ─── Одна кнопка-переключатель темы: луна ⇄ солнце с трансформацией ─────────
+// ─── Переключатель темы — точная копия кнопки с экрана авторизации ─────────
 
 class _ThemeSwitch extends StatelessWidget {
   const _ThemeSwitch({required this.isLight, required this.onChanged});
@@ -1174,35 +1174,20 @@ class _ThemeSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _TapBounce(
-      onTap: () => onChanged(isLight ? ThemeMode.dark : ThemeMode.light),
-      child: Container(
-        width: 52,
-        height: 52,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: (isLight ? Colors.black : Colors.white).withValues(alpha: 0.07),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: isLight ? 0.5 : 0.14),
+    return IconButton(
+      tooltip: 'Сменить тему',
+      onPressed: () => onChanged(isLight ? ThemeMode.dark : ThemeMode.light),
+      icon: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 400),
+        transitionBuilder: (child, animation) => RotationTransition(
+          turns: Tween(begin: 0.3, end: 0.0).animate(
+            CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
           ),
+          child: ScaleTransition(scale: animation, child: child),
         ),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 480),
-          switchInCurve: Curves.easeOutBack,
-          switchOutCurve: Curves.easeIn,
-          transitionBuilder: (child, animation) => RotationTransition(
-            turns: Tween<double>(begin: 0.5, end: 1.0).animate(animation),
-            child: ScaleTransition(
-              scale: animation,
-              child: FadeTransition(opacity: animation, child: child),
-            ),
-          ),
-          child: isLight
-              ? const Icon(Icons.light_mode_rounded,
-                  key: ValueKey('sun'), color: Color(0xFFFFB02E), size: 26)
-              : const Icon(Icons.dark_mode_rounded,
-                  key: ValueKey('moon'), color: Color(0xFFBFD4FF), size: 26),
+        child: Icon(
+          isLight ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+          key: ValueKey(isLight),
         ),
       ),
     );

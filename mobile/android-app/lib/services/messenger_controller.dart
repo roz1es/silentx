@@ -303,6 +303,33 @@ class MessengerController extends ChangeNotifier {
     _typingNames = const {};
   }
 
+  /// Отметить чат прочитанным без его открытия (для «прочитать всё» в папке).
+  void markChatRead(String chatId) {
+    _socket?.markRead(chatId);
+    final index = _chats.indexWhere((c) => c.id == chatId);
+    if (index == -1) return;
+    final chat = _chats[index];
+    if ((chat.unread[currentUser.id] ?? 0) == 0) return;
+    final next = [..._chats];
+    next[index] = Chat(
+      id: chat.id,
+      type: chat.type,
+      name: chat.name,
+      displayName: chat.displayName,
+      avatarUrl: chat.avatarUrl,
+      participantIds: chat.participantIds,
+      participants: chat.participants,
+      lastMessage: chat.lastMessage,
+      unread: {...chat.unread, currentUser.id: 0},
+      lastReadAt: chat.lastReadAt,
+      pinnedMessageId: chat.pinnedMessageId,
+      muted: chat.muted,
+      pinnedToTop: chat.pinnedToTop,
+    );
+    _chats = next;
+    notifyListeners();
+  }
+
   // --- Действия с сообщениями ---
 
   void sendMessage({

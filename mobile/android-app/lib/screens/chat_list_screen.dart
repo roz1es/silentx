@@ -583,8 +583,8 @@ class _ChatListScreenState extends State<ChatListScreen>
     );
   }
 
-  /// Количество чатов с непрочитанными сообщениями в папке.
-  int _folderUnread(int index) {
+  /// Чаты, попадающие в папку (0 = «Все»).
+  Iterable<Chat> _chatsInFolder(int index) {
     Iterable<Chat> list = _controller.chats;
     if (index > 0 && index <= _folders.length) {
       final folder = _folders[index - 1];
@@ -599,7 +599,106 @@ class _ChatListScreenState extends State<ChatListScreen>
           list = list.where((c) => ids.contains(c.id));
       }
     }
-    return list.where((c) => _controller.unreadFor(c) > 0).length;
+    return list;
+  }
+
+  /// Количество чатов с непрочитанными сообщениями в папке.
+  int _folderUnread(int index) =>
+      _chatsInFolder(index).where((c) => _controller.unreadFor(c) > 0).length;
+
+  void _markFolderRead(int index) {
+    for (final c in _chatsInFolder(index).toList()) {
+      if (_controller.unreadFor(c) > 0) _controller.markChatRead(c.id);
+    }
+  }
+
+  Future<void> _deleteFolder(int index) async {
+    if (index <= 0 || index > _folders.length) return;
+    final next = [..._folders]..removeAt(index - 1);
+    setState(() {
+      _folders = next;
+      _activeFolder = 0;
+    });
+    await FoldersStore.save(next);
+  }
+
+  Future<void> _editFolder(ChatFolder folder) async {
+    final result = await Navigator.of(context).push<ChatFolder>(
+      CupertinoPageRoute(
+        builder: (_) =>
+            FolderEditScreen(controller: _controller, folder: folder),
+      ),
+    );
+    if (result == null) return;
+    final i = _folders.indexWhere((f) => f.id == result.id);
+    if (i == -1) return;
+    final next = [..._folders];
+    next[i] = result;
+    setState(() => _folders = next);
+    await FoldersStore.save(next);
+  }
+
+  /// Мини-меню папки по долгому нажатию на вкладку.
+  void _folderMenu(int index) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final folder =
+        (index > 0 && index <= _folders.length) ? _folders[index - 1] : null;
+    final hasUnread = _folderUnread(index) > 0;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: isLight ? Colors.white : panel,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  index == 0 ? 'Все' : (folder?.name ?? ''),
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.w900),
+                ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.done_all_rounded, color: accent),
+              title: const Text('Прочитать всё'),
+              enabled: hasUnread,
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                _markFolderRead(index);
+              },
+            ),
+            if (folder != null && folder.filterType == FolderFilter.manual)
+              ListTile(
+                leading: const Icon(Icons.edit_rounded),
+                title: const Text('Изменить папку'),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  _editFolder(folder);
+                },
+              ),
+            if (folder != null)
+              ListTile(
+                leading:
+                    const Icon(Icons.delete_outline_rounded, color: danger),
+                title: const Text('Удалить папку',
+                    style: TextStyle(color: danger)),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  _deleteFolder(index);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _folderTab(String name, int index, bool isLight) {
@@ -607,6 +706,7 @@ class _ChatListScreenState extends State<ChatListScreen>
     final unread = _folderUnread(index);
     return GestureDetector(
       onTap: () => setState(() => _activeFolder = index),
+      onLongPress: () => _folderMenu(index),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOutCubic,

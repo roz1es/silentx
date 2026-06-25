@@ -35,10 +35,10 @@ class ChatListScreen extends StatefulWidget {
 
 class _ChatListScreenState extends State<ChatListScreen> {
   final _searchController = TextEditingController();
-  bool _searching = false;
   bool _showOffline = false;
   DateTime? _disconnectedAt;
-  int _tabIndex = 0;
+  int _tabIndex = 1; // 0 = Контакты, 1 = Чаты, 2 = Настройки
+  int _filter = 0; // 0 = Все, 1 = Личные, 2 = Группы
 
   MessengerController get _controller => widget.controller;
 
@@ -155,8 +155,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
-  void _openAccount() => setState(() => _tabIndex = 1);
-
   @override
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
@@ -166,6 +164,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         body: IndexedStack(
           index: _tabIndex,
           children: [
+            _contactsTab(isLight),
             _chatTab(isLight),
             _settingsTab(isLight),
           ],
@@ -181,11 +180,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 62,
+          height: 60,
           child: Row(
             children: [
-              _navItem(0, Icons.forum_rounded, 'Главная', isLight),
-              _navItem(1, Icons.settings_rounded, 'Настройки', isLight),
+              _navItem(0, Icons.person_rounded, 'Контакты', isLight),
+              _navItem(1, Icons.chat_bubble_rounded, 'Чаты', isLight),
+              _navItem(2, Icons.settings_rounded, 'Настройки', isLight),
             ],
           ),
         ),
@@ -202,7 +202,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 25),
+            Icon(icon, color: color, size: 24),
             const SizedBox(height: 3),
             Text(
               label,
@@ -223,7 +223,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        toolbarHeight: 70,
+        toolbarHeight: 64,
         automaticallyImplyLeading: false,
         flexibleSpace: const GlassBar(bottomBorder: true),
         titleSpacing: 20,
@@ -242,148 +242,70 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
-  Widget _chatTab(bool isLight) {
-    final query = _searchController.text.trim().toLowerCase();
-    final chats = query.isEmpty
-        ? _controller.chats
-        : _controller.chats
-            .where((chat) => chat.title.toLowerCase().contains(query))
-            .toList(growable: false);
-
+  Widget _contactsTab(bool isLight) {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        toolbarHeight: 70,
+        toolbarHeight: 64,
+        automaticallyImplyLeading: false,
         flexibleSpace: const GlassBar(bottomBorder: true),
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 12, top: 6),
-          child: Align(
-            // Ниже центра — иначе аватар прижат к статус-бару.
-            alignment: const Alignment(0, 0.6),
-            child: InkWell(
-              onTap: _openAccount,
-              customBorder: const CircleBorder(),
-              child: BrenksAvatar(
-                title: _controller.currentUser.title,
-                imageUrl: _controller.currentUser.avatarUrl,
-                baseUrl: _controller.serverUrl,
-                size: 38,
-              ),
-            ),
+        titleSpacing: 20,
+        title: const Text(
+          'Контакты',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+        ),
+      ),
+      body: _ContactsView(
+        controller: _controller,
+        isLight: isLight,
+        onOpenChat: _openChat,
+      ),
+    );
+  }
+
+  Widget _chatTab(bool isLight) {
+    final chats = _filteredChats();
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        toolbarHeight: 56,
+        centerTitle: true,
+        titleSpacing: 0,
+        automaticallyImplyLeading: false,
+        flexibleSpace: const GlassBar(),
+        leadingWidth: 84,
+        leading: Center(
+          child: _pillButton(
+            isLight: isLight,
+            onTap: () => showAppToast(context, 'Редактирование списка — скоро'),
+            child: const Text('Изм.',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
           ),
         ),
-        titleSpacing: 4,
-        title: _searching
-            ? TextField(
-                controller: _searchController,
-                autofocus: true,
-                onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  hintText: 'Поиск чатов...',
-                  border: InputBorder.none,
-                  filled: false,
-                ),
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    _controller.currentUser.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 7,
-                        height: 7,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF4AAE8A),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        'онлайн',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isLight ? lightMuted : muted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+        title: const Text('Чаты',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
         actions: [
-          _AnimatedCircleAction(
-            tooltip: _searching ? 'Закрыть поиск' : 'Поиск',
-            icon: _searching ? Icons.close_rounded : Icons.search_rounded,
-            onTap: () => setState(() {
-              _searching = !_searching;
-              if (!_searching) _searchController.clear();
-            }),
+          _pillButton(
             isLight: isLight,
-          ),
-          const SizedBox(width: 6),
-          _AnimatedCircleAction(
-            tooltip: 'Новый чат',
-            icon: Icons.maps_ugc_rounded,
             onTap: _newChat,
-            isLight: isLight,
-            accented: true,
+            child: const Icon(Icons.add_rounded, size: 22),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
+          _pillButton(
+            isLight: isLight,
+            onTap: _newChat,
+            child: const Icon(Icons.edit_square, size: 19),
+          ),
+          const SizedBox(width: 12),
         ],
       ),
       body: Column(
         children: [
-          AnimatedSize(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOutCubic,
-            child: _showOffline
-                ? Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 16),
-                    color: const Color(0xFFFF9800).withValues(alpha: 0.14),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.wifi_off_rounded,
-                            color: Color(0xFFFF9800), size: 16),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: Text(
-                            'Нет подключения к серверу — сообщения не доставляются',
-                            style: TextStyle(
-                              color: Color(0xFFFF9800),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: _controller.reconnect,
-                          child: const Text(
-                            'Повторить',
-                            style: TextStyle(
-                              color: Color(0xFFFF9800),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : const SizedBox.shrink(),
-          ),
+          _offlineBanner(),
+          _searchBar(isLight),
+          _filterTabs(isLight),
           Expanded(
             child: RefreshIndicator(
               onRefresh: _controller.loadChats,
@@ -391,6 +313,198 @@ class _ChatListScreenState extends State<ChatListScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  List<Chat> _filteredChats() {
+    final query = _searchController.text.trim().toLowerCase();
+    Iterable<Chat> list = _controller.chats;
+    if (_filter == 1) {
+      list = list.where((c) => c.type == ChatType.direct);
+    } else if (_filter == 2) {
+      list = list.where(
+          (c) => c.type == ChatType.group || c.type == ChatType.channel);
+    }
+    if (query.isNotEmpty) {
+      list = list.where((c) => c.title.toLowerCase().contains(query));
+    }
+    return list.toList(growable: false);
+  }
+
+  Widget _offlineBanner() {
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOutCubic,
+      child: _showOffline
+          ? Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 16),
+              color: const Color(0xFFFF9800).withValues(alpha: 0.14),
+              child: Row(
+                children: [
+                  const Icon(Icons.wifi_off_rounded,
+                      color: Color(0xFFFF9800), size: 16),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Нет подключения к серверу — сообщения не доставляются',
+                      style: TextStyle(
+                        color: Color(0xFFFF9800),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: _controller.reconnect,
+                    child: const Text(
+                      'Повторить',
+                      style: TextStyle(
+                        color: Color(0xFFFF9800),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : const SizedBox.shrink(),
+    );
+  }
+
+  Widget _searchBar(bool isLight) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+      child: Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: isLight ? 0.55 : 0.07),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: isLight ? 0.6 : 0.10),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.search_rounded,
+                size: 20, color: isLight ? lightMuted : muted),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: _searchController,
+                onChanged: (_) => setState(() {}),
+                textAlignVertical: TextAlignVertical.center,
+                decoration: InputDecoration(
+                  isCollapsed: true,
+                  hintText: 'Поиск',
+                  hintStyle: TextStyle(
+                      color: isLight ? lightMuted : muted, fontSize: 15),
+                  border: InputBorder.none,
+                  filled: false,
+                ),
+              ),
+            ),
+            if (_searchController.text.isNotEmpty)
+              GestureDetector(
+                onTap: () => setState(() => _searchController.clear()),
+                child: Icon(Icons.close_rounded,
+                    size: 18, color: isLight ? lightMuted : muted),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _filterTabs(bool isLight) {
+    final groupCount = _controller.chats
+        .where((c) => c.type == ChatType.group || c.type == ChatType.channel)
+        .length;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+      child: Row(
+        children: [
+          _filterPill('Все', 0, isLight, null),
+          const SizedBox(width: 8),
+          _filterPill('Личные', 1, isLight, null),
+          const SizedBox(width: 8),
+          _filterPill('Группы', 2, isLight, groupCount),
+        ],
+      ),
+    );
+  }
+
+  Widget _filterPill(String label, int index, bool isLight, int? count) {
+    final selected = _filter == index;
+    final bg = selected
+        ? accent
+        : Colors.white.withValues(alpha: isLight ? 0.55 : 0.07);
+    final fg =
+        selected ? const Color(0xFF08131A) : (isLight ? lightText : text);
+    return GestureDetector(
+      onTap: () => setState(() => _filter = index),
+      child: Container(
+        height: 34,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: isLight ? 0.6 : 0.10),
+          ),
+        ),
+        child: Row(
+          children: [
+            Text(label,
+                style: TextStyle(
+                    color: fg, fontWeight: FontWeight.w800, fontSize: 14)),
+            if (count != null && count > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? Colors.black.withValues(alpha: 0.18)
+                      : (isLight ? lightMuted : muted).withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Text('$count',
+                    style: TextStyle(
+                        color: fg, fontSize: 12, fontWeight: FontWeight.w800)),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _pillButton({
+    required bool isLight,
+    required VoidCallback onTap,
+    required Widget child,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 36,
+        constraints: const BoxConstraints(minWidth: 44),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: isLight ? 0.7 : 0.09),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: isLight ? 0.6 : 0.10),
+          ),
+        ),
+        child: child,
       ),
     );
   }
@@ -854,94 +968,117 @@ class _SettingsViewState extends State<_SettingsView> {
   }
 }
 
-// ─── Анимированная круглая кнопка AppBar ──────────────────────────────────
+// ─── Вкладка «Контакты» ───────────────────────────────────────────────────
 
-class _AnimatedCircleAction extends StatefulWidget {
-  const _AnimatedCircleAction({
-    required this.tooltip,
-    required this.icon,
-    required this.onTap,
+class _ContactsView extends StatefulWidget {
+  const _ContactsView({
+    required this.controller,
     required this.isLight,
-    this.accented = false,
+    required this.onOpenChat,
   });
 
-  final String tooltip;
-  final IconData icon;
-  final VoidCallback onTap;
+  final MessengerController controller;
   final bool isLight;
-  final bool accented;
+  final void Function(Chat) onOpenChat;
 
   @override
-  State<_AnimatedCircleAction> createState() => _AnimatedCircleActionState();
+  State<_ContactsView> createState() => _ContactsViewState();
 }
 
-class _AnimatedCircleActionState extends State<_AnimatedCircleAction>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _tap = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 240),
-  );
-  // Одноразовый мягкий «поп» при нажатии: 1 → 1.12 → 1. В покое кнопка статична.
-  late final Animation<double> _bounce = TweenSequence<double>([
-    TweenSequenceItem(
-      tween: Tween(begin: 1.0, end: 1.12)
-          .chain(CurveTween(curve: Curves.easeOut)),
-      weight: 45,
-    ),
-    TweenSequenceItem(
-      tween: Tween(begin: 1.12, end: 1.0)
-          .chain(CurveTween(curve: Curves.easeIn)),
-      weight: 55,
-    ),
-  ]).animate(_tap);
+class _ContactsViewState extends State<_ContactsView> {
+  List<DirectoryUser>? _users;
+  String? _error;
+  bool _creating = false;
+
+  MessengerController get _ctrl => widget.controller;
+  Color get _muted => widget.isLight ? lightMuted : muted;
 
   @override
-  void dispose() {
-    _tap.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _load();
   }
 
-  void _handleTap() {
-    _tap.forward(from: 0);
-    widget.onTap();
+  Future<void> _load() async {
+    try {
+      final users = await _ctrl.api.fetchUserDirectory();
+      if (!mounted) return;
+      setState(() {
+        _users = users
+            .where((u) => u.id != _ctrl.currentUser.id)
+            .toList(growable: false);
+        _error = null;
+      });
+    } on Object catch (e) {
+      if (mounted) setState(() => _error = '$e');
+    }
+  }
+
+  Future<void> _startChat(DirectoryUser user) async {
+    if (_creating) return;
+    setState(() => _creating = true);
+    try {
+      final chat = await _ctrl.createDirectChat(user.id);
+      if (mounted) widget.onOpenChat(chat);
+    } on Object catch (e) {
+      if (mounted) showAppToast(context, 'Ошибка: $e', error: true);
+    } finally {
+      if (mounted) setState(() => _creating = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final fg = widget.accented
-        ? accent
-        : (widget.isLight ? lightText : text);
-    final bg = widget.accented
-        ? accent.withValues(alpha: widget.isLight ? 0.16 : 0.18)
-        : Colors.white.withValues(alpha: widget.isLight ? 0.55 : 0.08);
-    return Tooltip(
-      message: widget.tooltip,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: _handleTap,
-        child: ScaleTransition(
-          scale: _bounce,
-          child: Container(
-            width: 42,
-            height: 42,
-            margin: const EdgeInsets.symmetric(vertical: 7),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              transitionBuilder: (child, animation) => RotationTransition(
-                turns: Tween<double>(begin: 0.5, end: 1.0).animate(animation),
-                child: ScaleTransition(scale: animation, child: child),
-              ),
-              child: Icon(
-                widget.icon,
-                key: ValueKey(widget.icon.codePoint),
-                color: fg,
-                size: 22,
+    if (_error != null) {
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          children: [
+            const SizedBox(height: 120),
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  'Не удалось загрузить контакты\n$_error',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: _muted),
+                ),
               ),
             ),
-          ),
+          ],
         ),
+      );
+    }
+    final users = _users;
+    if (users == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (users.isEmpty) {
+      return Center(child: Text('Контактов нет', style: TextStyle(color: _muted)));
+    }
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        itemCount: users.length,
+        itemBuilder: (context, index) {
+          final user = users[index];
+          return ListTile(
+            leading: BrenksAvatar(
+              title: user.title,
+              imageUrl: user.avatarUrl,
+              baseUrl: _ctrl.serverUrl,
+              size: 46,
+            ),
+            title: Text(user.title,
+                style: const TextStyle(fontWeight: FontWeight.w700)),
+            subtitle:
+                Text('@${user.username}', style: TextStyle(color: _muted)),
+            trailing:
+                const Icon(Icons.chat_bubble_outline_rounded, color: accent, size: 20),
+            onTap: () => _startChat(user),
+          );
+        },
       ),
     );
   }

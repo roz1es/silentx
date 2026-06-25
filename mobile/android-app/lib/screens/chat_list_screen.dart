@@ -17,6 +17,7 @@ import '../widgets/brenks_avatar.dart';
 import '../widgets/chat_tile.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/glass.dart';
+import '../widgets/ios_context_menu.dart';
 import '../widgets/night_mode_switch.dart';
 import '../widgets/new_chat_sheet.dart';
 import 'chat_screen.dart';
@@ -224,8 +225,89 @@ class _ChatListScreenState extends State<ChatListScreen>
     }
   }
 
-  Future<void> _chatOptions(Chat chat) async {
+  Future<void> _chatOptions(Chat chat, Offset pos) async {
     final isLight = Theme.of(context).brightness == Brightness.light;
+    final width =
+        (MediaQuery.of(context).size.width - 40).clamp(240.0, 360.0);
+    final unread = _controller.unreadFor(chat);
+
+    // «Приподнятая» карточка с самим чатом — превью над размытием.
+    final preview = Container(
+      width: width,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: isLight ? Colors.white : panel,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: border),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 8)),
+        ],
+      ),
+      child: ChatTile(
+        chat: chat,
+        avatarUrl: _controller.displayAvatar(chat),
+        serverUrl: _controller.serverUrl,
+        unread: unread,
+        peerOnline: _controller.isPeerOnline(chat),
+        onTap: () {},
+        onLongPress: (_) {},
+      ),
+    );
+
+    await showIosContextMenu(
+      context: context,
+      pos: pos,
+      preview: preview,
+      menuWidth: width,
+      actions: [
+        if (unread > 0)
+          IosMenuAction(
+            icon: Icons.mark_chat_read_rounded,
+            label: 'Отметить прочитанным',
+            onTap: () => _controller.markChatRead(chat.id),
+          ),
+        IosMenuAction(
+          icon: chat.pinnedToTop
+              ? Icons.push_pin_outlined
+              : Icons.push_pin_rounded,
+          label: chat.pinnedToTop ? 'Открепить' : 'Закрепить',
+          onTap: () => _controller.togglePinTop(chat),
+        ),
+        IosMenuAction(
+          icon: chat.muted
+              ? Icons.notifications_active_rounded
+              : Icons.notifications_off_rounded,
+          label: chat.muted ? 'Включить уведомления' : 'Выключить уведомления',
+          onTap: () => _controller.toggleMute(chat),
+        ),
+        IosMenuAction(
+          icon: Icons.create_new_folder_outlined,
+          label: 'Добавить в папку',
+          onTap: () => _addChatToFolderSheet(chat),
+        ),
+        IosMenuAction(
+          icon: Icons.delete_outline_rounded,
+          label: 'Удалить',
+          danger: true,
+          dividerBefore: true,
+          onTap: () => _controller.deleteChat(chat),
+        ),
+      ],
+    );
+  }
+
+  /// Лист выбора ручных папок: галочкой включаем/убираем чат из папки.
+  Future<void> _addChatToFolderSheet(Chat chat) async {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final manual =
+        _folders.where((f) => f.filterType == FolderFilter.manual).toList();
+    if (manual.isEmpty) {
+      showAppToast(context, 'Сначала создайте папку в Настройках');
+      return;
+    }
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: isLight ? Colors.white : panel,
@@ -234,38 +316,47 @@ class _ChatListScreenState extends State<ChatListScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Icon(chat.muted
-                  ? Icons.notifications_active_rounded
-                  : Icons.notifications_off_rounded),
-              title: Text(chat.muted ? 'Включить звук' : 'Выключить звук'),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _controller.toggleMute(chat);
-              },
-            ),
-            ListTile(
-              leading: Icon(chat.pinnedToTop
-                  ? Icons.push_pin_outlined
-                  : Icons.push_pin_rounded),
-              title: Text(chat.pinnedToTop ? 'Открепить чат' : 'Закрепить чат'),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _controller.togglePinTop(chat);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline_rounded, color: danger),
-              title: const Text('Удалить чат', style: TextStyle(color: danger)),
-              onTap: () async {
-                Navigator.pop(sheetContext);
-                await _controller.deleteChat(chat);
-              },
-            ),
-          ],
+        child: StatefulBuilder(
+          builder: (_, setSheet) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 2, 20, 10),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Папки для «${chat.title}»',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800, fontSize: 16),
+                  ),
+                ),
+              ),
+              for (final f in manual)
+                ListTile(
+                  leading: Icon(
+                    f.chatIds.contains(chat.id)
+                        ? Icons.check_circle_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    color: f.chatIds.contains(chat.id)
+                        ? accent
+                        : (isLight ? lightMuted : muted),
+                  ),
+                  title: Text(f.name),
+                  onTap: () async {
+                    setSheet(() {
+                      if (f.chatIds.contains(chat.id)) {
+                        f.chatIds.remove(chat.id);
+                      } else {
+                        f.chatIds.add(chat.id);
+                      }
+                    });
+                    await FoldersStore.save(_folders);
+                    if (mounted) setState(() {});
+                  },
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
@@ -797,7 +888,7 @@ class _ChatListScreenState extends State<ChatListScreen>
                     unread: _controller.unreadFor(chat),
                     peerOnline: _controller.isPeerOnline(chat),
                     onTap: () {},
-                    onLongPress: () {},
+                    onLongPress: (_) {},
                   ),
                 ),
                 ReorderableDragStartListener(
@@ -989,7 +1080,7 @@ class _ChatListScreenState extends State<ChatListScreen>
               unread: _controller.unreadFor(chat),
               peerOnline: _controller.isPeerOnline(chat),
               onTap: () => _openChat(chat),
-              onLongPress: () => _chatOptions(chat),
+              onLongPress: (pos) => _chatOptions(chat, pos),
             ),
           ),
         );

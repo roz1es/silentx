@@ -24,17 +24,20 @@ class ChatTile extends StatelessWidget {
   final int unread;
   final bool peerOnline;
   final VoidCallback onTap;
-  final VoidCallback onLongPress;
+
+  /// Долгое нажатие с позицией касания (для привязки контекстного меню).
+  final void Function(Offset globalPosition) onLongPress;
 
   @override
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
     final mutedColor = isLight ? lightMuted : muted;
-    return Material(
+    return GestureDetector(
+      onLongPressStart: (d) => onLongPress(d.globalPosition),
+      child: Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(18),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -142,6 +145,7 @@ class ChatTile extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

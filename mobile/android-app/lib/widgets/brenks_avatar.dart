@@ -73,6 +73,8 @@ class BrenksAvatar extends StatelessWidget {
       return Image.memory(
         bytes,
         fit: BoxFit.cover,
+        // Смещаем кадр к верху: у вертикальных фото cover иначе срезает макушку.
+        alignment: const Alignment(0, -0.55),
         width: size,
         height: size,
         gaplessPlayback: true,
@@ -82,6 +84,7 @@ class BrenksAvatar extends StatelessWidget {
     return Image.network(
       url,
       fit: BoxFit.cover,
+      alignment: const Alignment(0, -0.55),
       width: size,
       height: size,
       gaplessPlayback: true,

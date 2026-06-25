@@ -63,6 +63,8 @@ class MessageComposer extends StatefulWidget {
 class _MessageComposerState extends State<MessageComposer> {
   final _focusNode = FocusNode();
   bool _showEmoji = false;
+  // false — режим голосовых, true — режим видеокружков.
+  bool _circleMode = false;
 
   @override
   void dispose() {
@@ -220,8 +222,6 @@ class _MessageComposerState extends State<MessageComposer> {
                 ),
               ),
             ),
-            if (!hasText && !widget.recordingVoice)
-              _pillIcon(Icons.mic_rounded, iconColor, widget.onStartVoice),
             _pillIcon(
               _showEmoji
                   ? Icons.keyboard_rounded
@@ -282,12 +282,31 @@ class _MessageComposerState extends State<MessageComposer> {
         ),
       );
     }
-    // Пусто → кружок видеосообщения (камера)
-    return _blob(
-      color: blob,
-      isLight: isLight,
-      onTap: _openVideoCircle,
-      child: Icon(Icons.photo_camera_rounded, color: iconColor, size: 24),
+    // Пусто → кнопка режима: тап переключает голос/кружок,
+    // удержание — запись (голос) либо открытие записи кружка.
+    return Tooltip(
+      message: _circleMode
+          ? 'Видеокружок (удерживайте). Тап — голосовое'
+          : 'Голосовое (удерживайте). Тап — видеокружок',
+      child: _blob(
+        color: blob,
+        isLight: isLight,
+        onTap: () => setState(() => _circleMode = !_circleMode),
+        onLongPress: _circleMode ? _openVideoCircle : widget.onStartVoice,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 240),
+          transitionBuilder: (child, animation) => ScaleTransition(
+            scale: animation,
+            child: FadeTransition(opacity: animation, child: child),
+          ),
+          child: Icon(
+            _circleMode ? Icons.videocam_rounded : Icons.mic_rounded,
+            key: ValueKey(_circleMode),
+            color: iconColor,
+            size: 24,
+          ),
+        ),
+      ),
     );
   }
 
@@ -296,6 +315,7 @@ class _MessageComposerState extends State<MessageComposer> {
     required bool isLight,
     required Widget child,
     required VoidCallback? onTap,
+    VoidCallback? onLongPress,
   }) {
     return Material(
       color: color,
@@ -305,6 +325,7 @@ class _MessageComposerState extends State<MessageComposer> {
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
+        onLongPress: onLongPress,
         child: SizedBox(width: 48, height: 48, child: Center(child: child)),
       ),
     );

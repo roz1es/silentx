@@ -51,7 +51,7 @@ class _VideoRecorderScreenState extends State<VideoRecorderScreen> {
       );
       final ctrl = CameraController(
         cam,
-        ResolutionPreset.low,
+        ResolutionPreset.medium,
         enableAudio: true,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
@@ -245,6 +245,7 @@ class _VideoRecorderScreenState extends State<VideoRecorderScreen> {
         ),
       );
     }
+    final preview = _camera!.value.previewSize;
     return Container(
       width: size,
       height: size,
@@ -255,7 +256,21 @@ class _VideoRecorderScreenState extends State<VideoRecorderScreen> {
           width: _recording ? 3 : 1.5,
         ),
       ),
-      child: ClipOval(child: CameraPreview(_camera!)),
+      child: ClipOval(
+        child: SizedBox(
+          width: size,
+          height: size,
+          // Заполняем круг кадром (cover), иначе 4:3-превью даёт чёрную рамку.
+          child: FittedBox(
+            fit: BoxFit.cover,
+            child: SizedBox(
+              width: preview?.height ?? size,
+              height: preview?.width ?? size,
+              child: CameraPreview(_camera!),
+            ),
+          ),
+        ),
+      ),
     );
   }
 

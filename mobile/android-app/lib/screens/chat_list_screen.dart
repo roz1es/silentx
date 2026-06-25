@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../format.dart';
 import '../models.dart';
 import '../services/messenger_controller.dart';
 import '../theme/app_theme.dart';
@@ -695,12 +696,36 @@ class _SettingsView extends StatefulWidget {
 
 class _SettingsViewState extends State<_SettingsView> {
   bool _uploadingPhoto = false;
+  List<String> _avatarHistory = const [];
 
   MessengerController get _ctrl => widget.controller;
   bool get _isLight => widget.isLight;
 
   Color get _textColor => _isLight ? const Color(0xFF17202B) : text;
   Color get _mutedColor => _isLight ? const Color(0xFF637083) : muted;
+
+  String get _historyKey => 'avatar_history_${_ctrl.currentUser.id}';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAvatarHistory();
+  }
+
+  Future<void> _loadAvatarHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getStringList(_historyKey);
+    if (raw != null && mounted) setState(() => _avatarHistory = raw);
+  }
+
+  Future<void> _pushAvatarHistory(String dataUrl) async {
+    final next = [dataUrl, ..._avatarHistory.where((a) => a != dataUrl)]
+        .take(12)
+        .toList();
+    setState(() => _avatarHistory = next);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_historyKey, next);
+  }
 
   Future<void> _changePhoto() async {
     setState(() => _uploadingPhoto = true);
@@ -716,12 +741,81 @@ class _SettingsViewState extends State<_SettingsView> {
       final mime = file.extension?.toLowerCase() == 'png' ? 'image/png' : 'image/jpeg';
       final dataUrl = 'data:$mime;base64,${base64Encode(bytes)}';
       await _ctrl.api.updateProfile(avatarDataUrl: dataUrl);
-      if (mounted) showAppToast(context, 'Фото обновлено');
+      await _pushAvatarHistory(dataUrl);
+      if (mounted) showAppToast(context, 'Аватар обновлён');
     } on Object catch (e) {
       if (mounted) showAppToast(context, 'Ошибка: $e', error: true);
     } finally {
       if (mounted) setState(() => _uploadingPhoto = false);
     }
+  }
+
+  Future<void> _applyHistoryAvatar(String dataUrl) async {
+    Navigator.of(context).pop();
+    try {
+      await _ctrl.api.updateProfile(avatarDataUrl: dataUrl);
+      await _pushAvatarHistory(dataUrl);
+      if (mounted) showAppToast(context, 'Аватар обновлён');
+    } on Object catch (e) {
+      if (mounted) showAppToast(context, 'Ошибка: $e', error: true);
+    }
+  }
+
+  void _openAvatarGallery() {
+    if (_avatarHistory.isEmpty) {
+      showAppToast(context, 'История аватаров пуста — добавьте аватар');
+      return;
+    }
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: _isLight ? Colors.white : panel,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Мои аватары',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: _textColor)),
+              const SizedBox(height: 12),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate:
+                    const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                ),
+                itemCount: _avatarHistory.length,
+                itemBuilder: (context, index) {
+                  final dataUrl = _avatarHistory[index];
+                  final bytes = bytesFromDataUrl(dataUrl);
+                  return GestureDetector(
+                    onTap: () => _applyHistoryAvatar(dataUrl),
+                    child: ClipOval(
+                      child: bytes == null
+                          ? Container(color: panelSoft)
+                          : Image.memory(bytes,
+                              fit: BoxFit.cover,
+                              alignment: const Alignment(0, -0.55)),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _removePhoto() async {
@@ -758,7 +852,9 @@ class _SettingsViewState extends State<_SettingsView> {
                       padding: const EdgeInsets.fromLTRB(20, 24, 20, 22),
                       child: Column(
                         children: [
-                          Container(
+                          GestureDetector(
+                            onTap: _openAvatarGallery,
+                            child: Container(
                             padding: const EdgeInsets.all(4),
                             decoration: const BoxDecoration(
                               shape: BoxShape.circle,
@@ -781,6 +877,7 @@ class _SettingsViewState extends State<_SettingsView> {
                                 size: 88,
                               ),
                             ),
+                          ),
                           ),
                           const SizedBox(height: 14),
                           Text(
@@ -892,14 +989,14 @@ class _SettingsViewState extends State<_SettingsView> {
                       ),
                     ],
                     const SizedBox(height: 20),
-                    _sectionLabel('ФОТОГРАФИЯ'),
+                    _sectionLabel('АВАТАР'),
                     const SizedBox(height: 8),
                     Row(
                       children: [
                         Expanded(
                           child: _photoBtn(
-                            icon: Icons.camera_alt_rounded,
-                            label: 'Сменить',
+                            icon: Icons.add_a_photo_rounded,
+                            label: 'Добавить аватар',
                             onTap: _uploadingPhoto ? null : _changePhoto,
                             loading: _uploadingPhoto,
                           ),

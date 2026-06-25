@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' as io;
+import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
@@ -311,7 +312,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     final messages = _controller.messages;
     final pinned = _controller.pinnedMessage;
-    final typing = _controller.typingNames;
 
     return GlassBackground(
       child: Scaffold(
@@ -374,8 +374,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               );
                             },
                           ),
-                // Composer + индикатор печати поверх ленты —
-                // сообщения видны за ними (как в Telegram).
+                // Composer поверх ленты — сообщения видны за ним (как в Telegram).
                 Positioned(
                   left: 0,
                   right: 0,
@@ -383,17 +382,6 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (typing.isNotEmpty)
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
-                            child: Text(
-                              '${typing.join(', ')} печатает...',
-                              style: const TextStyle(color: muted),
-                            ),
-                          ),
-                        ),
                       MessageComposer(
                         controller: _messageController,
                         replyTo: _replyTo,
@@ -453,9 +441,22 @@ class _ChatScreenState extends State<ChatScreen> {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  Text(
-                    _controller.isPeerOnline(chat) ? 'онлайн' : chatSubtitle(chat),
-                    style: const TextStyle(color: muted, fontSize: 12),
+                  Builder(
+                    builder: (context) {
+                      final typing = _controller.typingNames;
+                      if (typing.isNotEmpty) {
+                        final label = chat.type == ChatType.direct
+                            ? 'печатает'
+                            : '${typing.join(', ')} печатает';
+                        return _TypingIndicator(label: label);
+                      }
+                      return Text(
+                        _controller.isPeerOnline(chat)
+                            ? 'онлайн'
+                            : chatSubtitle(chat),
+                        style: const TextStyle(color: muted, fontSize: 12),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -658,6 +659,74 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Анимированный индикатор «печатает…» с волной из трёх точек.
+class _TypingIndicator extends StatefulWidget {
+  const _TypingIndicator({required this.label});
+
+  final String label;
+
+  @override
+  State<_TypingIndicator> createState() => _TypingIndicatorState();
+}
+
+class _TypingIndicatorState extends State<_TypingIndicator>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          widget.label,
+          style: const TextStyle(
+              color: accent, fontSize: 12, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(width: 5),
+        AnimatedBuilder(
+          animation: _c,
+          builder: (context, _) {
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(3, (i) {
+                final phase = (_c.value * 2 * math.pi) - i * 0.9;
+                final t = (0.5 + 0.5 * math.sin(phase)).clamp(0.0, 1.0);
+                return Padding(
+                  padding: const EdgeInsets.only(right: 3),
+                  child: Transform.translate(
+                    offset: Offset(0, -2 * t),
+                    child: Opacity(
+                      opacity: (0.35 + 0.65 * t).clamp(0.0, 1.0),
+                      child: Container(
+                        width: 4,
+                        height: 4,
+                        decoration: const BoxDecoration(
+                          color: accent,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            );
+          },
+        ),
+      ],
     );
   }
 }

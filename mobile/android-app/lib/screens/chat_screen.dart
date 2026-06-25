@@ -53,6 +53,8 @@ class _ChatScreenState extends State<ChatScreen> {
   int _lastTick = -1;
   int _bgIndex = 0;
   bool _recordingCircle = false;
+  bool _msgSearch = false;
+  final _msgSearchController = TextEditingController();
 
   MessengerController get _controller => widget.controller;
 
@@ -75,6 +77,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _recordingTimer?.cancel();
     unawaited(_audioService.dispose());
     _messageController.dispose();
+    _msgSearchController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -312,7 +315,12 @@ class _ChatScreenState extends State<ChatScreen> {
         body: Center(child: Text('Чат недоступен')),
       );
     }
-    final messages = _controller.messages;
+    final query = _msgSearchController.text.trim().toLowerCase();
+    final messages = (_msgSearch && query.isNotEmpty)
+        ? _controller.messages
+            .where((m) => !m.deleted && m.text.toLowerCase().contains(query))
+            .toList(growable: false)
+        : _controller.messages;
     final pinned = _controller.pinnedMessage;
 
     return GlassBackground(
@@ -432,6 +440,38 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   PreferredSizeWidget _appBar(Chat chat) {
+    if (_msgSearch) {
+      return AppBar(
+        backgroundColor: Colors.transparent,
+        flexibleSpace: const GlassBar(bottomBorder: true),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => setState(() {
+            _msgSearch = false;
+            _msgSearchController.clear();
+          }),
+        ),
+        titleSpacing: 0,
+        title: TextField(
+          controller: _msgSearchController,
+          autofocus: true,
+          onChanged: (_) => setState(() {}),
+          cursorColor: accent,
+          decoration: const InputDecoration(
+            hintText: 'Поиск в чате',
+            border: InputBorder.none,
+            filled: false,
+          ),
+        ),
+        actions: [
+          if (_msgSearchController.text.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.close_rounded),
+              onPressed: () => setState(() => _msgSearchController.clear()),
+            ),
+        ],
+      );
+    }
     return AppBar(
       backgroundColor: Colors.transparent,
       flexibleSpace: const GlassBar(bottomBorder: true),
@@ -485,6 +525,11 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
       actions: [
+        IconButton(
+          tooltip: 'Поиск в чате',
+          icon: const Icon(Icons.search_rounded),
+          onPressed: () => setState(() => _msgSearch = true),
+        ),
         PopupMenuButton<String>(
           onSelected: (value) => _onMenu(value, chat),
           itemBuilder: (context) => [
@@ -535,10 +580,10 @@ class _ChatScreenState extends State<ChatScreen> {
     final isLight = Theme.of(context).brightness == Brightness.light;
     const options = [
       ('По умолчанию', 0),
-      ('Синий', 1),
-      ('Фиолетовый', 2),
-      ('Тёмный', 3),
-      ('Зелёный', 4),
+      ('Тёплый', 1),
+      ('Графит', 2),
+      ('Сепия', 3),
+      ('Уголь', 4),
       ('Без фона', 5),
     ];
     showModalBottomSheet<void>(
@@ -612,29 +657,29 @@ class _ChatScreenState extends State<ChatScreen> {
 
   static LinearGradient? _bgGradient(int idx) {
     switch (idx) {
-      case 1:
+      case 1: // Тёплый графит
         return const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF1A3A5C), Color(0xFF0D2137)],
+          colors: [Color(0xFF26231D), Color(0xFF141209)],
         );
-      case 2:
+      case 2: // Холодный графит
         return const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF2D1B69), Color(0xFF1A0A3C)],
+          colors: [Color(0xFF1C1F24), Color(0xFF111215)],
         );
-      case 3:
+      case 3: // Сепия
         return const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF1C2128), Color(0xFF0D1117)],
+          colors: [Color(0xFF2B261C), Color(0xFF161106)],
         );
-      case 4:
+      case 4: // Уголь
         return const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF1B3A2D), Color(0xFF0A2218)],
+          colors: [Color(0xFF202327), Color(0xFF0E0F12)],
         );
       default:
         return null;
@@ -758,7 +803,7 @@ class _PatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.03)
+      ..color = accent.withValues(alpha: 0.035)
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round;
 

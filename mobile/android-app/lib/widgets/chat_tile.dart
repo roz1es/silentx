@@ -35,9 +35,9 @@ class ChatTile extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           child: Row(
             children: [
               Stack(
@@ -46,7 +46,7 @@ class ChatTile extends StatelessWidget {
                     title: chat.title,
                     imageUrl: avatarUrl ?? chat.avatarUrl,
                     baseUrl: serverUrl,
-                    size: 54,
+                    size: 50,
                   ),
                   if (peerOnline)
                     Positioned(

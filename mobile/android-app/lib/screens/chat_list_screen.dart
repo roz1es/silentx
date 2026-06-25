@@ -638,67 +638,67 @@ class _ChatListScreenState extends State<ChatListScreen>
     await FoldersStore.save(next);
   }
 
-  /// Мини-меню папки по долгому нажатию на вкладку.
-  void _folderMenu(int index) {
+  /// Всплывающее меню папки (iOS-стиль) по долгому нажатию на вкладку.
+  Future<void> _folderMenu(int index, Offset pos) async {
     final isLight = Theme.of(context).brightness == Brightness.light;
     final folder =
         (index > 0 && index <= _folders.length) ? _folders[index - 1] : null;
     final hasUnread = _folderUnread(index) > 0;
-    showModalBottomSheet<void>(
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox;
+
+    Widget item(IconData icon, String label, {bool danger_ = false}) {
+      final c = danger_ ? danger : (isLight ? lightText : text);
+      return Row(
+        children: [
+          Icon(icon, size: 20, color: danger_ ? danger : accent),
+          const SizedBox(width: 14),
+          Text(label,
+              style: TextStyle(
+                  color: c, fontWeight: FontWeight.w600, fontSize: 15)),
+        ],
+      );
+    }
+
+    final result = await showMenu<String>(
       context: context,
-      backgroundColor: isLight ? Colors.white : panel,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      position: RelativeRect.fromRect(
+        pos & const Size(1, 1),
+        Offset.zero & overlay.size,
       ),
-      builder: (sheetCtx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  index == 0 ? 'Все' : (folder?.name ?? ''),
-                  style: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.w900),
-                ),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.done_all_rounded, color: accent),
-              title: const Text('Прочитать всё'),
-              enabled: hasUnread,
-              onTap: () {
-                Navigator.pop(sheetCtx);
-                _markFolderRead(index);
-              },
-            ),
-            if (folder != null && folder.filterType == FolderFilter.manual)
-              ListTile(
-                leading: const Icon(Icons.edit_rounded),
-                title: const Text('Изменить папку'),
-                onTap: () {
-                  Navigator.pop(sheetCtx);
-                  _editFolder(folder);
-                },
-              ),
-            if (folder != null)
-              ListTile(
-                leading:
-                    const Icon(Icons.delete_outline_rounded, color: danger),
-                title: const Text('Удалить папку',
-                    style: TextStyle(color: danger)),
-                onTap: () {
-                  Navigator.pop(sheetCtx);
-                  _deleteFolder(index);
-                },
-              ),
-          ],
+      color: isLight ? Colors.white : panel,
+      elevation: 8,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: border),
+      ),
+      items: [
+        PopupMenuItem(
+          value: 'read',
+          enabled: hasUnread,
+          child: item(Icons.done_all_rounded, 'Прочитать всё'),
         ),
-      ),
+        if (folder != null && folder.filterType == FolderFilter.manual)
+          PopupMenuItem(
+            value: 'edit',
+            child: item(Icons.edit_rounded, 'Настроить папку'),
+          ),
+        if (folder != null)
+          PopupMenuItem(
+            value: 'delete',
+            child: item(Icons.delete_outline_rounded, 'Удалить', danger_: true),
+          ),
+      ],
     );
+
+    switch (result) {
+      case 'read':
+        _markFolderRead(index);
+      case 'edit':
+        if (folder != null) _editFolder(folder);
+      case 'delete':
+        _deleteFolder(index);
+    }
   }
 
   Widget _folderTab(String name, int index, bool isLight) {
@@ -706,7 +706,7 @@ class _ChatListScreenState extends State<ChatListScreen>
     final unread = _folderUnread(index);
     return GestureDetector(
       onTap: () => setState(() => _activeFolder = index),
-      onLongPress: () => _folderMenu(index),
+      onLongPressStart: (d) => _folderMenu(index, d.globalPosition),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOutCubic,
@@ -783,9 +783,9 @@ class _ChatListScreenState extends State<ChatListScreen>
         final chat = chats[index];
         return Padding(
           key: ValueKey(chat.id),
-          padding: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.only(bottom: 5),
           child: GlassCard(
-            borderRadius: 20,
+            borderRadius: 18,
             padding: const EdgeInsets.symmetric(horizontal: 6),
             child: Row(
               children: [
@@ -835,7 +835,10 @@ class _ChatListScreenState extends State<ChatListScreen>
     if (query.isNotEmpty) {
       list = list.where((c) => c.title.toLowerCase().contains(query));
     }
-    return _applyManualOrder(list.toList(growable: false));
+    // Сортировка приходит из контроллера: закреплённые сверху, остальные по
+    // свежести. Ручной порядок здесь не применяем, чтобы новые сообщения
+    // поднимали чат вверх.
+    return list.toList(growable: false);
   }
 
   Widget _offlineBanner() {
@@ -975,9 +978,9 @@ class _ChatListScreenState extends State<ChatListScreen>
       itemBuilder: (context, index) {
         final chat = chats[index];
         return Padding(
-          padding: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.only(bottom: 5),
           child: GlassCard(
-            borderRadius: 20,
+            borderRadius: 18,
             padding: EdgeInsets.zero,
             child: ChatTile(
               chat: chat,

@@ -79,20 +79,34 @@ class _ChatListScreenState extends State<ChatListScreen>
   }
 
   void _toggleSearch() {
-    final show = !_searchVisible;
+    if (_searchVisible) {
+      _closeSearch();
+      return;
+    }
     setState(() {
       _tabIndex = 0;
-      _searchVisible = show;
-      if (!show) _searchController.clear();
+      _searchVisible = true;
     });
-    if (show) {
-      _searchReveal.forward();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _searchFocus.requestFocus();
-      });
-    } else {
-      _searchReveal.reverse();
-      _searchFocus.unfocus();
+    _searchReveal.forward();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _searchFocus.requestFocus();
+    });
+  }
+
+  void _closeSearch() {
+    if (!_searchVisible) return;
+    setState(() {
+      _searchVisible = false;
+      _searchController.clear();
+    });
+    _searchReveal.reverse();
+    _searchFocus.unfocus();
+  }
+
+  /// Закрывает поиск, если он открыт и в строке ничего не введено.
+  void _maybeCloseEmptySearch() {
+    if (_searchVisible && _searchController.text.trim().isEmpty) {
+      _closeSearch();
     }
   }
 
@@ -167,6 +181,7 @@ class _ChatListScreenState extends State<ChatListScreen>
   }
 
   void _openChat(Chat chat) {
+    _maybeCloseEmptySearch();
     Navigator.of(context).push(
       // Cupertino-роут даёт свайп-назад (edge swipe) и на Android.
       CupertinoPageRoute(
@@ -176,6 +191,7 @@ class _ChatListScreenState extends State<ChatListScreen>
   }
 
   Future<void> _newChat() async {
+    _maybeCloseEmptySearch();
     try {
       final users = await _controller.api.fetchUserDirectory();
       if (!mounted) return;
@@ -317,7 +333,10 @@ class _ChatListScreenState extends State<ChatListScreen>
                             label: 'Чаты',
                             selected: _tabIndex == 0,
                             isLight: isLight,
-                            onTap: () => setState(() => _tabIndex = 0),
+                            onTap: () {
+                              _maybeCloseEmptySearch();
+                              setState(() => _tabIndex = 0);
+                            },
                           ),
                           _NavItem(
                             icon: Icons.settings_rounded,
@@ -325,7 +344,10 @@ class _ChatListScreenState extends State<ChatListScreen>
                             label: 'Настройки',
                             selected: _tabIndex == 1,
                             isLight: isLight,
-                            onTap: () => setState(() => _tabIndex = 1),
+                            onTap: () {
+                              _maybeCloseEmptySearch();
+                              setState(() => _tabIndex = 1);
+                            },
                           ),
                         ],
                       ),
@@ -467,35 +489,50 @@ class _ChatListScreenState extends State<ChatListScreen>
                 ),
               ),
             ),
-          if (!_editMode && _folders.isNotEmpty) _folderTabs(isLight),
           Expanded(
-            child: _editMode
-                ? _buildEditList()
-                : GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    // Тап по пустому месту закрывает открытый поиск.
-                    // Тап по плитке чата перехватывается ею и открывает чат.
-                    onTap: _searchVisible ? _toggleSearch : null,
-                    // Свайп влево/вправо переключает папки (как в Telegram).
-                    onHorizontalDragEnd: _folders.isEmpty
-                        ? null
-                        : (details) {
-                            final v = details.primaryVelocity ?? 0;
-                            if (v < -250) {
-                              setState(() => _activeFolder =
-                                  (_activeFolder + 1)
-                                      .clamp(0, _folders.length));
-                            } else if (v > 250) {
-                              setState(() => _activeFolder =
-                                  (_activeFolder - 1)
-                                      .clamp(0, _folders.length));
-                            }
-                          },
-                    child: RefreshIndicator(
-                      onRefresh: _controller.loadChats,
-                      child: _buildBody(chats),
-                    ),
+            child: Listener(
+              behavior: HitTestBehavior.translucent,
+              // Если строка поиска пустая — любое касание (чат, кнопка, пустое
+              // место) закрывает поиск. Событие не поглощается, так что чат/
+              // кнопка всё равно срабатывают.
+              onPointerDown: (_) => _maybeCloseEmptySearch(),
+              child: Column(
+                children: [
+                  if (!_editMode && _folders.isNotEmpty) _folderTabs(isLight),
+                  Expanded(
+                    child: _editMode
+                        ? _buildEditList()
+                        : GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            // Тап по пустому месту закрывает поиск (при любом
+                            // тексте); по плитке чата — открывает чат.
+                            onTap: () {
+                              if (_searchVisible) _closeSearch();
+                            },
+                            // Свайп влево/вправо переключает папки.
+                            onHorizontalDragEnd: _folders.isEmpty
+                                ? null
+                                : (details) {
+                                    final v = details.primaryVelocity ?? 0;
+                                    if (v < -250) {
+                                      setState(() => _activeFolder =
+                                          (_activeFolder + 1)
+                                              .clamp(0, _folders.length));
+                                    } else if (v > 250) {
+                                      setState(() => _activeFolder =
+                                          (_activeFolder - 1)
+                                              .clamp(0, _folders.length));
+                                    }
+                                  },
+                            child: RefreshIndicator(
+                              onRefresh: _controller.loadChats,
+                              child: _buildBody(chats),
+                            ),
+                          ),
                   ),
+                ],
+              ),
+            ),
           ),
         ],
       ),

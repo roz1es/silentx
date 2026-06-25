@@ -232,6 +232,7 @@ class _ChatListScreenState extends State<ChatListScreen>
 
     await showIosContextMenu(
       context: context,
+      preview: _chatPreview(chat, width),
       menuWidth: width,
       actions: [
         if (unread > 0)
@@ -267,6 +268,155 @@ class _ChatListScreenState extends State<ChatListScreen>
           onTap: () => _controller.deleteChat(chat),
         ),
       ],
+    );
+  }
+
+  /// Предпросмотр окна чата: шапка (имя + статус) и последнее сообщение.
+  Widget _chatPreview(Chat chat, double width) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final online = _controller.isPeerOnline(chat);
+    final last = chat.lastMessage;
+    final ownLast =
+        last != null && last.senderId == _controller.currentUser.id;
+    final headerBg =
+        isLight ? const Color(0xFFF4F2EC) : const Color(0xFF1A1C20);
+    final bodyBg = isLight ? const Color(0xFFECE9E1) : chatBg;
+    final statusColor =
+        online ? const Color(0xFF4AAE8A) : (isLight ? lightMuted : muted);
+
+    return Container(
+      width: width,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: border),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.32),
+              blurRadius: 24,
+              offset: const Offset(0, 10)),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Шапка как в окне чата.
+          Container(
+            color: headerBg,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Stack(
+                  children: [
+                    BrenksAvatar(
+                      title: chat.title,
+                      imageUrl: _controller.displayAvatar(chat),
+                      baseUrl: _controller.serverUrl,
+                      size: 38,
+                    ),
+                    if (online)
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          width: 11,
+                          height: 11,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4AAE8A),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: headerBg, width: 2),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        chat.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        online ? 'в сети' : chatSubtitle(chat),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: statusColor),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Область переписки с последним сообщением.
+          Container(
+            height: 124,
+            width: double.infinity,
+            color: bodyBg,
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+            alignment: last == null
+                ? Alignment.center
+                : (ownLast ? Alignment.bottomRight : Alignment.bottomLeft),
+            child: last == null
+                ? Text('Нет сообщений',
+                    style: TextStyle(
+                        color: isLight ? lightMuted : muted, fontSize: 13))
+                : _previewBubble(last, ownLast, isLight),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _previewBubble(LastMessage last, bool own, bool isLight) {
+    final ownBg = isLight ? const Color(0xFFF0E7D6) : const Color(0xFF34312A);
+    final otherBg = isLight ? Colors.white : const Color(0xFF34373E);
+    final textColor = isLight ? lightText : text;
+    final timeColor = isLight ? lightMuted : muted;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 220),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+        decoration: BoxDecoration(
+          color: own ? ownBg : otherBg,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(own ? 16 : 5),
+            bottomRight: Radius.circular(own ? 5 : 16),
+          ),
+          border: Border.all(
+              color: own
+                  ? accent.withValues(alpha: 0.18)
+                  : Colors.white.withValues(alpha: 0.06)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              lastMessageLabel(last.text),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: textColor, fontSize: 14.5),
+            ),
+            const SizedBox(height: 2),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(formatTime(last.time),
+                  style: TextStyle(color: timeColor, fontSize: 10.5)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

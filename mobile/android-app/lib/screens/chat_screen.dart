@@ -345,7 +345,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           )
                         : ListView.builder(
                             controller: _scrollController,
-                            padding: const EdgeInsets.fromLTRB(14, 16, 14, 12),
+                            padding: const EdgeInsets.fromLTRB(14, 16, 14, 92),
                             itemCount: messages.length,
                             itemBuilder: (context, index) {
                               final message = messages[index];
@@ -372,35 +372,48 @@ class _ChatScreenState extends State<ChatScreen> {
                               );
                             },
                           ),
+                // Composer + индикатор печати поверх ленты —
+                // сообщения видны за ними (как в Telegram).
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (typing.isNotEmpty)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+                            child: Text(
+                              '${typing.join(', ')} печатает...',
+                              style: const TextStyle(color: muted),
+                            ),
+                          ),
+                        ),
+                      MessageComposer(
+                        controller: _messageController,
+                        replyTo: _replyTo,
+                        editing: _editing,
+                        sendingMedia: _sendingMedia,
+                        recordingVoice: _recordingVoice,
+                        recordingMs: _recordingMs,
+                        onAttach: _attach,
+                        onSend: _send,
+                        onStartVoice: _startVoice,
+                        onFinishVoice: _finishVoice,
+                        onCancelVoice: _cancelVoice,
+                        onCancelMode: _cancelComposerMode,
+                        onTyping: _controller.notifyTyping,
+                        onVideoCircle: (media) =>
+                            _controller.sendMessage(media: media),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
-          ),
-          if (typing.isNotEmpty)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
-                child: Text(
-                  '${typing.join(', ')} печатает...',
-                  style: const TextStyle(color: muted),
-                ),
-              ),
-            ),
-          MessageComposer(
-            controller: _messageController,
-            replyTo: _replyTo,
-            editing: _editing,
-            sendingMedia: _sendingMedia,
-            recordingVoice: _recordingVoice,
-            recordingMs: _recordingMs,
-            onAttach: _attach,
-            onSend: _send,
-            onStartVoice: _startVoice,
-            onFinishVoice: _finishVoice,
-            onCancelVoice: _cancelVoice,
-            onCancelMode: _cancelComposerMode,
-            onTyping: _controller.notifyTyping,
-            onVideoCircle: (media) => _controller.sendMessage(media: media),
           ),
         ],
       ),

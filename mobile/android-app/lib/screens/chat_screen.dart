@@ -351,11 +351,14 @@ class _ChatScreenState extends State<ChatScreen> {
                             itemCount: messages.length,
                             itemBuilder: (context, index) {
                               final message = messages[index];
+                              final isOwn = message.senderId ==
+                                  _controller.currentUser.id;
                               return MessageBubble(
                                 message: message,
                                 serverUrl: _controller.serverUrl,
-                                own: message.senderId ==
-                                    _controller.currentUser.id,
+                                own: isOwn,
+                                read: isOwn &&
+                                    _controller.isMessageRead(message),
                                 currentUserId: _controller.currentUser.id,
                                 senderName: _senderName(chat, message),
                                 replyPreview: _replyPreview(message),

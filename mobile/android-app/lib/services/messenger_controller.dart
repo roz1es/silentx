@@ -102,6 +102,17 @@ class MessengerController extends ChangeNotifier {
     return chat.avatarUrl;
   }
 
+  /// Прочитано ли наше сообщение собеседником (по lastReadAt участников).
+  bool isMessageRead(Message message) {
+    final chat = chatById(message.chatId);
+    if (chat == null) return false;
+    var peerRead = 0;
+    chat.lastReadAt.forEach((uid, t) {
+      if (uid != currentUser.id && t > peerRead) peerRead = t;
+    });
+    return peerRead >= message.createdAt;
+  }
+
   // --- Жизненный цикл ---
 
   void start() {
@@ -246,6 +257,7 @@ class MessengerController extends ChangeNotifier {
         senderId: message.senderId,
       ),
       unread: chat.unread,
+      lastReadAt: chat.lastReadAt,
       pinnedMessageId: chat.pinnedMessageId,
       muted: chat.muted,
       pinnedToTop: chat.pinnedToTop,

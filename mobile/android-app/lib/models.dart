@@ -87,6 +87,7 @@ class Chat {
     this.participants = const [],
     this.lastMessage,
     this.unread = const {},
+    this.lastReadAt = const {},
     this.pinnedMessageId,
     this.muted = false,
     this.pinnedToTop = false,
@@ -101,6 +102,8 @@ class Chat {
   final List<ChatParticipant> participants;
   final LastMessage? lastMessage;
   final Map<String, int> unread;
+  // userId → время последнего прочтения (для галочек «прочитано»).
+  final Map<String, int> lastReadAt;
   final String? pinnedMessageId;
   final bool muted;
   final bool pinnedToTop;
@@ -137,6 +140,11 @@ class Chat {
           : null,
       unread: json['unread'] is Map
           ? (json['unread'] as Map).map(
+              (key, value) => MapEntry(key.toString(), _intFromJson(value)),
+            )
+          : const {},
+      lastReadAt: json['lastReadAt'] is Map
+          ? (json['lastReadAt'] as Map).map(
               (key, value) => MapEntry(key.toString(), _intFromJson(value)),
             )
           : const {},

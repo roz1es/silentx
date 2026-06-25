@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -5,6 +7,7 @@ import '../config.dart';
 import '../models.dart';
 import '../services/api_client.dart';
 import '../theme/app_theme.dart';
+import '../widgets/night_mode_switch.dart';
 
 /// Полезная нагрузка успешной авторизации.
 class LoginResult {
@@ -60,6 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
   _PendingCode? _pending;
   bool _rememberMe = true;
   bool _loading = false;
+  bool _showPassword = false;
   String? _error;
   String? _notice;
 
@@ -256,49 +260,76 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
     return Scaffold(
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: isLight
-                ? const [Color(0xFFEAF2F8), Color(0xFFDDE6F0)]
-                : const [Color(0xFF252A33), Color(0xFF191C22)],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 460),
-                child: _card(isLight),
+      body: Stack(
+        children: [
+          // Фон с градиентом
+          Positioned.fill(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 600),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: isLight
+                      ? const [Color(0xFFBDD8F0), Color(0xFFCDD5E8), Color(0xFFE8D5F0)]
+                      : const [Color(0xFF1A2540), Color(0xFF0D1B2A), Color(0xFF1E1030)],
+                ),
               ),
             ),
           ),
-        ),
+          // Контент
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 460),
+                  child: _card(isLight),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
+
   Widget _card(bool isLight) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: (isLight ? Colors.white : panel).withValues(alpha: 0.94),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: (isLight ? Colors.black : Colors.white).withValues(alpha: 0.08),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isLight ? 0.12 : 0.32),
-            blurRadius: 42,
-            offset: const Offset(0, 24),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(32),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(32),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isLight
+                  ? [
+                      Colors.white.withValues(alpha: 0.82),
+                      Colors.white.withValues(alpha: 0.65),
+                    ]
+                  : [
+                      Colors.white.withValues(alpha: 0.10),
+                      Colors.white.withValues(alpha: 0.04),
+                    ],
+            ),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: isLight ? 0.7 : 0.18),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isLight ? 0.10 : 0.45),
+                blurRadius: 40,
+                offset: const Offset(0, 20),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
+          child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -316,7 +347,19 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 18),
           ],
           AnimatedSwitcher(
-            duration: const Duration(milliseconds: 180),
+            duration: const Duration(milliseconds: 260),
+            transitionBuilder: (child, animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 0.06),
+                    end: Offset.zero,
+                  ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+                  child: child,
+                ),
+              );
+            },
             child: _pending != null
                 ? _codeFields()
                 : _mode == _AuthMode.reset
@@ -340,6 +383,8 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 12),
           _footerLinks(),
         ],
+      ),
+        ),
       ),
     );
   }
@@ -387,12 +432,9 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
           ),
         ),
-        IconButton(
-          tooltip: 'Сменить тему',
-          onPressed: () => widget.onThemeModeChanged(
-            isLight ? ThemeMode.dark : ThemeMode.light,
-          ),
-          icon: Icon(isLight ? Icons.dark_mode_rounded : Icons.light_mode_rounded),
+        NightModeSwitch(
+          isLight: isLight,
+          onChanged: widget.onThemeModeChanged,
         ),
       ],
     );
@@ -402,13 +444,41 @@ class _LoginScreenState extends State<LoginScreen> {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: (isLight ? Colors.black : Colors.white).withValues(alpha: 0.06),
+        color: (isLight ? Colors.black : Colors.white).withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Row(
+      child: Stack(
         children: [
-          _modeTab('Вход', _AuthMode.login, isLight),
-          _modeTab('Регистрация', _AuthMode.register, isLight),
+          // Скользящий индикатор
+          AnimatedAlign(
+            alignment: _mode == _AuthMode.login ? Alignment.centerLeft : Alignment.centerRight,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOutCubic,
+            child: FractionallySizedBox(
+              widthFactor: 0.5,
+              child: Container(
+                height: 42,
+                decoration: BoxDecoration(
+                  color: isLight ? Colors.white : panelStrong,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Лейблы поверх индикатора
+          Row(
+            children: [
+              _modeTab('Вход', _AuthMode.login, isLight),
+              _modeTab('Регистрация', _AuthMode.register, isLight),
+            ],
+          ),
         ],
       ),
     );
@@ -416,33 +486,22 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _modeTab(String label, _AuthMode mode, bool isLight) {
     final selected = _mode == mode;
+    final selectedColor = isLight ? const Color(0xFF1A1A2E) : text;
     return Expanded(
       child: GestureDetector(
         onTap: () => _switchMode(mode),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 11),
-          decoration: BoxDecoration(
-            color: selected
-                ? (isLight ? Colors.white : panelStrong)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.18),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : null,
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: selected ? null : muted,
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          height: 42,
+          child: Center(
+            child: AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+                color: selected ? selectedColor : muted,
+              ),
+              child: Text(label),
             ),
           ),
         ),
@@ -482,13 +541,48 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: 12),
         TextField(
           controller: _passwordController,
-          obscureText: true,
+          obscureText: !_showPassword,
           textInputAction: TextInputAction.done,
           onSubmitted: (_) => _loading ? null : _submit(),
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Пароль',
             hintText: 'Пароль',
-            prefixIcon: Icon(Icons.lock_outline_rounded),
+            prefixIcon: const Icon(Icons.lock_outline_rounded),
+            suffixIcon: IconButton(
+              onPressed: () => setState(() => _showPassword = !_showPassword),
+              icon: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 350),
+                transitionBuilder: (child, animation) {
+                  final squish = CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeInOutCubic,
+                  );
+                  return AnimatedBuilder(
+                    animation: squish,
+                    child: ScaleTransition(
+                      scale: Tween(begin: 0.5, end: 1.0).animate(
+                        CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+                      ),
+                      child: RotationTransition(
+                        turns: Tween(begin: 0.15, end: 0.0).animate(
+                          CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+                        ),
+                        child: child,
+                      ),
+                    ),
+                    builder: (context, inner) => Transform(
+                      alignment: Alignment.center,
+                      transform: Matrix4.diagonal3Values(1.0, squish.value, 1.0),
+                      child: inner,
+                    ),
+                  );
+                },
+                child: Icon(
+                  _showPassword ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                  key: ValueKey(_showPassword),
+                ),
+              ),
+            ),
           ),
         ),
         if (_mode == _AuthMode.login) ...[
@@ -549,14 +643,28 @@ class _LoginScreenState extends State<LoginScreen> {
           controller: _codeController,
           autofocus: true,
           keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          autofillHints: const [AutofillHints.oneTimeCode],
+          obscureText: false,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(6),
+          ],
           textInputAction: isReset ? TextInputAction.next : TextInputAction.done,
           onSubmitted: (_) => _loading ? null : _submit(),
-          decoration: const InputDecoration(
-            labelText: 'Код из письма',
-            hintText: '123456',
-            prefixIcon: Icon(Icons.password_rounded),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 32,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 14,
+          ),
+          decoration: InputDecoration(
+            hintText: '······',
+            hintStyle: TextStyle(
+              fontSize: 28,
+              letterSpacing: 10,
+              color: muted.withValues(alpha: 0.5),
+            ),
+            prefixIcon: const Icon(Icons.dialpad_rounded),
+            contentPadding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
           ),
         ),
         if (isReset) ...[

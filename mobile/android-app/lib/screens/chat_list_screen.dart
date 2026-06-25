@@ -15,6 +15,7 @@ import '../widgets/brenks_avatar.dart';
 import '../widgets/chat_tile.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/glass.dart';
+import '../widgets/night_mode_switch.dart';
 import '../widgets/new_chat_sheet.dart';
 import 'chat_screen.dart';
 
@@ -1056,18 +1057,18 @@ class _SettingsViewState extends State<_SettingsView> {
                     GlassCard(
                       borderRadius: 18,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 12),
+                          horizontal: 14, vertical: 8),
                       child: Row(
                         children: [
-                          _miniIcon(Icons.contrast_rounded),
+                          _miniIcon(Icons.dark_mode_rounded),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: Text('Тема оформления',
+                            child: Text('Ночной режим',
                                 style: TextStyle(
                                     fontWeight: FontWeight.w700,
                                     color: _textColor)),
                           ),
-                          _ThemeSwitch(
+                          NightModeSwitch(
                             isLight: _isLight,
                             onChanged: widget.onThemeModeChanged,
                           ),
@@ -1255,36 +1256,6 @@ class _NavItem extends StatelessWidget {
               child: Text(label),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Переключатель темы — точная копия кнопки с экрана авторизации ─────────
-
-class _ThemeSwitch extends StatelessWidget {
-  const _ThemeSwitch({required this.isLight, required this.onChanged});
-
-  final bool isLight;
-  final ValueChanged<ThemeMode> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      tooltip: 'Сменить тему',
-      onPressed: () => onChanged(isLight ? ThemeMode.dark : ThemeMode.light),
-      icon: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 400),
-        transitionBuilder: (child, animation) => RotationTransition(
-          turns: Tween(begin: 0.3, end: 0.0).animate(
-            CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
-          ),
-          child: ScaleTransition(scale: animation, child: child),
-        ),
-        child: Icon(
-          isLight ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-          key: ValueKey(isLight),
         ),
       ),
     );

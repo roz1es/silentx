@@ -24,11 +24,13 @@ class MessageBubble extends StatelessWidget {
     required this.onPlayVoice,
     this.senderName,
     this.replyPreview,
+    this.read = false,
   });
 
   final Message message;
   final String serverUrl;
   final bool own;
+  final bool read;
   final String currentUserId;
   final VoidCallback onReply;
   final VoidCallback onEdit;
@@ -106,6 +108,18 @@ class MessageBubble extends StatelessWidget {
                           formatTime(message.createdAt),
                           style: TextStyle(color: timeColor, fontSize: 11),
                         ),
+                        if (own && !message.deleted) ...[
+                          const SizedBox(width: 3),
+                          Icon(
+                            read ? Icons.done_all_rounded : Icons.done_rounded,
+                            size: 15,
+                            color: read
+                                ? (isLight
+                                    ? const Color(0xFF34A0F0)
+                                    : const Color(0xFF6FD0FF))
+                                : timeColor,
+                          ),
+                        ],
                       ],
                     ),
                   ],

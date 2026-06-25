@@ -56,7 +56,7 @@ class MessageBubble extends StatelessWidget {
     final timeColor = isLight ? lightMuted : muted;
 
     return GestureDetector(
-      onLongPress: () => _openMenu(context),
+      onLongPressStart: (d) => _openMenu(context, d.globalPosition),
       child: Align(
         alignment: own ? Alignment.centerRight : Alignment.centerLeft,
         child: Container(
@@ -204,85 +204,185 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  Future<void> _openMenu(BuildContext context) async {
+  Future<void> _openMenu(BuildContext context, Offset pos) async {
     final isLight = Theme.of(context).brightness == Brightness.light;
-    final sheetBg = isLight ? Colors.white : panel;
-    final actionColor = isLight ? const Color(0xFF17202B) : text;
-    await showModalBottomSheet<void>(
+    await showGeneralDialog<void>(
       context: context,
-      backgroundColor: sheetBg,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      barrierDismissible: true,
+      barrierLabel: 'menu',
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      transitionDuration: const Duration(milliseconds: 170),
+      pageBuilder: (ctx, _, __) => _ContextMenu(
+        pos: pos,
+        isLight: isLight,
+        own: own,
+        deleted: message.deleted,
+        messageText: message.text,
+        onReply: onReply,
+        onEdit: onEdit,
+        onPin: onPin,
+        onDelete: onDelete,
+        onReaction: onReaction,
       ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (!message.deleted)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: quickReactions.map((emoji) {
-                      return InkWell(
-                        borderRadius: BorderRadius.circular(999),
-                        onTap: () {
-                          Navigator.pop(sheetContext);
-                          onReaction(emoji);
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: Text(emoji, style: const TextStyle(fontSize: 26)),
-                        ),
-                      );
-                    }).toList(growable: false),
-                  ),
-                ),
-              Divider(height: 1, color: isLight ? const Color(0xFFE2E7EF) : border),
-              _action(sheetContext, Icons.reply_rounded, 'Ответить', onReply, actionColor),
-              if (own && !message.deleted)
-                _action(sheetContext, Icons.edit_rounded, 'Изменить', onEdit, actionColor),
-              if (!message.deleted)
-                _action(
-                  sheetContext,
-                  Icons.copy_rounded,
-                  'Копировать текст',
-                  () => Clipboard.setData(ClipboardData(text: message.text.trim())),
-                  actionColor,
-                ),
-              if (!message.deleted)
-                _action(sheetContext, Icons.push_pin_rounded, 'Закрепить', onPin, actionColor),
-              if (own)
-                _action(
-                  sheetContext,
-                  Icons.delete_outline_rounded,
-                  'Удалить',
-                  onDelete,
-                  danger,
-                ),
-            ],
+      transitionBuilder: (ctx, anim, _, child) {
+        final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+        return FadeTransition(
+          opacity: curved,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.94, end: 1.0).animate(curved),
+            alignment: own ? Alignment.bottomRight : Alignment.bottomLeft,
+            child: child,
           ),
         );
       },
     );
   }
+}
 
-  Widget _action(
-    BuildContext sheetContext,
-    IconData icon,
-    String label,
-    VoidCallback onTap,
-    Color color,
-  ) {
-    return ListTile(
-      leading: Icon(icon, color: color),
-      title: Text(label, style: TextStyle(color: color)),
+/// Всплывающее контекстное меню сообщения (iOS-стиль): пилюля реакций + меню.
+class _ContextMenu extends StatelessWidget {
+  const _ContextMenu({
+    required this.pos,
+    required this.isLight,
+    required this.own,
+    required this.deleted,
+    required this.messageText,
+    required this.onReply,
+    required this.onEdit,
+    required this.onPin,
+    required this.onDelete,
+    required this.onReaction,
+  });
+
+  final Offset pos;
+  final bool isLight;
+  final bool own;
+  final bool deleted;
+  final String messageText;
+  final VoidCallback onReply;
+  final VoidCallback onEdit;
+  final VoidCallback onPin;
+  final VoidCallback onDelete;
+  final ValueChanged<String> onReaction;
+
+  @override
+  Widget build(BuildContext context) {
+    final screen = MediaQuery.of(context).size;
+    final cardBg = isLight ? Colors.white : panel;
+    final actionColor = isLight ? lightText : text;
+    // Размещаем меню около точки нажатия, прижимая к нужному краю.
+    final top = pos.dy.clamp(110.0, screen.height - 380.0);
+    return Stack(
+      children: [
+        Positioned(
+          top: top,
+          left: own ? null : 14,
+          right: own ? 14 : null,
+          child: Column(
+            crossAxisAlignment:
+                own ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!deleted) ...[
+                _reactionsBar(context, cardBg),
+                const SizedBox(height: 10),
+              ],
+              _menuCard(context, cardBg, actionColor),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _reactionsBar(BuildContext context, Color cardBg) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: border),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.3), blurRadius: 16),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: quickReactions.map((emoji) {
+          return InkWell(
+            borderRadius: BorderRadius.circular(999),
+            onTap: () {
+              Navigator.pop(context);
+              onReaction(emoji);
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(7),
+              child: Text(emoji, style: const TextStyle(fontSize: 25)),
+            ),
+          );
+        }).toList(growable: false),
+      ),
+    );
+  }
+
+  Widget _menuCard(BuildContext context, Color cardBg, Color actionColor) {
+    return Container(
+      width: 230,
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: border),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.35), blurRadius: 24),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _item(context, Icons.reply_rounded, 'Ответить', onReply, actionColor),
+          if (own && !deleted)
+            _item(context, Icons.edit_rounded, 'Изменить', onEdit, actionColor),
+          if (!deleted)
+            _item(
+              context,
+              Icons.copy_rounded,
+              'Копировать',
+              () =>
+                  Clipboard.setData(ClipboardData(text: messageText.trim())),
+              actionColor,
+            ),
+          if (!deleted)
+            _item(context, Icons.push_pin_rounded, 'Закрепить', onPin,
+                actionColor),
+          if (own)
+            _item(context, Icons.delete_outline_rounded, 'Удалить', onDelete,
+                danger),
+        ],
+      ),
+    );
+  }
+
+  Widget _item(BuildContext context, IconData icon, String label,
+      VoidCallback onTap, Color color) {
+    return InkWell(
       onTap: () {
-        Navigator.pop(sheetContext);
+        Navigator.pop(context);
         onTap();
       },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 21),
+            const SizedBox(width: 14),
+            Text(label,
+                style: TextStyle(
+                    color: color, fontSize: 15, fontWeight: FontWeight.w500)),
+          ],
+        ),
+      ),
     );
   }
 }

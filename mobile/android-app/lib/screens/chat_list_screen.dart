@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -116,7 +117,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   void _openChat(Chat chat) {
     Navigator.of(context).push(
-      MaterialPageRoute(
+      // Cupertino-роут даёт свайп-назад (edge swipe) и на Android.
+      CupertinoPageRoute(
         builder: (_) => ChatScreen(controller: _controller, chatId: chat.id),
       ),
     );
@@ -233,11 +235,59 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 shadow: true,
                 child: SizedBox(
                   height: 58,
-                  child: Row(
+                  child: Stack(
                     children: [
-                      _navItem(0, Icons.person_rounded, 'Контакты', isLight),
-                      _navItem(1, Icons.chat_bubble_rounded, 'Чаты', isLight),
-                      _navItem(2, Icons.settings_rounded, 'Настройки', isLight),
+                      // Скользящий стеклянный индикатор выбранной вкладки
+                      Positioned.fill(
+                        child: Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: AnimatedAlign(
+                            alignment: Alignment((_tabIndex / 2) * 2 - 1, 0),
+                            duration: const Duration(milliseconds: 320),
+                            curve: Curves.easeOutCubic,
+                            child: FractionallySizedBox(
+                              widthFactor: 1 / 3,
+                              heightFactor: 1,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: accent
+                                      .withValues(alpha: isLight ? 0.18 : 0.22),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(
+                                        alpha: isLight ? 0.55 : 0.18),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          _NavItem(
+                            icon: Icons.person_rounded,
+                            label: 'Контакты',
+                            selected: _tabIndex == 0,
+                            isLight: isLight,
+                            onTap: () => setState(() => _tabIndex = 0),
+                          ),
+                          _NavItem(
+                            icon: Icons.chat_bubble_rounded,
+                            label: 'Чаты',
+                            selected: _tabIndex == 1,
+                            isLight: isLight,
+                            onTap: () => setState(() => _tabIndex = 1),
+                          ),
+                          _NavItem(
+                            icon: Icons.settings_rounded,
+                            label: 'Настройки',
+                            selected: _tabIndex == 2,
+                            isLight: isLight,
+                            onTap: () => setState(() => _tabIndex = 2),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -247,8 +297,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
             GlassPanel(
               borderRadius: 28,
               shadow: true,
-              child: InkWell(
-                customBorder: const CircleBorder(),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: () {
                   setState(() => _tabIndex = 1);
                   _searchFocus.requestFocus();
@@ -259,31 +309,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   child: Icon(Icons.search_rounded,
                       color: isLight ? lightText : text, size: 25),
                 ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _navItem(int index, IconData icon, String label, bool isLight) {
-    final selected = _tabIndex == index;
-    final color = selected ? accent : (isLight ? lightMuted : muted);
-    return Expanded(
-      child: InkWell(
-        onTap: () => setState(() => _tabIndex = index),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 11,
-                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
               ),
             ),
           ],
@@ -1191,6 +1216,91 @@ class _ContactsViewState extends State<_ContactsView> {
             onTap: () => _startChat(user),
           );
         },
+      ),
+    );
+  }
+}
+
+// ─── Элемент нижней навигации с анимацией иконки при выборе ────────────────
+
+class _NavItem extends StatefulWidget {
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.isLight,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final bool isLight;
+  final VoidCallback onTap;
+
+  @override
+  State<_NavItem> createState() => _NavItemState();
+}
+
+class _NavItemState extends State<_NavItem>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 420),
+  );
+  // Чистый «поп» иконки, когда вкладка становится выбранной (без раскачки).
+  late final Animation<double> _scale = TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween(begin: 1.0, end: 1.25)
+          .chain(CurveTween(curve: Curves.easeOut)),
+      weight: 45,
+    ),
+    TweenSequenceItem(
+      tween: Tween(begin: 1.25, end: 1.0)
+          .chain(CurveTween(curve: Curves.easeOutBack)),
+      weight: 55,
+    ),
+  ]).animate(_c);
+
+  @override
+  void didUpdateWidget(_NavItem old) {
+    super.didUpdateWidget(old);
+    if (widget.selected && !old.selected) _c.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color =
+        widget.selected ? accent : (widget.isLight ? lightMuted : muted);
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ScaleTransition(
+              scale: _scale,
+              child: Icon(widget.icon, color: color, size: 24),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              widget.label,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight:
+                    widget.selected ? FontWeight.w800 : FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

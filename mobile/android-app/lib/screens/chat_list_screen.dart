@@ -583,7 +583,7 @@ class _ChatListScreenState extends State<ChatListScreen>
     );
   }
 
-  /// Сумма непрочитанных сообщений по всем чатам, попадающим в папку.
+  /// Количество чатов с непрочитанными сообщениями в папке.
   int _folderUnread(int index) {
     Iterable<Chat> list = _controller.chats;
     if (index > 0 && index <= _folders.length) {
@@ -599,11 +599,7 @@ class _ChatListScreenState extends State<ChatListScreen>
           list = list.where((c) => ids.contains(c.id));
       }
     }
-    var sum = 0;
-    for (final c in list) {
-      sum += _controller.unreadFor(c);
-    }
-    return sum;
+    return list.where((c) => _controller.unreadFor(c) > 0).length;
   }
 
   Widget _folderTab(String name, int index, bool isLight) {

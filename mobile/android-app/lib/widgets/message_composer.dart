@@ -111,20 +111,16 @@ class _MessageComposerState extends State<MessageComposer> {
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
     final modeMessage = widget.editing ?? widget.replyTo;
-    final panelBg = Colors.white.withValues(alpha: isLight ? 0.55 : 0.07);
-    final topBorder = Colors.white.withValues(alpha: isLight ? 0.6 : 0.12);
+    final blob = isLight ? Colors.white : const Color(0xFF3A4352);
+    final iconColor = isLight ? const Color(0xFF3A4352) : text;
+    final hintColor = isLight ? const Color(0xFF8A93A3) : muted;
+    final hasText = widget.controller.text.trim().isNotEmpty;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        ClipRect(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-            child: Container(
-          padding: const EdgeInsets.fromLTRB(8, 8, 12, 10),
-          decoration: BoxDecoration(
-            color: panelBg,
-            border: Border(top: BorderSide(color: topBorder)),
-          ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 4, 8, 6),
           child: SafeArea(
             top: false,
             child: Column(
@@ -135,151 +131,208 @@ class _MessageComposerState extends State<MessageComposer> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    // Emoji toggle
-                    IconButton(
-                      tooltip: _showEmoji ? 'Клавиатура' : 'Эмодзи',
-                      onPressed: widget.recordingVoice ? null : _toggleEmoji,
-                      icon: Icon(
-                        _showEmoji
-                            ? Icons.keyboard_rounded
-                            : Icons.emoji_emotions_rounded,
-                      ),
-                    ),
-                    // Video circle
-                    IconButton(
-                      tooltip: 'Видеокружок',
-                      onPressed: widget.recordingVoice ? null : _openVideoCircle,
-                      icon: const Icon(Icons.videocam_rounded),
-                    ),
-                    // Attach
-                    IconButton(
-                      tooltip: 'Прикрепить файл',
-                      onPressed: widget.sendingMedia || widget.recordingVoice ? null : widget.onAttach,
-                      icon: widget.sendingMedia
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                    // Левый кружок — вложение
+                    _blob(
+                      color: blob,
+                      isLight: isLight,
+                      onTap: (widget.sendingMedia || widget.recordingVoice)
+                          ? null
+                          : widget.onAttach,
+                      child: widget.sendingMedia
+                          ? SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: iconColor),
                             )
-                          : const Icon(Icons.attach_file_rounded),
-                    ),
-                    Expanded(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 130),
-                        child: TextField(
-                          controller: widget.controller,
-                          focusNode: _focusNode,
-                          minLines: 1,
-                          maxLines: 5,
-                          enabled: !widget.recordingVoice,
-                          keyboardType: TextInputType.multiline,
-                          textInputAction: TextInputAction.newline,
-                          onChanged: (value) {
-                            widget.onTyping(value.trim().isNotEmpty);
-                            if (_showEmoji) setState(() => _showEmoji = false);
-                          },
-                          onTap: () {
-                            if (_showEmoji) setState(() => _showEmoji = false);
-                          },
-                          decoration: const InputDecoration(
-                            hintText: 'Сообщение',
-                            contentPadding:
-                                EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          ),
-                        ),
-                      ),
+                          : Icon(Icons.attach_file_rounded,
+                              color: iconColor, size: 24),
                     ),
                     const SizedBox(width: 8),
-                    _sendArea(),
+                    // Центральная «пилюля» с полем ввода
+                    Expanded(
+                      child: _pill(isLight, blob, iconColor, hintColor, hasText),
+                    ),
+                    const SizedBox(width: 8),
+                    // Правый кружок — видео / отправка / запись
+                    _rightArea(isLight, blob, iconColor, hasText),
                   ],
                 ),
               ],
             ),
           ),
-            ),
-          ),
         ),
-        // Emoji panel
+        // Панель эмодзи
         AnimatedSize(
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeOutCubic,
-          child: _showEmoji
-              ? _emojiPanel(isLight, panelBg)
-              : const SizedBox.shrink(),
+          child: _showEmoji ? _emojiPanel(isLight) : const SizedBox.shrink(),
         ),
       ],
     );
   }
 
-  Widget _emojiPanel(bool isLight, Color bg) {
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-        child: Container(
-      height: 260,
-      color: Colors.white.withValues(alpha: isLight ? 0.6 : 0.08),
-      child: GridView.builder(
-        padding: const EdgeInsets.all(8),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 10,
-          mainAxisSpacing: 2,
-          crossAxisSpacing: 2,
-          childAspectRatio: 1,
-        ),
-        itemCount: _emojis.length,
-        itemBuilder: (_, i) => GestureDetector(
-          onTap: () => _insertEmoji(_emojis[i]),
-          child: Center(
-            child: Text(_emojis[i], style: const TextStyle(fontSize: 22)),
-          ),
-        ),
-      ),
+  Widget _pill(bool isLight, Color blob, Color iconColor, Color hintColor,
+      bool hasText) {
+    return Material(
+      color: blob,
+      elevation: isLight ? 2 : 1,
+      shadowColor: Colors.black.withValues(alpha: 0.25),
+      borderRadius: BorderRadius.circular(26),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 48, maxHeight: 130),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const SizedBox(width: 18),
+            Expanded(
+              child: TextField(
+                controller: widget.controller,
+                focusNode: _focusNode,
+                minLines: 1,
+                maxLines: 5,
+                enabled: !widget.recordingVoice,
+                keyboardType: TextInputType.multiline,
+                textInputAction: TextInputAction.newline,
+                cursorColor: accent,
+                style: TextStyle(
+                    color: isLight ? const Color(0xFF17202B) : text,
+                    fontSize: 16),
+                onChanged: (value) {
+                  widget.onTyping(value.trim().isNotEmpty);
+                  if (_showEmoji) {
+                    _showEmoji = false;
+                  }
+                  setState(() {});
+                },
+                onTap: () {
+                  if (_showEmoji) setState(() => _showEmoji = false);
+                },
+                decoration: InputDecoration(
+                  isCollapsed: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                  hintText: 'Сообщение',
+                  hintStyle: TextStyle(color: hintColor, fontSize: 16),
+                  filled: false,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                ),
+              ),
+            ),
+            if (!hasText && !widget.recordingVoice)
+              _pillIcon(Icons.mic_rounded, iconColor, widget.onStartVoice),
+            _pillIcon(
+              _showEmoji
+                  ? Icons.keyboard_rounded
+                  : Icons.emoji_emotions_outlined,
+              iconColor,
+              widget.recordingVoice ? null : _toggleEmoji,
+            ),
+            const SizedBox(width: 6),
+          ],
         ),
       ),
     );
   }
 
-  Widget _sendArea() {
+  Widget _pillIcon(IconData icon, Color color, VoidCallback? onTap) {
+    return InkResponse(
+      onTap: onTap,
+      radius: 24,
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Icon(icon, color: color, size: 24),
+      ),
+    );
+  }
+
+  Widget _rightArea(bool isLight, Color blob, Color iconColor, bool hasText) {
     if (widget.recordingVoice) {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          IconButton(
-            tooltip: 'Отмена',
-            onPressed: widget.onCancelVoice,
-            icon: const Icon(Icons.delete_outline_rounded, color: danger),
+          _blob(
+            color: blob,
+            isLight: isLight,
+            onTap: widget.onCancelVoice,
+            child: const Icon(Icons.delete_outline_rounded,
+                color: danger, size: 24),
           ),
-          _circleButton(Icons.send_rounded, widget.onFinishVoice),
+          const SizedBox(width: 8),
+          _blob(
+            color: accent,
+            isLight: isLight,
+            onTap: widget.onFinishVoice,
+            child: const Icon(Icons.send_rounded,
+                color: Color(0xFF08131A), size: 24),
+          ),
         ],
       );
     }
-
-    return ValueListenableBuilder<TextEditingValue>(
-      valueListenable: widget.controller,
-      builder: (context, value, _) {
-        final hasText = value.text.trim().isNotEmpty;
-        if (hasText || widget.editing != null) {
-          return _circleButton(
-            widget.editing != null ? Icons.check_rounded : Icons.send_rounded,
-            widget.onSend,
-          );
-        }
-        return _circleButton(Icons.mic_rounded, widget.onStartVoice);
-      },
+    if (hasText || widget.editing != null) {
+      return _blob(
+        color: accent,
+        isLight: isLight,
+        onTap: widget.onSend,
+        child: Icon(
+          widget.editing != null ? Icons.check_rounded : Icons.send_rounded,
+          color: const Color(0xFF08131A),
+          size: 24,
+        ),
+      );
+    }
+    // Пусто → кружок видеосообщения (камера)
+    return _blob(
+      color: blob,
+      isLight: isLight,
+      onTap: _openVideoCircle,
+      child: Icon(Icons.photo_camera_rounded, color: iconColor, size: 24),
     );
   }
 
-  Widget _circleButton(IconData icon, VoidCallback onTap) {
+  Widget _blob({
+    required Color color,
+    required bool isLight,
+    required Widget child,
+    required VoidCallback? onTap,
+  }) {
     return Material(
-      color: accent,
+      color: color,
       shape: const CircleBorder(),
+      elevation: isLight ? 2 : 1,
+      shadowColor: Colors.black.withValues(alpha: 0.25),
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
-        child: SizedBox(
-          width: 48,
-          height: 48,
-          child: Icon(icon, color: const Color(0xFF08131A)),
+        child: SizedBox(width: 48, height: 48, child: Center(child: child)),
+      ),
+    );
+  }
+
+  Widget _emojiPanel(bool isLight) {
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+        child: Container(
+          height: 260,
+          color: Colors.white.withValues(alpha: isLight ? 0.6 : 0.08),
+          child: GridView.builder(
+            padding: const EdgeInsets.all(8),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 10,
+              mainAxisSpacing: 2,
+              crossAxisSpacing: 2,
+              childAspectRatio: 1,
+            ),
+            itemCount: _emojis.length,
+            itemBuilder: (_, i) => GestureDetector(
+              onTap: () => _insertEmoji(_emojis[i]),
+              child: Center(
+                child: Text(_emojis[i], style: const TextStyle(fontSize: 22)),
+              ),
+            ),
+          ),
         ),
       ),
     );

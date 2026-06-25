@@ -271,8 +271,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: isLight
-                      ? const [Color(0xFFBDD8F0), Color(0xFFCDD5E8), Color(0xFFE8D5F0)]
-                      : const [Color(0xFF1A2540), Color(0xFF0D1B2A), Color(0xFF1E1030)],
+                      ? const [Color(0xFFF3F1EC), Color(0xFFEAE6DD), Color(0xFFF0EBE0)]
+                      : const [Color(0xFF1A1C20), Color(0xFF111215), Color(0xFF1C1A16)],
                 ),
               ),
             ),

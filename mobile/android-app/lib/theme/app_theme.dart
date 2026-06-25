@@ -1,22 +1,41 @@
 import 'package:flutter/material.dart';
 
-// Палитра BrenksChat (совпадает с веб-версией и desktop-клиентом).
-const bg = Color(0xFF20242B);
-const panel = Color(0xFF272C35);
-const panelSoft = Color(0xFF303744);
-const panelStrong = Color(0xFF3A4352);
-const text = Color(0xFFF4F7FB);
-const muted = Color(0xFFABB5C4);
-const border = Color(0xFF465061);
-const accent = Color(0xFF5CC8F5);
+// ─── Палитра BrenksChat: тёмный графит + умеренное золото-акцент ───────────
+
+// Фон
+const bg = Color(0xFF17191D);
+const deepBg = Color(0xFF111215);
+const chatBg = Color(0xFF1C1F24);
+const chatBgAlt = Color(0xFF24272D);
+
+// Панели и карточки
+const panel = Color(0xFF22252A);
+const panelSoft = Color(0xFF2D3037);
+const panelStrong = Color(0xFF464950); // = «сильная» граница
+const hoverBg = Color(0xFF303238);
+
+// Текст
+const text = Color(0xFFF6F4EF);
+const muted = Color(0xFFB9B5AC);
+const hint = Color(0xFF858A92);
+
+// Границы (по умолчанию — мягкая белая, фокус — золотая)
+const border = Color(0x1FFFFFFF); // white ~12%
+const goldBorder = Color(0x4DD8B76C); // gold ~30% (focus/важное)
+
+// Золото — только тонкий акцент
+const accent = Color(0xFFD8B76C);
+const softGold = Color(0xFFE0C783);
+const goldDark = Color(0xFF5D4A28);
+
 const danger = Color(0xFFFF7474);
 
-// Цвета светлой темы.
-const lightBg = Color(0xFFF3F5F8);
+// Светлая тема (вторична; золото-акцент сохраняется)
+const lightBg = Color(0xFFF3F1EC);
 const lightPanel = Color(0xFFFFFFFF);
-const lightText = Color(0xFF17202B);
-const lightMuted = Color(0xFF637083);
-const lightAccent = Color(0xFF596575);
+const lightText = Color(0xFF1B1A17);
+const lightMuted = Color(0xFF6B675F);
+const lightAccent = Color(0xFFB5933F);
 
 ThemeData buildBrenksTheme() {
   final base = ThemeData.dark(useMaterial3: true);
@@ -24,7 +43,7 @@ ThemeData buildBrenksTheme() {
     scaffoldBackgroundColor: bg,
     colorScheme: const ColorScheme.dark(
       primary: accent,
-      secondary: Color(0xFF8ED9B8),
+      secondary: softGold,
       surface: panel,
       error: danger,
     ),
@@ -33,27 +52,28 @@ ThemeData buildBrenksTheme() {
       displayColor: text,
       fontFamily: 'Roboto',
     ),
-    iconTheme: const IconThemeData(color: accent),
+    // Иконки по умолчанию — нейтральные светлые (золото точечно в коде).
+    iconTheme: const IconThemeData(color: text),
     iconButtonTheme: IconButtonThemeData(
-      style: IconButton.styleFrom(foregroundColor: accent),
+      style: IconButton.styleFrom(foregroundColor: text),
     ),
     appBarTheme: const AppBarTheme(
-      backgroundColor: Color(0xFF202329),
+      backgroundColor: Color(0xFF1A1C20),
       foregroundColor: text,
-      iconTheme: IconThemeData(color: accent),
-      actionsIconTheme: IconThemeData(color: accent),
+      iconTheme: IconThemeData(color: text),
+      actionsIconTheme: IconThemeData(color: text),
       elevation: 0,
       surfaceTintColor: Colors.transparent,
     ),
     inputDecorationTheme: _inputDecorationTheme(
-      fill: const Color(0xFF1D2027),
-      hint: const Color(0xFF7F8CA0),
+      fill: const Color(0x75121418), // rgba(18,20,24,0.46)
+      hint: hint,
       label: muted,
-      enabled: const Color(0xFF3A4250),
+      enabled: border,
       focused: accent,
     ),
     snackBarTheme: _snackBarTheme(
-      background: const Color(0xFF3A4352),
+      background: panelSoft,
       textColor: text,
       action: accent,
     ),
@@ -66,7 +86,7 @@ ThemeData buildBrenksLightTheme() {
     scaffoldBackgroundColor: lightBg,
     colorScheme: const ColorScheme.light(
       primary: lightAccent,
-      secondary: Color(0xFF4AAE8A),
+      secondary: Color(0xFF8A6E22),
       surface: lightPanel,
       error: Color(0xFFD84B4B),
     ),
@@ -75,29 +95,29 @@ ThemeData buildBrenksLightTheme() {
       displayColor: lightText,
       fontFamily: 'Roboto',
     ),
-    iconTheme: const IconThemeData(color: accent),
+    iconTheme: const IconThemeData(color: lightText),
     iconButtonTheme: IconButtonThemeData(
-      style: IconButton.styleFrom(foregroundColor: accent),
+      style: IconButton.styleFrom(foregroundColor: lightText),
     ),
     appBarTheme: const AppBarTheme(
       backgroundColor: lightPanel,
       foregroundColor: lightText,
-      iconTheme: IconThemeData(color: accent),
-      actionsIconTheme: IconThemeData(color: accent),
+      iconTheme: IconThemeData(color: lightText),
+      actionsIconTheme: IconThemeData(color: lightText),
       elevation: 0,
       surfaceTintColor: Colors.transparent,
     ),
     inputDecorationTheme: _inputDecorationTheme(
       fill: const Color(0xFFFFFFFF),
-      hint: const Color(0xFF7C8797),
-      label: const Color(0xFF637083),
-      enabled: const Color(0xFFD4DAE3),
+      hint: const Color(0xFF8A857B),
+      label: lightMuted,
+      enabled: const Color(0xFFE0DCD2),
       focused: lightAccent,
     ),
     snackBarTheme: _snackBarTheme(
-      background: const Color(0xFF222A35),
+      background: const Color(0xFF26241F),
       textColor: Colors.white,
-      action: const Color(0xFF7FD4FF),
+      action: softGold,
     ),
   );
 }

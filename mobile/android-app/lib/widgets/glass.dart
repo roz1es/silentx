@@ -25,14 +25,14 @@ void showAppToast(BuildContext context, String message, {bool error = false}) {
   );
 }
 
-/// Палитра фона мессенджера — чистая, как в веб-версии (без ярких оттенков).
+/// Фон мессенджера — тёмный графит (без ярких оттенков).
 const _lightGradient = [
-  Color(0xFFF2F5F9),
-  Color(0xFFE8EDF4),
+  Color(0xFFF3F1EC),
+  Color(0xFFEAE6DD),
 ];
 const _darkGradient = [
-  Color(0xFF20242B),
-  Color(0xFF14171D),
+  Color(0xFF17191D),
+  Color(0xFF111215),
 ];
 
 /// Фон-градиент в стиле экрана авторизации. Кладётся под весь экран.

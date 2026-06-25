@@ -44,12 +44,16 @@ class MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
-    final ownBg = isLight ? const Color(0xFFD0EAFE) : const Color(0xFF3B5568);
-    final otherBg = isLight ? Colors.white : panelSoft;
-    final ownBorder = isLight ? const Color(0xFFADD4F7) : accent.withValues(alpha: 0.2);
-    final otherBorder = isLight ? const Color(0xFFE2E7EF) : Colors.white.withValues(alpha: 0.06);
-    final msgTextColor = isLight ? const Color(0xFF17202B) : text;
-    final timeColor = isLight ? const Color(0xFF8A9BB0) : muted;
+    // Исходящее — тёплый тёмный (лёгкий золотой оттенок), входящее — графит.
+    final ownBg = isLight ? const Color(0xFFF0E7D6) : const Color(0xFF34312A);
+    final otherBg = isLight ? Colors.white : const Color(0xFF34373E);
+    final ownBorder =
+        isLight ? const Color(0xFFE3D6B8) : accent.withValues(alpha: 0.18);
+    final otherBorder = isLight
+        ? const Color(0xFFE6E2D8)
+        : Colors.white.withValues(alpha: 0.06);
+    final msgTextColor = isLight ? lightText : text;
+    final timeColor = isLight ? lightMuted : muted;
 
     return GestureDetector(
       onLongPress: () => _openMenu(context),
@@ -120,9 +124,7 @@ class MessageBubble extends StatelessWidget {
                                   : Icons.done_rounded,
                               size: 15,
                               color: read
-                                  ? (isLight
-                                      ? const Color(0xFF34A0F0)
-                                      : const Color(0xFF6FD0FF))
+                                  ? (isLight ? lightAccent : softGold)
                                   : timeColor,
                             ),
                           ],

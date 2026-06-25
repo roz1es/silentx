@@ -130,7 +130,7 @@ class ChatProfileScreen extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [accent, Color(0xFF7C5CF5)],
+                colors: [softGold, goldDark],
               ),
             ),
             child: Container(

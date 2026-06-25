@@ -377,7 +377,7 @@ class _ChatListScreenState extends State<ChatListScreen>
                     child: Icon(
                       _searchVisible ? Icons.close_rounded : Icons.search_rounded,
                       key: ValueKey(_searchVisible),
-                      color: accent,
+                      color: _searchVisible ? accent : (isLight ? lightText : text),
                       size: 25,
                     ),
                   ),
@@ -440,10 +440,10 @@ class _ChatListScreenState extends State<ChatListScreen>
               setState(() => _editMode = !_editMode);
             },
             child: Text(_editMode ? 'Готово' : 'Изм.',
-                style: const TextStyle(
+                style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 15,
-                    color: accent)),
+                    color: _editMode ? accent : (isLight ? lightText : text))),
           ),
         ),
         title: const Text('Чаты',
@@ -572,8 +572,8 @@ class _ChatListScreenState extends State<ChatListScreen>
                         color: Colors.white
                             .withValues(alpha: isLight ? 0.6 : 0.10)),
                   ),
-                  child: const Icon(Icons.tune_rounded,
-                      size: 18, color: accent),
+                  child: Icon(Icons.tune_rounded,
+                      size: 18, color: isLight ? lightMuted : muted),
                 ),
               ),
             ],
@@ -588,22 +588,26 @@ class _ChatListScreenState extends State<ChatListScreen>
     return GestureDetector(
       onTap: () => setState(() => _activeFolder = index),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
         height: 34,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: selected
-              ? accent
-              : Colors.white.withValues(alpha: isLight ? 0.55 : 0.07),
+              ? accent.withValues(alpha: 0.12)
+              : Colors.white.withValues(alpha: isLight ? 0.45 : 0.05),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-              color: Colors.white.withValues(alpha: isLight ? 0.6 : 0.10)),
+            color: selected
+                ? goldBorder
+                : Colors.white.withValues(alpha: isLight ? 0.5 : 0.08),
+          ),
         ),
         child: Text(
           name,
           style: TextStyle(
-            color: selected ? const Color(0xFF08131A) : accent,
+            color: selected ? accent : (isLight ? lightMuted : muted),
             fontWeight: FontWeight.w800,
             fontSize: 14,
           ),
@@ -746,7 +750,8 @@ class _ChatListScreenState extends State<ChatListScreen>
         ),
         child: Row(
           children: [
-            const Icon(Icons.search_rounded, size: 20, color: accent),
+            Icon(Icons.search_rounded,
+                size: 20, color: isLight ? lightMuted : muted),
             const SizedBox(width: 8),
             Expanded(
               child: TextField(
@@ -1034,7 +1039,7 @@ class _SettingsViewState extends State<_SettingsView> {
                               gradient: LinearGradient(
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
-                                colors: [accent, Color(0xFF7C5CF5)],
+                                colors: [softGold, goldDark],
                               ),
                             ),
                             child: Container(
@@ -1463,8 +1468,9 @@ class _NavItemState extends State<_NavItem>
 
   @override
   Widget build(BuildContext context) {
-    final color =
-        widget.selected ? accent : accent.withValues(alpha: 0.5);
+    final color = widget.selected
+        ? accent
+        : (widget.isLight ? lightMuted : muted);
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,

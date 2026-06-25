@@ -358,65 +358,85 @@ class _ChatListScreenState extends State<ChatListScreen>
               ],
             ),
           ),
-          // Область переписки с последним сообщением.
-          Container(
-            height: 174,
+          // Лента: последние сообщения чата (подгружаем при открытии меню).
+          SizedBox(
+            height: 208,
             width: double.infinity,
-            color: bodyBg,
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
-            alignment: last == null
-                ? Alignment.center
-                : (ownLast ? Alignment.bottomRight : Alignment.bottomLeft),
-            child: last == null
-                ? Text('Нет сообщений',
-                    style: TextStyle(
-                        color: isLight ? lightMuted : muted, fontSize: 13))
-                : _previewBubble(last, ownLast, isLight),
+            child: Container(
+              color: bodyBg,
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              child: FutureBuilder<List<Message>>(
+                future: _controller.api.fetchMessages(chat.id),
+                builder: (ctx, snap) {
+                  final myId = _controller.currentUser.id;
+                  final rows = <Widget>[];
+                  if (snap.hasData && snap.data!.isNotEmpty) {
+                    final all = snap.data!;
+                    final tail =
+                        all.length > 5 ? all.sublist(all.length - 5) : all;
+                    for (final m in tail) {
+                      rows.add(_previewRow(messagePreview(m),
+                          m.senderId == myId, isLight, width));
+                    }
+                  } else if (last != null) {
+                    // Пока грузится (или при ошибке) — последнее сообщение.
+                    rows.add(_previewRow(
+                        lastMessageLabel(last.text), ownLast, isLight, width));
+                  }
+                  if (rows.isEmpty) {
+                    return Center(
+                      child: Text('Нет сообщений',
+                          style: TextStyle(
+                              color: isLight ? lightMuted : muted,
+                              fontSize: 13)),
+                    );
+                  }
+                  return Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: rows,
+                  );
+                },
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _previewBubble(LastMessage last, bool own, bool isLight) {
+  Widget _previewRow(String label, bool own, bool isLight, double maxW) {
     final ownBg = isLight ? const Color(0xFFF0E7D6) : const Color(0xFF34312A);
     final otherBg = isLight ? Colors.white : const Color(0xFF34373E);
     final textColor = isLight ? lightText : text;
-    final timeColor = isLight ? lightMuted : muted;
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 300),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
-        decoration: BoxDecoration(
-          color: own ? ownBg : otherBg,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            topRight: const Radius.circular(16),
-            bottomLeft: Radius.circular(own ? 16 : 5),
-            bottomRight: Radius.circular(own ? 5 : 16),
-          ),
-          border: Border.all(
-              color: own
-                  ? accent.withValues(alpha: 0.18)
-                  : Colors.white.withValues(alpha: 0.06)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              lastMessageLabel(last.text),
-              maxLines: 3,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Align(
+        alignment: own ? Alignment.centerRight : Alignment.centerLeft,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxW * 0.74),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+            decoration: BoxDecoration(
+              color: own ? ownBg : otherBg,
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(13),
+                topRight: const Radius.circular(13),
+                bottomLeft: Radius.circular(own ? 13 : 4),
+                bottomRight: Radius.circular(own ? 4 : 13),
+              ),
+              border: Border.all(
+                  color: own
+                      ? accent.withValues(alpha: 0.18)
+                      : Colors.white.withValues(alpha: 0.06)),
+            ),
+            child: Text(
+              label,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: textColor, fontSize: 15.5),
+              style: TextStyle(color: textColor, fontSize: 13.5),
             ),
-            const SizedBox(height: 2),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(formatTime(last.time),
-                  style: TextStyle(color: timeColor, fontSize: 10.5)),
-            ),
-          ],
+          ),
         ),
       ),
     );

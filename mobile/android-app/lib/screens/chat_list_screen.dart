@@ -1162,7 +1162,7 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-// ─── Переключатель темы со скользящим стеклянным индикатором ───────────────
+// ─── Одна кнопка-переключатель темы: луна ⇄ солнце с трансформацией ─────────
 
 class _ThemeSwitch extends StatelessWidget {
   const _ThemeSwitch({required this.isLight, required this.onChanged});
@@ -1172,59 +1172,35 @@ class _ThemeSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark = !isLight; // позиция индикатора по текущей теме
-    return Container(
-      width: 96,
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: (isLight ? Colors.black : Colors.white).withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Stack(
-        children: [
-          // Скользящий индикатор — настоящее матовое стекло
-          Positioned.fill(
-            child: AnimatedAlign(
-              alignment: dark ? Alignment.centerLeft : Alignment.centerRight,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOutCubic,
-              child: FractionallySizedBox(
-                widthFactor: 0.5,
-                heightFactor: 1,
-                child: GlassPanel(
-                  borderRadius: 12,
-                  blur: 12,
-                  strength: 1.7,
-                  shadow: true,
-                  child: const SizedBox.expand(),
-                ),
-              ),
+    return _TapBounce(
+      onTap: () => onChanged(isLight ? ThemeMode.dark : ThemeMode.light),
+      child: Container(
+        width: 50,
+        height: 50,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: (isLight ? Colors.black : Colors.white).withValues(alpha: 0.06),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: isLight ? 0.5 : 0.14),
+          ),
+        ),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 480),
+          switchInCurve: Curves.easeOutBack,
+          switchOutCurve: Curves.easeIn,
+          transitionBuilder: (child, animation) => RotationTransition(
+            turns: Tween<double>(begin: 0.5, end: 1.0).animate(animation),
+            child: ScaleTransition(
+              scale: animation,
+              child: FadeTransition(opacity: animation, child: child),
             ),
           ),
-          Row(
-            children: [
-              _tab(Icons.dark_mode_rounded, dark,
-                  () => onChanged(ThemeMode.dark)),
-              _tab(Icons.light_mode_rounded, !dark,
-                  () => onChanged(ThemeMode.light)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _tab(IconData icon, bool selected, VoidCallback onTap) {
-    final color = selected
-        ? (isLight ? lightText : text)
-        : (isLight ? lightMuted : muted);
-    return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: SizedBox(
-          height: 34,
-          child: Icon(icon, size: 18, color: color),
+          child: isLight
+              ? const Icon(Icons.light_mode_rounded,
+                  key: ValueKey('sun'), color: Color(0xFFFFB02E), size: 26)
+              : const Icon(Icons.dark_mode_rounded,
+                  key: ValueKey('moon'), color: Color(0xFFBFD4FF), size: 26),
         ),
       ),
     );

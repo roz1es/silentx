@@ -33,9 +33,15 @@ ThemeData buildBrenksTheme() {
       displayColor: text,
       fontFamily: 'Roboto',
     ),
+    iconTheme: const IconThemeData(color: accent),
+    iconButtonTheme: IconButtonThemeData(
+      style: IconButton.styleFrom(foregroundColor: accent),
+    ),
     appBarTheme: const AppBarTheme(
       backgroundColor: Color(0xFF202329),
       foregroundColor: text,
+      iconTheme: IconThemeData(color: accent),
+      actionsIconTheme: IconThemeData(color: accent),
       elevation: 0,
       surfaceTintColor: Colors.transparent,
     ),
@@ -69,9 +75,15 @@ ThemeData buildBrenksLightTheme() {
       displayColor: lightText,
       fontFamily: 'Roboto',
     ),
+    iconTheme: const IconThemeData(color: accent),
+    iconButtonTheme: IconButtonThemeData(
+      style: IconButton.styleFrom(foregroundColor: accent),
+    ),
     appBarTheme: const AppBarTheme(
       backgroundColor: lightPanel,
       foregroundColor: lightText,
+      iconTheme: IconThemeData(color: accent),
+      actionsIconTheme: IconThemeData(color: accent),
       elevation: 0,
       surfaceTintColor: Colors.transparent,
     ),

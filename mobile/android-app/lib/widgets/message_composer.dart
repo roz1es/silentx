@@ -107,7 +107,7 @@ class _MessageComposerState extends State<MessageComposer> {
     final isLight = Theme.of(context).brightness == Brightness.light;
     final modeMessage = widget.editing ?? widget.replyTo;
     final blob = isLight ? Colors.white : const Color(0xFF3A4352);
-    final iconColor = isLight ? const Color(0xFF3A4352) : text;
+    final iconColor = accent;
     final hintColor = isLight ? const Color(0xFF8A93A3) : muted;
     final hasText = widget.controller.text.trim().isNotEmpty;
 

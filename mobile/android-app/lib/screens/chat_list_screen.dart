@@ -352,7 +352,7 @@ class _ChatListScreenState extends State<ChatListScreen>
                     child: Icon(
                       _searchVisible ? Icons.close_rounded : Icons.search_rounded,
                       key: ValueKey(_searchVisible),
-                      color: _searchVisible ? accent : (isLight ? lightText : text),
+                      color: accent,
                       size: 25,
                     ),
                   ),
@@ -415,10 +415,10 @@ class _ChatListScreenState extends State<ChatListScreen>
               setState(() => _editMode = !_editMode);
             },
             child: Text(_editMode ? 'Готово' : 'Изм.',
-                style: TextStyle(
+                style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 15,
-                    color: _editMode ? accent : (isLight ? lightText : text))),
+                    color: accent)),
           ),
         ),
         title: const Text('Чаты',
@@ -528,8 +528,8 @@ class _ChatListScreenState extends State<ChatListScreen>
                         color: Colors.white
                             .withValues(alpha: isLight ? 0.6 : 0.10)),
                   ),
-                  child: Icon(Icons.tune_rounded,
-                      size: 18, color: isLight ? lightMuted : muted),
+                  child: const Icon(Icons.tune_rounded,
+                      size: 18, color: accent),
                 ),
               ),
             ],
@@ -559,9 +559,7 @@ class _ChatListScreenState extends State<ChatListScreen>
         child: Text(
           name,
           style: TextStyle(
-            color: selected
-                ? const Color(0xFF08131A)
-                : (isLight ? lightText : text),
+            color: selected ? const Color(0xFF08131A) : accent,
             fontWeight: FontWeight.w800,
             fontSize: 14,
           ),
@@ -704,8 +702,7 @@ class _ChatListScreenState extends State<ChatListScreen>
         ),
         child: Row(
           children: [
-            Icon(Icons.search_rounded,
-                size: 20, color: isLight ? lightMuted : muted),
+            const Icon(Icons.search_rounded, size: 20, color: accent),
             const SizedBox(width: 8),
             Expanded(
               child: TextField(
@@ -1371,8 +1368,7 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color =
-        selected ? (isLight ? lightText : text) : (isLight ? lightMuted : muted);
+    final color = selected ? accent : accent.withValues(alpha: 0.5);
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,

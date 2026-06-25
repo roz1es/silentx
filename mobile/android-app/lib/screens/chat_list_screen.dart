@@ -35,9 +35,14 @@ class ChatListScreen extends StatefulWidget {
   State<ChatListScreen> createState() => _ChatListScreenState();
 }
 
-class _ChatListScreenState extends State<ChatListScreen> {
+class _ChatListScreenState extends State<ChatListScreen>
+    with SingleTickerProviderStateMixin {
   final _searchController = TextEditingController();
   final _searchFocus = FocusNode();
+  late final AnimationController _searchReveal = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 360),
+  );
   bool _showOffline = false;
   DateTime? _disconnectedAt;
   int _tabIndex = 1; // 0 = Контакты, 1 = Чаты, 2 = Настройки
@@ -55,10 +60,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
       if (!show) _searchController.clear();
     });
     if (show) {
+      _searchReveal.forward();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _searchFocus.requestFocus();
       });
     } else {
+      _searchReveal.reverse();
       _searchFocus.unfocus();
     }
   }
@@ -75,6 +82,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     _controller.removeListener(_onChanged);
     _searchController.dispose();
     _searchFocus.dispose();
+    _searchReveal.dispose();
     super.dispose();
   }
 
@@ -400,7 +408,15 @@ class _ChatListScreenState extends State<ChatListScreen> {
         leading: Center(
           child: _PillButton(
             isLight: isLight,
-            onTap: () => setState(() => _editMode = !_editMode),
+            onTap: () {
+              if (!_editMode && _searchVisible) {
+                _searchVisible = false;
+                _searchController.clear();
+                _searchReveal.value = 0;
+                _searchFocus.unfocus();
+              }
+              setState(() => _editMode = !_editMode);
+            },
             child: Text(_editMode ? 'Готово' : 'Изм.',
                 style: TextStyle(
                     fontWeight: FontWeight.w700,
@@ -422,14 +438,38 @@ class _ChatListScreenState extends State<ChatListScreen> {
       body: Column(
         children: [
           _offlineBanner(),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 240),
-            curve: Curves.easeOutCubic,
-            alignment: Alignment.topCenter,
-            child: (_searchVisible && !_editMode)
-                ? _searchBar(isLight)
-                : const SizedBox(width: double.infinity),
-          ),
+          if (!_editMode)
+            SizeTransition(
+              alignment: Alignment.topCenter,
+              sizeFactor: CurvedAnimation(
+                parent: _searchReveal,
+                curve: Curves.easeOutCubic,
+                reverseCurve: Curves.easeInCubic,
+              ),
+              child: FadeTransition(
+                opacity: CurvedAnimation(
+                  parent: _searchReveal,
+                  curve: const Interval(0.2, 1, curve: Curves.easeOut),
+                ),
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, -0.35),
+                    end: Offset.zero,
+                  ).animate(CurvedAnimation(
+                    parent: _searchReveal,
+                    curve: Curves.easeOutCubic,
+                  )),
+                  child: ScaleTransition(
+                    scale: Tween<double>(begin: 0.94, end: 1.0).animate(
+                      CurvedAnimation(
+                          parent: _searchReveal, curve: Curves.easeOutCubic),
+                    ),
+                    alignment: Alignment.topCenter,
+                    child: _searchBar(isLight),
+                  ),
+                ),
+              ),
+            ),
           Expanded(
             child: _editMode
                 ? _buildEditList()

@@ -1175,26 +1175,26 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Иконка «перетекает» contour ↔ fill с поворотом и масштабом.
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 340),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              transitionBuilder: (child, animation) => FadeTransition(
-                opacity: animation,
-                child: ScaleTransition(
-                  scale: Tween<double>(begin: 0.55, end: 1.0).animate(animation),
-                  child: RotationTransition(
-                    turns: Tween<double>(begin: -0.18, end: 0.0).animate(animation),
-                    child: child,
+            // Плавно: иконка чуть подрастает + контур мягко перетекает в заливку.
+            AnimatedScale(
+              scale: selected ? 1.14 : 1.0,
+              duration: const Duration(milliseconds: 240),
+              curve: Curves.easeOutCubic,
+              child: AnimatedSlide(
+                offset: selected ? const Offset(0, -0.05) : Offset.zero,
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOutCubic,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  transitionBuilder: (child, animation) =>
+                      FadeTransition(opacity: animation, child: child),
+                  child: Icon(
+                    selected ? icon : iconOutline,
+                    key: ValueKey(selected),
+                    color: color,
+                    size: 24,
                   ),
                 ),
-              ),
-              child: Icon(
-                selected ? icon : iconOutline,
-                key: ValueKey(selected),
-                color: color,
-                size: 24,
               ),
             ),
             const SizedBox(height: 3),

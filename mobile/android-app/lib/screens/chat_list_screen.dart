@@ -472,6 +472,10 @@ class _ChatListScreenState extends State<ChatListScreen>
             child: _editMode
                 ? _buildEditList()
                 : GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    // Тап по пустому месту закрывает открытый поиск.
+                    // Тап по плитке чата перехватывается ею и открывает чат.
+                    onTap: _searchVisible ? _toggleSearch : null,
                     // Свайп влево/вправо переключает папки (как в Telegram).
                     onHorizontalDragEnd: _folders.isEmpty
                         ? null

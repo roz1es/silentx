@@ -289,12 +289,15 @@ class _MessageComposerState extends State<MessageComposer> {
             scale: animation,
             child: FadeTransition(opacity: animation, child: child),
           ),
-          child: Icon(
-            _circleMode ? Icons.videocam_rounded : Icons.mic_rounded,
-            key: ValueKey(_circleMode),
-            color: iconColor,
-            size: 24,
-          ),
+          child: _circleMode
+              ? _VideoCircleIcon(
+                  key: const ValueKey('circle'), color: iconColor)
+              : Icon(
+                  Icons.mic_rounded,
+                  key: const ValueKey('mic'),
+                  color: iconColor,
+                  size: 24,
+                ),
         ),
       ),
     );
@@ -505,6 +508,34 @@ class _SendButtonState extends State<_SendButton>
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Иконка «видеокружок» для строки ввода: кольцо с камерой внутри —
+/// сразу понятно, что запись будет круглой (видеокружок), а не обычным видео.
+class _VideoCircleIcon extends StatelessWidget {
+  const _VideoCircleIcon({super.key, required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 26,
+      height: 26,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: color, width: 2),
+            ),
+          ),
+          Icon(Icons.videocam_rounded, color: color, size: 14),
+        ],
       ),
     );
   }

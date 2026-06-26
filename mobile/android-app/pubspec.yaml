@@ -17,6 +17,7 @@ dependencies:
   http: ^1.2.2
   mime: ^2.0.0
   path_provider: ^2.1.5
+  photo_manager: ^3.0.0
   qr_flutter: ^4.1.0
   record: ^6.1.2
   shared_preferences: ^2.3.2

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' as io;
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
@@ -14,6 +15,7 @@ import '../models.dart';
 import '../services/audio_message_service.dart';
 import '../services/messenger_controller.dart';
 import '../theme/app_theme.dart';
+import '../widgets/attach_sheet.dart';
 import '../widgets/brenks_avatar.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/glass.dart';
@@ -146,6 +148,48 @@ class _ChatScreenState extends State<ChatScreen> {
     _messageController.clear();
     _controller.notifyTyping(false);
     _scrollToBottom();
+  }
+
+  void _openAttachSheet() {
+    FocusScope.of(context).unfocus();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => AttachSheet(onImage: _sendPhotoBytes, onFile: _attach),
+    );
+  }
+
+  Future<void> _sendPhotoBytes(Uint8List bytes, String name) async {
+    if (bytes.isEmpty) return;
+    setState(() => _sendingMedia = true);
+    try {
+      final mimeType =
+          lookupMimeType(name, headerBytes: bytes.take(16).toList()) ??
+              'image/jpeg';
+      final dataUrl = 'data:$mimeType;base64,${base64Encode(bytes)}';
+      if (dataUrl.length > _maxMediaDataUrlLength) {
+        _showSnack('Фото слишком большое для текущего сервера.');
+        return;
+      }
+      final media = MessageMedia(
+        kind: mimeType.startsWith('image/') ? 'image' : 'file',
+        dataUrl: dataUrl,
+        fileName: name,
+        mimeType: mimeType,
+      );
+      _controller.sendMessage(
+        text: _messageController.text.trim(),
+        media: media,
+        replyToMessageId: _replyTo?.id,
+      );
+      setState(() => _replyTo = null);
+      _messageController.clear();
+    } on Object catch (err) {
+      _showSnack('Не удалось отправить фото: $err');
+    } finally {
+      if (mounted) setState(() => _sendingMedia = false);
+    }
   }
 
   Future<void> _attach() async {
@@ -404,7 +448,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         sendingMedia: _sendingMedia,
                         recordingVoice: _recordingVoice,
                         recordingMs: _recordingMs,
-                        onAttach: _attach,
+                        onAttach: _openAttachSheet,
                         onSend: _send,
                         onStartVoice: _startVoice,
                         onFinishVoice: _finishVoice,

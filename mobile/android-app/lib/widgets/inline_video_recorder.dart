@@ -158,16 +158,11 @@ class _InlineVideoRecorderState extends State<InlineVideoRecorder> {
     }
   }
 
-  Future<void> _cancel() async {
+  void _cancel() {
+    if (_busy) return;
     _timer?.cancel();
-    final cam = _camera;
-    try {
-      if (cam != null && cam.value.isRecordingVideo) {
-        await cam.stopVideoRecording();
-      }
-    } on Object {
-      // игнорируем
-    }
+    // Закрываем оверлей сразу — камеру корректно освободит dispose().
+    // (await stopVideoRecording мог зависать и оверлей не пропадал.)
     widget.onCancel();
   }
 

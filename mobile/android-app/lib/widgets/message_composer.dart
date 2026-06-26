@@ -175,7 +175,7 @@ class _MessageComposerState extends State<MessageComposer> {
       shadowColor: Colors.black.withValues(alpha: 0.25),
       borderRadius: BorderRadius.circular(26),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 48, maxHeight: 130),
+        constraints: const BoxConstraints(minHeight: 52, maxHeight: 132),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -319,7 +319,7 @@ class _MessageComposerState extends State<MessageComposer> {
         customBorder: const CircleBorder(),
         onTap: onTap,
         onLongPress: onLongPress,
-        child: SizedBox(width: 48, height: 48, child: Center(child: child)),
+        child: SizedBox(width: 52, height: 52, child: Center(child: child)),
       ),
     );
   }
@@ -477,8 +477,8 @@ class _SendButtonState extends State<_SendButton>
         customBorder: const CircleBorder(),
         onTap: _handleTap,
         child: SizedBox(
-          width: 48,
-          height: 48,
+          width: 52,
+          height: 52,
           child: Center(
             child: AnimatedBuilder(
               animation: _c,

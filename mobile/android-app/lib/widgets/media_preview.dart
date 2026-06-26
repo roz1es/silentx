@@ -417,16 +417,47 @@ class _OverlayPill extends StatelessWidget {
   }
 }
 
-class ImagePreview extends StatelessWidget {
+class ImagePreview extends StatefulWidget {
   const ImagePreview({super.key, required this.source, required this.serverUrl});
 
   final String source;
   final String serverUrl;
 
   @override
+  State<ImagePreview> createState() => _ImagePreviewState();
+}
+
+class _ImagePreviewState extends State<ImagePreview> {
+  // Декодируем один раз и держим стабильные байты — иначе Image.memory
+  // перезагружается на каждый rebuild и лента «прыгает».
+  Uint8List? _bytes;
+  String? _url;
+
+  @override
+  void initState() {
+    super.initState();
+    _decode();
+  }
+
+  @override
+  void didUpdateWidget(ImagePreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.source != widget.source ||
+        oldWidget.serverUrl != widget.serverUrl) {
+      _decode();
+    }
+  }
+
+  void _decode() {
+    final b = bytesFromDataUrl(widget.source);
+    _bytes = b;
+    _url = b == null ? resolveMediaUrl(widget.source, widget.serverUrl) : null;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final bytes = bytesFromDataUrl(source);
-    final url = bytes == null ? resolveMediaUrl(source, serverUrl) : null;
+    final bytes = _bytes;
+    final url = _url;
     if (bytes == null && (url == null || url.isEmpty)) {
       return const Text('Фото не удалось открыть',
           style: TextStyle(color: muted));
@@ -438,10 +469,11 @@ class ImagePreview extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxHeight: 320, maxWidth: 320),
           child: bytes != null
-              ? Image.memory(bytes, fit: BoxFit.cover)
+              ? Image.memory(bytes, fit: BoxFit.cover, gaplessPlayback: true)
               : Image.network(
                   url!,
                   fit: BoxFit.cover,
+                  gaplessPlayback: true,
                   errorBuilder: (_, __, ___) => const Text(
                     'Фото не удалось загрузить',
                     style: TextStyle(color: muted),

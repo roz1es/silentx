@@ -372,11 +372,18 @@ class _MediaTile extends StatelessWidget {
     final source = media?.dataUrl ?? message.imageUrl ?? '';
 
     if (isVideo) {
-      return Container(
-        color: Colors.black,
-        alignment: Alignment.center,
-        child: const Icon(Icons.videocam_rounded,
-            color: Colors.white70, size: 28),
+      // Видеокружок — круглая плитка с золотой иконкой, чтобы было понятно.
+      return Padding(
+        padding: const EdgeInsets.all(6),
+        child: Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.black,
+            border: Border.all(color: accent.withValues(alpha: 0.55), width: 2),
+          ),
+          alignment: Alignment.center,
+          child: const Icon(Icons.videocam_rounded, color: accent, size: 30),
+        ),
       );
     }
 

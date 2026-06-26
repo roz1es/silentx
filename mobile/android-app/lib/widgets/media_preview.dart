@@ -103,38 +103,33 @@ class VoicePreview extends StatelessWidget {
     final size = _formatSize(bytes?.length ?? 0);
     final dur = formatDuration(media.durationMs ?? 0);
     final meta = size.isEmpty ? dur : '$dur, $size';
-    return SizedBox(
-      width: 232,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          GestureDetector(
-            onTap: onPlay,
-            child: Container(
-              width: 42,
-              height: 42,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: accent,
-              ),
-              child: const Icon(Icons.play_arrow_rounded,
-                  color: Color(0xFF08131A), size: 26),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GestureDetector(
+          onTap: onPlay,
+          child: Container(
+            width: 42,
+            height: 42,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: accent,
             ),
+            child: const Icon(Icons.play_arrow_rounded,
+                color: Color(0xFF08131A), size: 26),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const _VoiceWave(),
-                const SizedBox(height: 6),
-                Text(meta, style: const TextStyle(color: muted, fontSize: 11.5)),
-              ],
-            ),
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const _VoiceWave(),
+            const SizedBox(height: 6),
+            Text(meta, style: const TextStyle(color: muted, fontSize: 11.5)),
+          ],
+        ),
+      ],
     );
   }
 }

@@ -6,6 +6,7 @@ import { useCall } from '@/contexts/CallContext';
 import { useMessenger } from '@/contexts/MessengerContext';
 import { UserAvatar } from '@/components/UserAvatar';
 import {
+  IconCheck,
   IconMoreVertical,
   IconLock,
   IconPalette,
@@ -66,6 +67,17 @@ function deleteChatMenuLabel(chat: Chat, selfId: string): string {
   return 'Выйти из группы';
 }
 
+function VerifiedBadge() {
+  return (
+    <span
+      className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-amber-200/60 bg-amber-300/90 text-zinc-950 shadow-[0_0_14px_rgba(251,191,36,0.25)] dark:border-amber-200/35"
+      title="Подтвержденный канал"
+    >
+      <IconCheck className="h-3 w-3" />
+    </span>
+  );
+}
+
 type Props = {
   onGroupInfo?: () => void;
   onPeerProfile?: () => void;
@@ -81,6 +93,7 @@ export function ChatHeader({ onGroupInfo, onPeerProfile }: Props) {
     setMessageSearch,
     setMuted,
     setPinnedTop,
+    setChatVerified,
     clearChat,
     deleteChat,
     textEncryptionStatus,
@@ -282,6 +295,18 @@ export function ChatHeader({ onGroupInfo, onPeerProfile }: Props) {
             >
               {activeChat.pinnedToTop ? 'Открепить чат' : 'Закрепить чат'}
             </button>
+            {user.isAdmin && activeChat.type === 'channel' ? (
+              <button
+                type="button"
+                className="block w-full px-4 py-2.5 text-left text-sm hover:bg-tg-hover"
+                onClick={() => {
+                  void setChatVerified(activeChat.id, !activeChat.verified);
+                  closeMenu();
+                }}
+              >
+                {activeChat.verified ? 'Снять галочку' : 'Выдать галочку'}
+              </button>
+            ) : null}
             {!(
               activeChat.type === 'channel' &&
               activeChat.channelOwnerId !== user.id
@@ -327,6 +352,9 @@ export function ChatHeader({ onGroupInfo, onPeerProfile }: Props) {
         <div className="flex min-w-0 flex-1 flex-col justify-center">
           <div className="flex min-w-0 items-center gap-1.5">
             {titleEl}
+            {activeChat?.type === 'channel' && activeChat.verified ? (
+              <VerifiedBadge />
+            ) : null}
             {textEncryptionStatus === 'protected' ? (
               <span
                 className="shrink-0 text-emerald-600 dark:text-emerald-400"

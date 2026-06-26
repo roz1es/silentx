@@ -1,6 +1,6 @@
 const defaultApiUrl = String.fromEnvironment(
   'BRENKS_API_URL',
-  defaultValue: 'https://silentx.ru',
+  defaultValue: 'https://api.brenkschat.ru',
 );
 
 const appVersion = String.fromEnvironment(
@@ -10,7 +10,7 @@ const appVersion = String.fromEnvironment(
 
 const updateManifestUrl = String.fromEnvironment(
   'BRENKS_UPDATE_URL',
-  defaultValue: 'https://silentx.ru/desktop/windows/latest.json',
+  defaultValue: 'https://brenkschat.ru/desktop/windows/latest.json',
 );
 
 String normalizeServerUrl(String value) {

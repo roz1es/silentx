@@ -12,24 +12,24 @@ on:
       api_url:
         description: "BrenksChat server URL"
         required: true
-        default: "https://silentx.ru"
+        default: "https://api.brenkschat.ru"
       update_url:
         description: "Auto-update manifest URL"
         required: true
-        default: "https://silentx.ru/desktop/windows/latest.json"
+        default: "https://brenkschat.ru/desktop/windows/latest.json"
       download_base_url:
         description: "Public folder with installer files"
         required: true
-        default: "https://silentx.ru/desktop/windows"
+        default: "https://brenkschat.ru/desktop/windows"
 
 jobs:
   build:
     name: Build Flutter Windows installer
     runs-on: windows-2022
     env:
-      API_URL: ${{ github.event.inputs.api_url || 'https://silentx.ru' }}
-      UPDATE_URL: ${{ github.event.inputs.update_url || 'https://silentx.ru/desktop/windows/latest.json' }}
-      DOWNLOAD_BASE_URL: ${{ github.event.inputs.download_base_url || 'https://silentx.ru/desktop/windows' }}
+      API_URL: ${{ github.event.inputs.api_url || 'https://api.brenkschat.ru' }}
+      UPDATE_URL: ${{ github.event.inputs.update_url || 'https://brenkschat.ru/desktop/windows/latest.json' }}
+      DOWNLOAD_BASE_URL: ${{ github.event.inputs.download_base_url || 'https://brenkschat.ru/desktop/windows' }}
 
     steps:
       - name: Checkout repository

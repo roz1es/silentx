@@ -138,7 +138,7 @@ async function main() {
     );
 
     const configFiles = [
-      '/etc/nginx/sites-available/silentx.ru',
+      '/etc/nginx/sites-available/brenkschat.ru',
       '/etc/nginx/.pma_htpasswd',
       '/etc/turnserver.conf',
       '/etc/ssh/sshd_config',

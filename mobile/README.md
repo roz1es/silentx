@@ -6,7 +6,7 @@
 индикатор печати в реальном времени через Socket.IO.
 
 Приложение **не меняет backend** — оно использует уже существующие HTTP- и
-Socket.IO-эндпоинты сервера `https://silentx.ru` (см. раздел «Контракт API»).
+Socket.IO-эндпоинты сервера `https://api.brenkschat.ru` (см. раздел «Контракт API»).
 
 ## Возможности
 
@@ -111,10 +111,10 @@ flutter test                      # тесты
 
 ## Конфигурация сервера
 
-По умолчанию используется `https://silentx.ru`. Переопределить можно при сборке:
+По умолчанию используется `https://api.brenkschat.ru`. Переопределить можно при сборке:
 
 ```bash
-flutter run --dart-define=BRENKS_API_URL=https://silentx.ru
+flutter run --dart-define=BRENKS_API_URL=https://api.brenkschat.ru
 ```
 
 ## Контракт API (используется, без изменений на сервере)

@@ -78,6 +78,9 @@ class ApiClient {
         'DELETE' => _http
             .delete(_uri(path), headers: headers, body: encodedBody)
             .timeout(const Duration(seconds: 20)),
+        'PATCH' => _http
+            .patch(_uri(path), headers: headers, body: encodedBody)
+            .timeout(const Duration(seconds: 20)),
         _ => _http
             .get(_uri(path), headers: headers)
             .timeout(const Duration(seconds: 20)),
@@ -167,6 +170,17 @@ class ApiClient {
     return User.fromJson((json['user'] as Map).cast<String, dynamic>());
   }
 
+  Future<User> updateProfile({
+    String? displayName,
+    Object? avatarUrl = _unchanged,
+  }) async {
+    final body = <String, Object?>{};
+    if (displayName != null) body['displayName'] = displayName;
+    if (!identical(avatarUrl, _unchanged)) body['avatarUrl'] = avatarUrl;
+    final json = await _request('/api/me', method: 'PATCH', body: body);
+    return User.fromJson((json['user'] as Map).cast<String, dynamic>());
+  }
+
   Future<List<Chat>> fetchChats() async {
     final json = await _request('/api/chats');
     final chats = json['chats'];
@@ -177,9 +191,20 @@ class ApiClient {
         .toList(growable: false);
   }
 
-  Future<List<Message>> fetchMessages(String chatId) async {
-    final json =
-        await _request('/api/chats/${Uri.encodeComponent(chatId)}/messages');
+  Future<List<Message>> fetchMessages(
+    String chatId, {
+    int limit = 80,
+    int? before,
+  }) async {
+    final query = <String, String>{
+      'limit': limit.toString(),
+      if (before != null) 'before': before.toString(),
+    };
+    final uri = Uri(
+      path: '/api/chats/${Uri.encodeComponent(chatId)}/messages',
+      queryParameters: query,
+    );
+    final json = await _request(uri.toString());
     final messages = json['messages'];
     if (messages is! List) return const [];
     return messages
@@ -190,6 +215,20 @@ class ApiClient {
 
   Future<List<DirectoryUser>> fetchUserDirectory() async {
     final json = await _request('/api/users/directory');
+    final users = json['users'];
+    if (users is! List) return const [];
+    return users
+        .whereType<Map>()
+        .map((item) => DirectoryUser.fromJson(item.cast<String, dynamic>()))
+        .toList(growable: false);
+  }
+
+  Future<List<DirectoryUser>> searchUsers(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return const [];
+    final json = await _request(
+      '/api/users/search?q=${Uri.encodeQueryComponent(trimmed)}',
+    );
     final users = json['users'];
     if (users is! List) return const [];
     return users
@@ -275,6 +314,18 @@ class ApiClient {
     );
   }
 
+  Future<Chat> setChatVerified({
+    required String chatId,
+    required bool verified,
+  }) async {
+    final json = await _request(
+      '/api/admin/chats/${Uri.encodeComponent(chatId)}/verified',
+      method: 'POST',
+      body: {'verified': verified},
+    );
+    return Chat.fromJson((json['chat'] as Map).cast<String, dynamic>());
+  }
+
   Future<void> clearChat(String chatId) async {
     await _request(
       '/api/chats/${Uri.encodeComponent(chatId)}/clear',
@@ -290,3 +341,5 @@ class ApiClient {
     );
   }
 }
+
+const Object _unchanged = Object();

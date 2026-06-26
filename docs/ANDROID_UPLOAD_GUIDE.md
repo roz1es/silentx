@@ -123,7 +123,7 @@ compare: mobile/android-app
 Что сделано:
 - добавлена структура мобильного приложения;
 - подключён экран входа;
-- начата интеграция с API https://silentx.ru;
+- начата интеграция с API https://api.brenkschat.ru;
 - добавлены основные зависимости.
 
 Проверка:
@@ -149,4 +149,3 @@ git add mobile
 git commit -m "Update Android app"
 git push
 ```
-

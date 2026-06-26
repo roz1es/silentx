@@ -21,6 +21,7 @@ class BrenksSocket {
     required void Function(String chatId) onChatDeleted,
     required void Function(String chatId) onMessagesCleared,
     required void Function(List<String> userIds) onPresence,
+    required void Function(String message) onSocketError,
     required void Function({
       required String chatId,
       required String userId,
@@ -40,7 +41,13 @@ class BrenksSocket {
 
     socket.onConnect((_) => onConnectionChanged(true));
     socket.onDisconnect((_) => onConnectionChanged(false));
-    socket.onConnectError((_) => onConnectionChanged(false));
+    socket.onConnectError((error) {
+      onConnectionChanged(false);
+      final message = error?.toString() ?? '';
+      if (message.contains('UNAUTHORIZED')) {
+        onSocketError('Сессия истекла. Войдите в аккаунт заново.');
+      }
+    });
 
     socket.on('message', (payload) {
       if (payload is! Map || payload['message'] is! Map) return;

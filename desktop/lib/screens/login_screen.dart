@@ -132,31 +132,37 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFF252A33),
-              Color(0xFF191C22),
+              const Color(0xFF24262B).withValues(alpha: 0.98),
+              const Color(0xFF181A1F),
+              const Color(0xFF111215),
             ],
           ),
         ),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
+            constraints: const BoxConstraints(maxWidth: 500),
             child: Container(
               margin: const EdgeInsets.all(28),
-              padding: const EdgeInsets.all(28),
+              padding: const EdgeInsets.all(26),
               decoration: BoxDecoration(
-                color: panel.withValues(alpha: 0.92),
-                borderRadius: BorderRadius.circular(32),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                color: panel.withValues(alpha: 0.86),
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.32),
-                    blurRadius: 42,
-                    offset: const Offset(0, 24),
+                    color: Colors.black.withValues(alpha: 0.28),
+                    blurRadius: 40,
+                    offset: const Offset(0, 22),
+                  ),
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.035),
+                    blurRadius: 0,
+                    offset: const Offset(0, 1),
                   ),
                 ],
               ),
@@ -170,9 +176,19 @@ class _LoginScreenState extends State<LoginScreen> {
                         width: 56,
                         height: 56,
                         decoration: BoxDecoration(
-                          color: panelSoft,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: border),
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFFFFF4D2),
+                              Color(0xFFD5B462),
+                              Color(0xFF35302A),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Color(0x80FFE6A8),
+                          ),
                         ),
                         child: const Center(
                           child: Text(
@@ -191,13 +207,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           Text(
                             'БренксЧат',
                             style: TextStyle(
-                              fontSize: 28,
+                              fontSize: 27,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
                           SizedBox(height: 2),
                           Text(
-                            'Desktop client',
+                            'Вход в аккаунт',
                             style: TextStyle(color: muted),
                           ),
                         ],

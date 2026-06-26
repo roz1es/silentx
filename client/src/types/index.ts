@@ -77,6 +77,8 @@ export interface Chat {
   pinnedMessageId?: string | null;
   /** Канал: id владельца (единственный, кто пишет) */
   channelOwnerId?: string;
+  /** Канал подтвержден администрацией */
+  verified?: boolean;
   /** Локально для пользователя */
   muted?: boolean;
   pinnedToTop?: boolean;

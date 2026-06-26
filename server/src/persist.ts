@@ -45,6 +45,22 @@ async function withMysql<T>(fn: (conn: mysql.Connection) => Promise<T>): Promise
   }
 }
 
+async function ensureColumn(
+  conn: mysql.Connection,
+  table: string,
+  column: string,
+  definition: string
+): Promise<void> {
+  const [rows] = await conn.execute<mysql.RowDataPacket[]>(
+    `SHOW COLUMNS FROM \`${table}\` LIKE ?`,
+    [column]
+  );
+  if (rows.length > 0) return;
+  await conn.execute(
+    `ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`
+  );
+}
+
 async function ensureMysqlSchema(conn: mysql.Connection): Promise<void> {
   await conn.execute(`
     CREATE TABLE IF NOT EXISTS app_state (
@@ -82,9 +98,16 @@ async function ensureMysqlSchema(conn: mysql.Connection): Promise<void> {
       last_read_at JSON NULL,
       pinned_message_id VARCHAR(96) NULL,
       channel_owner_id VARCHAR(96) NULL,
+      verified TINYINT(1) NOT NULL DEFAULT 0,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `);
+  await ensureColumn(
+    conn,
+    'chats',
+    'verified',
+    'TINYINT(1) NOT NULL DEFAULT 0'
+  );
   await conn.execute(`
     CREATE TABLE IF NOT EXISTS chat_participants (
       chat_id VARCHAR(96) NOT NULL,
@@ -287,6 +310,7 @@ async function readStateFromNormalizedMysql(): Promise<PersistedStateV1 | null> 
           row.pinned_message_id == null ? undefined : String(row.pinned_message_id),
         channelOwnerId:
           row.channel_owner_id == null ? undefined : String(row.channel_owner_id),
+        verified: !!row.verified,
       })),
       messagesByChat: [...messagesByChatMap.entries()],
       muted: groupPairs(mutedRows),
@@ -360,9 +384,9 @@ async function flushToMysql(): Promise<void> {
           `
             INSERT INTO chats (
               id, type, name, avatar_url, last_message, unread,
-              last_read_at, pinned_message_id, channel_owner_id
+              last_read_at, pinned_message_id, channel_owner_id, verified
             )
-            VALUES (?, ?, ?, ?, CAST(? AS JSON), CAST(? AS JSON), CAST(? AS JSON), ?, ?)
+            VALUES (?, ?, ?, ?, CAST(? AS JSON), CAST(? AS JSON), CAST(? AS JSON), ?, ?, ?)
           `,
           [
             chat.id,
@@ -374,6 +398,7 @@ async function flushToMysql(): Promise<void> {
             JSON.stringify(chat.lastReadAt ?? null),
             chat.pinnedMessageId ?? null,
             chat.channelOwnerId ?? null,
+            chat.verified ? 1 : 0,
           ]
         );
         for (const [position, userId] of chat.participantIds.entries()) {

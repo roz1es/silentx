@@ -24,7 +24,7 @@ class AudioMessageService {
       : _recorder = AudioRecorder(),
         _player = AudioPlayer();
 
-  final AudioRecorder _recorder;
+  AudioRecorder _recorder;
   final AudioPlayer _player;
   DateTime? _startedAt;
   String? _recordingPath;
@@ -34,6 +34,9 @@ class AudioMessageService {
   Future<bool> hasRecordingPermission() => _recorder.hasPermission();
 
   Future<void> startRecording() async {
+    if (await _recorder.isRecording().catchError((_) => false)) {
+      await cancelRecording();
+    }
     final allowed = await _recorder.hasPermission();
     if (!allowed) {
       throw Exception('Нет доступа к микрофону.');
@@ -56,9 +59,10 @@ class AudioMessageService {
 
   Future<VoiceRecording?> stopRecording() async {
     final started = _startedAt;
-    final path = await _recorder.stop();
-    _startedAt = null;
-    _recordingPath = null;
+    final path = await _recorder.stop().whenComplete(() {
+      _startedAt = null;
+      _recordingPath = null;
+    });
     if (path == null) return null;
 
     final file = io.File(path);
@@ -82,13 +86,14 @@ class AudioMessageService {
   }
 
   Future<void> cancelRecording() async {
-    await _recorder.stop().catchError((_) => null);
+    await _recorder.cancel().catchError((_) => null);
     final path = _recordingPath;
     _recordingPath = null;
     _startedAt = null;
     if (path != null) {
       unawaited(io.File(path).delete().catchError((_) => io.File(path)));
     }
+    await _resetRecorder();
   }
 
   Future<void> playDataUrl(String dataUrl) async {
@@ -103,6 +108,11 @@ class AudioMessageService {
   Future<void> dispose() async {
     await _recorder.dispose();
     await _player.dispose();
+  }
+
+  Future<void> _resetRecorder() async {
+    await _recorder.dispose().catchError((_) {});
+    _recorder = AudioRecorder();
   }
 }
 

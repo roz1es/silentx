@@ -1,7 +1,11 @@
 import type { Chat, Message, User } from '@/types';
 
-/** Base URL для API. Если задан в env — используем его, иначе относительный путь (для прокси) */
-const API_BASE = import.meta.env.VITE_API_URL || '';
+/** Base URL для API. Если задан в env — используем отдельный API-домен, иначе относительный путь. */
+const API_BASE = (
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_API_BASE ||
+  ''
+).replace(/\/$/, '');
 const REQUEST_TIMEOUT_MS = 20000;
 
 async function request<T>(
@@ -301,6 +305,16 @@ export async function setAdminUserBlocked(
   return request(`/api/admin/users/${encodeURIComponent(userId)}/block`, {
     method: 'POST',
     body: JSON.stringify({ banned }),
+  });
+}
+
+export async function setChatVerified(
+  chatId: string,
+  verified: boolean
+): Promise<{ chat: Chat }> {
+  return request(`/api/admin/chats/${encodeURIComponent(chatId)}/verified`, {
+    method: 'POST',
+    body: JSON.stringify({ verified }),
   });
 }
 

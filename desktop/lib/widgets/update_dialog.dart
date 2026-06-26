@@ -117,7 +117,11 @@ class _UpdateDialogState extends State<_UpdateDialog> {
                   width: double.infinity,
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [Color(0xFFE9EDF8), Color(0xFF8991A3)],
+                      colors: [
+                        Color(0xFFFFF4D2),
+                        Color(0xFFD5B462),
+                        Color(0xFF2B2116),
+                      ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -142,7 +146,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
                         child: Text(
                           'БренксЧат',
                           style: TextStyle(
-                            color: Color(0xFF111827),
+                            color: Color(0xFF12100D),
                             fontWeight: FontWeight.w900,
                             fontSize: 28,
                           ),

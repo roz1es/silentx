@@ -68,6 +68,7 @@ type MessengerContextValue = {
   deleteChat: (chatId: string) => Promise<void>;
   setMuted: (chatId: string, muted: boolean) => Promise<void>;
   setPinnedTop: (chatId: string, pinned: boolean) => Promise<void>;
+  setChatVerified: (chatId: string, verified: boolean) => Promise<void>;
   pinMessage: (messageId: string | null) => Promise<void>;
   clearChat: (chatId: string) => Promise<void>;
   getSocket: () => Socket | null;
@@ -403,8 +404,11 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
   }, [decryptLoadedMessages]);
 
   useEffect(() => {
-    /** Base URL для API. Если задан в env — используем его, иначе относительный путь */
-    const socketBaseUrl = import.meta.env.VITE_API_URL || undefined;
+    /** Base URL для Socket.IO. Если задан в env — используем отдельный API-домен. */
+    const socketBaseUrl =
+      import.meta.env.VITE_API_URL ||
+      import.meta.env.VITE_API_BASE ||
+      undefined;
 
     const socket = io(socketBaseUrl, {
       path: '/socket.io',
@@ -884,6 +888,25 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
+  const setChatVerified = useCallback(
+    async (chatId: string, verified: boolean) => {
+      const { chat } = await api.setChatVerified(chatId, verified);
+      setChats((prev) => {
+        const idx = prev.findIndex((c) => c.id === chat.id);
+        if (idx === -1) return [...prev, chat];
+        const next = [...prev];
+        const cur = next[idx];
+        next[idx] = {
+          ...cur,
+          ...chat,
+          participants: chat.participants ?? cur.participants,
+        };
+        return next;
+      });
+    },
+    []
+  );
+
   const pinMessage = useCallback(
     async (messageId: string | null) => {
       if (!activeChatId) return;
@@ -970,6 +993,7 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
       deleteChat,
       setMuted,
       setPinnedTop,
+      setChatVerified,
       pinMessage,
       clearChat,
       getSocket,
@@ -1009,6 +1033,7 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
       deleteChat,
       setMuted,
       setPinnedTop,
+      setChatVerified,
       pinMessage,
       clearChat,
       getSocket,

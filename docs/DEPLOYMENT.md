@@ -94,7 +94,7 @@ RUN_TESTS=1 \
 ```bash
 systemctl status brenkschat --no-pager
 journalctl -u brenkschat -n 80 --no-pager
-curl -I https://silentx.ru
+curl -I https://brenkschat.ru
 ```
 
 Если сайт открылся и сервис активен, деплой прошёл успешно.

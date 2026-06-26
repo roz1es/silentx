@@ -4,6 +4,7 @@ import type { Chat } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMessenger } from '@/contexts/MessengerContext';
 import {
+  IconCheck,
   IconChevronRight,
   IconDrawingPin,
   IconMegaphone,
@@ -123,6 +124,17 @@ const CHAT_FILTERS: Array<{ id: ChatFilter; label: string }> = [
   { id: 'channel', label: 'Каналы' },
 ];
 
+function VerifiedBadge() {
+  return (
+    <span
+      className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-amber-200/60 bg-amber-300/90 text-zinc-950 shadow-[0_0_12px_rgba(251,191,36,0.2)]"
+      title="Подтвержденный канал"
+    >
+      <IconCheck className="h-2.5 w-2.5" />
+    </span>
+  );
+}
+
 export function ChatList({ onOpenNewChat }: Props) {
   const { user } = useAuth();
   if (!user) return null;
@@ -138,6 +150,7 @@ export function ChatList({ onOpenNewChat }: Props) {
     clearChat,
     setMuted,
     setPinnedTop,
+    setChatVerified,
     refreshChats,
   } = useMessenger();
 
@@ -206,6 +219,12 @@ export function ChatList({ onOpenNewChat }: Props) {
   const handleTogglePin = async () => {
     if (!contextMenu) return;
     await setPinnedTop(contextMenu.chat.id, !contextMenu.chat.pinnedToTop);
+    setContextMenu(null);
+  };
+
+  const handleToggleVerified = async () => {
+    if (!contextMenu) return;
+    await setChatVerified(contextMenu.chat.id, !contextMenu.chat.verified);
     setContextMenu(null);
   };
 
@@ -429,6 +448,9 @@ export function ChatList({ onOpenNewChat }: Props) {
                       </span>
                     ) : null}
                     <span className="truncate">{label(c, user.id)}</span>
+                    {c.type === 'channel' && c.verified ? (
+                      <VerifiedBadge />
+                    ) : null}
                   </span>
                   {last ? (
                     <span className="shrink-0 text-[10px] text-tg-muted sm:text-[11px]">
@@ -480,6 +502,16 @@ export function ChatList({ onOpenNewChat }: Props) {
             <IconMute className="h-4 w-4 shrink-0 opacity-70" />
             {contextMenu.chat.muted ? 'Включить уведомления' : 'Без звука'}
           </button>
+          {user.isAdmin && contextMenu.chat.type === 'channel' ? (
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-tg-hover"
+              onClick={handleToggleVerified}
+            >
+              <IconCheck className="h-4 w-4 shrink-0 opacity-70" />
+              {contextMenu.chat.verified ? 'Снять галочку' : 'Выдать галочку'}
+            </button>
+          ) : null}
           <button
             type="button"
             className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-tg-hover"

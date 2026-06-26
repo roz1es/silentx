@@ -19,7 +19,7 @@
 
 ```powershell
 cd "...\messengercursor\desktop\installer\windows"
-.\build-installer.ps1 -ApiUrl "https://silentx.ru"
+.\build-installer.ps1 -ApiUrl "https://api.brenkschat.ru"
 ```
 
 Готовые файлы будут здесь:
@@ -55,19 +55,19 @@ latest.json
 Они должны лежать по адресу:
 
 ```text
-https://silentx.ru/desktop/windows/
+https://brenkschat.ru/desktop/windows/
 ```
 
 Тогда другу можно дать ссылку:
 
 ```text
-https://silentx.ru/desktop/windows/BrenksChatSetup-0.1.0.exe
+https://brenkschat.ru/desktop/windows/BrenksChatSetup-0.1.0.exe
 ```
 
 После установки приложение будет само проверять:
 
 ```text
-https://silentx.ru/desktop/windows/latest.json
+https://brenkschat.ru/desktop/windows/latest.json
 ```
 
 Если там появится версия новее, БренксЧат покажет окно обновления и скачает новый установщик.
@@ -85,7 +85,7 @@ https://silentx.ru/desktop/windows/latest.json
 Автообновление использует manifest:
 
 ```text
-https://silentx.ru/desktop/windows/latest.json
+https://brenkschat.ru/desktop/windows/latest.json
 ```
 
 Пример лежит в `latest.example.json`. Скрипт `build-installer.ps1` создаёт актуальный `latest.json` автоматически.
@@ -98,7 +98,7 @@ https://silentx.ru/desktop/windows/latest.json
    ```
 2. Соберите новый установщик:
    ```powershell
-   .\build-installer.ps1 -ApiUrl "https://silentx.ru"
+   .\build-installer.ps1 -ApiUrl "https://api.brenkschat.ru"
    ```
 3. Загрузите новый `BrenksChatSetup-0.1.1.exe` и новый `latest.json` на сервер в `/desktop/windows/`.
 4. Пользователи увидят обновление при следующем запуске приложения.

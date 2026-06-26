@@ -3,7 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
-import '../theme/app_theme.dart';
+import 'brenks_cached_image.dart';
 
 class BrenksAvatar extends StatelessWidget {
   const BrenksAvatar({
@@ -30,13 +30,27 @@ class BrenksAvatar extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: accent.withValues(alpha: 0.9),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFFE0C783).withValues(alpha: 0.82),
+            const Color(0xFF4A4030).withValues(alpha: 0.84),
+            const Color(0xFF24272D).withValues(alpha: 0.9),
+          ],
+        ),
+        border:
+            Border.all(color: const Color(0xFFFFE6A8).withValues(alpha: 0.22)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.16),
+            color: Colors.black.withValues(alpha: 0.26),
             blurRadius: 18,
             offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: const Color(0xFFFFE6A8).withValues(alpha: 0.1),
+            blurRadius: 0,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
@@ -51,13 +65,13 @@ class BrenksAvatar extends StatelessWidget {
             )
           : url == null || url.isEmpty
               ? _AvatarFallback(first: first, size: size)
-              : Image.network(
-                  url,
+              : BrenksCachedNetworkImage(
+                  url: url,
+                  width: size,
+                  height: size,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _AvatarFallback(
-                    first: first,
-                    size: size,
-                  ),
+                  placeholder: _AvatarFallback(first: first, size: size),
+                  errorWidget: _AvatarFallback(first: first, size: size),
                 ),
     );
   }

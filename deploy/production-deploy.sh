@@ -85,5 +85,5 @@ if [[ "$SKIP_NGINX_RELOAD" != "1" ]]; then
 fi
 
 log "Deploy completed"
-printf 'Site: https://silentx.ru\n'
+printf 'Site: https://brenkschat.ru\n'
 

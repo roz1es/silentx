@@ -71,7 +71,7 @@ startPeriodicPersistence();
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY?.trim() ?? '';
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY?.trim() ?? '';
 const VAPID_SUBJECT =
-  process.env.VAPID_SUBJECT?.trim() || 'mailto:no-reply@silentx.ru';
+  process.env.VAPID_SUBJECT?.trim() || 'mailto:no-reply@brenkschat.ru';
 
 if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
   setupWebPush(VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT);
@@ -136,7 +136,7 @@ app.set('trust proxy', 1);
 const allowedOrigins = new Set(
   (
     process.env.CLIENT_ORIGINS ??
-    'https://silentx.ru,https://www.silentx.ru,http://localhost:5173,http://127.0.0.1:5173'
+    'https://brenkschat.ru,https://www.brenkschat.ru,https://api.brenkschat.ru,http://localhost:5173,http://127.0.0.1:5173'
   )
     .split(',')
     .map((origin) => origin.trim())
@@ -387,6 +387,21 @@ app.post('/api/admin/users/:userId/block', requireAuth, requireAdmin, async (req
     io.in(`user:${targetId}`).disconnectSockets(true);
   }
   res.json({ user: publicUser(updated) });
+});
+
+app.post('/api/admin/chats/:chatId/verified', requireAuth, requireAdmin, (req, res) => {
+  const chatId = req.params.chatId;
+  const verified = Boolean((req.body as { verified?: boolean })?.verified);
+  const updated = store.setChatVerified(chatId, verified);
+  if (!updated) {
+    return res.status(404).json({ error: 'Канал не найден' });
+  }
+  updated.participantIds.forEach((pid) => {
+    io.to(`user:${pid}`).emit('chat_updated', {
+      chat: store.serializeChatForViewer(updated, pid),
+    });
+  });
+  res.json({ chat: store.serializeChatForViewer(updated, req.userId!) });
 });
 
 app.patch('/api/me', requireAuth, (req, res) => {
@@ -711,7 +726,18 @@ app.get('/api/chats/:chatId/messages', requireAuth, (req, res) => {
   if (!chat?.participantIds.includes(userId)) {
     return res.status(404).json({ error: 'Чат не найден' });
   }
-  res.json({ messages: store.getMessages(chatId) });
+  const limitRaw = Number(req.query.limit);
+  const beforeRaw = Number(req.query.before);
+  const limit = Number.isFinite(limitRaw)
+    ? Math.max(1, Math.min(Math.trunc(limitRaw), 120))
+    : 80;
+  const before = Number.isFinite(beforeRaw) ? beforeRaw : undefined;
+  const allMessages = store.getMessages(chatId);
+  const visibleMessages =
+    before == null
+      ? allMessages
+      : allMessages.filter((message) => message.createdAt < before);
+  res.json({ messages: visibleMessages.slice(-limit) });
 });
 
 app.post('/api/e2ee/devices', requireAuth, async (req, res) => {

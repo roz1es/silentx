@@ -13,9 +13,9 @@ AppId={{A87210F1-273E-4C21-90BE-979CFB0E7931}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher={#AppPublisher}
-AppPublisherURL=https://silentx.ru
-AppSupportURL=https://silentx.ru
-AppUpdatesURL=https://silentx.ru/desktop/windows/latest.json
+AppPublisherURL=https://brenkschat.ru
+AppSupportURL=https://brenkschat.ru
+AppUpdatesURL=https://brenkschat.ru/desktop/windows/latest.json
 DefaultDirName={localappdata}\Programs\BrenksChat
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
@@ -67,7 +67,7 @@ begin
   WizardForm.WelcomeLabel1.Caption := 'BrenksChat';
   WizardForm.WelcomeLabel2.Caption :=
     'Desktop messenger installer.' + #13#10 +
-    'The app connects to silentx.ru and works as a native desktop client.';
+    'The app connects to api.brenkschat.ru and works as a native desktop client.';
   WizardForm.FinishedHeadingLabel.Caption := 'BrenksChat installed';
   WizardForm.FinishedLabel.Caption :=
     'You can launch the app and sign in to your account.';

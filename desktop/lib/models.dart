@@ -46,6 +46,18 @@ class User {
       isAdmin: json['isAdmin'] == true,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'username': username,
+      if (displayName != null) 'displayName': displayName,
+      if (avatarUrl != null) 'avatarUrl': avatarUrl,
+      if (email != null) 'email': email,
+      'emailVerified': emailVerified,
+      'isAdmin': isAdmin,
+    };
+  }
 }
 
 class ChatParticipant {
@@ -74,6 +86,15 @@ class ChatParticipant {
       avatarUrl: json['avatarUrl']?.toString(),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'username': username,
+      if (displayName != null) 'displayName': displayName,
+      if (avatarUrl != null) 'avatarUrl': avatarUrl,
+    };
+  }
 }
 
 class Chat {
@@ -90,6 +111,7 @@ class Chat {
     this.pinnedMessageId,
     this.muted = false,
     this.pinnedToTop = false,
+    this.verified = false,
   });
 
   final String id;
@@ -104,6 +126,7 @@ class Chat {
   final String? pinnedMessageId;
   final bool muted;
   final bool pinnedToTop;
+  final bool verified;
 
   String get title {
     final custom = displayName?.trim();
@@ -161,7 +184,26 @@ class Chat {
       pinnedMessageId: json['pinnedMessageId']?.toString(),
       muted: json['muted'] == true,
       pinnedToTop: json['pinnedToTop'] == true,
+      verified: json['verified'] == true,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'type': type.name,
+      'name': name,
+      if (displayName != null) 'displayName': displayName,
+      if (avatarUrl != null) 'avatarUrl': avatarUrl,
+      'participantIds': participantIds,
+      'participants': participants.map((item) => item.toJson()).toList(),
+      if (lastMessage != null) 'lastMessage': lastMessage!.toJson(),
+      'unread': unread,
+      if (pinnedMessageId != null) 'pinnedMessageId': pinnedMessageId,
+      'muted': muted,
+      'pinnedToTop': pinnedToTop,
+      'verified': verified,
+    };
   }
 }
 
@@ -210,6 +252,14 @@ class LastMessage {
       time: _intFromJson(json['time']),
       senderId: json['senderId']?.toString() ?? '',
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'text': text,
+      'time': time,
+      'senderId': senderId,
+    };
   }
 }
 
@@ -298,6 +348,23 @@ class Message {
       replyToMessageId: json['replyToMessageId']?.toString(),
       reactions: _reactionsFromJson(json['reactions']),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'chatId': chatId,
+      'senderId': senderId,
+      'text': text,
+      'createdAt': createdAt,
+      if (encryptedText) 'encryptedText': true,
+      if (imageUrl != null) 'imageUrl': imageUrl,
+      if (media != null) 'media': media!.toJson(),
+      if (deleted) 'deleted': deleted,
+      if (editedAt != null) 'editedAt': editedAt,
+      if (replyToMessageId != null) 'replyToMessageId': replyToMessageId,
+      if (reactions.isNotEmpty) 'reactions': reactions,
+    };
   }
 }
 

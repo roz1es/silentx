@@ -1,7 +1,7 @@
 param(
-  [string]$ApiUrl = "https://silentx.ru",
-  [string]$UpdateUrl = "https://silentx.ru/desktop/windows/latest.json",
-  [string]$DownloadBaseUrl = "https://silentx.ru/desktop/windows",
+  [string]$ApiUrl = "https://api.brenkschat.ru",
+  [string]$UpdateUrl = "https://brenkschat.ru/desktop/windows/latest.json",
+  [string]$DownloadBaseUrl = "https://brenkschat.ru/desktop/windows",
   [string]$Configuration = "Release"
 )
 

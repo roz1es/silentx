@@ -717,6 +717,16 @@ export function updateChatProfile(
   return chat;
 }
 
+export function setChatVerified(
+  chatId: string,
+  verified: boolean
+): Chat | undefined {
+  const chat = chats.get(chatId);
+  if (!chat || chat.type !== 'channel') return undefined;
+  chat.verified = verified;
+  return chat;
+}
+
 export function addChatMembers(
   chatId: string,
   requesterId: string,

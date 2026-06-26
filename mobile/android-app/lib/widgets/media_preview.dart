@@ -16,11 +16,18 @@ class MediaPreview extends StatelessWidget {
     required this.media,
     required this.serverUrl,
     required this.onPlayVoice,
+    this.timeLabel,
+    this.read = false,
+    this.own = false,
   });
 
   final MessageMedia media;
   final String serverUrl;
   final ValueChanged<MessageMedia> onPlayVoice;
+  // Для видеокружка — наложить время/галочки прямо на круг.
+  final String? timeLabel;
+  final bool read;
+  final bool own;
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +37,12 @@ class MediaPreview extends StatelessWidget {
       case 'voice':
         return VoicePreview(media: media, onPlay: () => onPlayVoice(media));
       case 'video_note':
-        return _VideoNotePreview(media: media);
+        return _VideoNotePreview(
+          media: media,
+          timeLabel: timeLabel,
+          read: read,
+          own: own,
+        );
       default:
         return _FilePreview(media: media);
     }
@@ -87,43 +99,39 @@ class VoicePreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 250,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF242A33),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: border),
-      ),
+    final bytes = bytesFromDataUrl(media.dataUrl);
+    final size = _formatSize(bytes?.length ?? 0);
+    final dur = formatDuration(media.durationMs ?? 0);
+    final meta = size.isEmpty ? dur : '$dur, $size';
+    return SizedBox(
+      width: 232,
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          IconButton.filled(
-            tooltip: 'Воспроизвести',
-            onPressed: onPlay,
-            icon: const Icon(Icons.play_arrow_rounded),
-            style: IconButton.styleFrom(
-              backgroundColor: accent,
-              foregroundColor: const Color(0xFF08131A),
+          GestureDetector(
+            onTap: onPlay,
+            child: Container(
+              width: 42,
+              height: 42,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: accent,
+              ),
+              child: const Icon(Icons.play_arrow_rounded,
+                  color: Color(0xFF08131A), size: 26),
             ),
           ),
-          const SizedBox(width: 10),
-          const Expanded(
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  'Голосовое',
-                  style: TextStyle(fontWeight: FontWeight.w800, color: text),
-                ),
-                SizedBox(height: 6),
-                _VoiceWave(),
+                const _VoiceWave(),
+                const SizedBox(height: 6),
+                Text(meta, style: const TextStyle(color: muted, fontSize: 11.5)),
               ],
             ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            formatDuration(media.durationMs ?? 0),
-            style: const TextStyle(color: muted, fontSize: 12),
           ),
         ],
       ),
@@ -131,27 +139,58 @@ class VoicePreview extends StatelessWidget {
   }
 }
 
+String _formatSize(int bytes) {
+  if (bytes <= 0) return '';
+  final kb = bytes / 1024;
+  if (kb < 1024) return '${kb.toStringAsFixed(1)} KB';
+  return '${(kb / 1024).toStringAsFixed(1)} MB';
+}
+
 class _VoiceWave extends StatelessWidget {
   const _VoiceWave();
 
+  // Статичная «волна» из палочек разной высоты.
+  static const _bars = <double>[
+    5, 9, 14, 8, 12, 18, 13, 7, 11, 17, 10, 6, //
+    13, 8, 15, 10, 7, 12, 18, 9, 11, 7, 14, 9,
+  ];
+
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(999),
-      child: LinearProgressIndicator(
-        minHeight: 5,
-        value: 0.44,
-        backgroundColor: Colors.white.withValues(alpha: 0.08),
-        valueColor: AlwaysStoppedAnimation<Color>(accent.withValues(alpha: 0.9)),
+    return SizedBox(
+      height: 22,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          for (final h in _bars)
+            Container(
+              width: 2.5,
+              height: h,
+              margin: const EdgeInsets.symmetric(horizontal: 1),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.85),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+        ],
       ),
     );
   }
 }
 
 class _VideoNotePreview extends StatefulWidget {
-  const _VideoNotePreview({required this.media});
+  const _VideoNotePreview({
+    required this.media,
+    this.timeLabel,
+    this.read = false,
+    this.own = false,
+  });
 
   final MessageMedia media;
+  final String? timeLabel;
+  final bool read;
+  final bool own;
 
   @override
   State<_VideoNotePreview> createState() => _VideoNotePreviewState();
@@ -160,6 +199,7 @@ class _VideoNotePreview extends StatefulWidget {
 class _VideoNotePreviewState extends State<_VideoNotePreview> {
   VideoPlayerController? _ctrl;
   bool _playing = false;
+  bool _muted = true;
 
   @override
   void initState() {
@@ -172,16 +212,19 @@ class _VideoNotePreviewState extends State<_VideoNotePreview> {
     if (bytes == null || bytes.isEmpty) return;
     try {
       final dir = await getTemporaryDirectory();
-      final path = '${dir.path}/vnote_${widget.media.dataUrl.hashCode.abs()}.mp4';
+      final path =
+          '${dir.path}/vnote_${widget.media.dataUrl.hashCode.abs()}.mp4';
       await io.File(path).writeAsBytes(bytes);
       final ctrl = VideoPlayerController.file(io.File(path));
       await ctrl.initialize();
+      await ctrl.setVolume(0); // по умолчанию без звука (как в Telegram)
+      await ctrl.setLooping(true);
       ctrl.addListener(() {
         if (mounted) setState(() => _playing = ctrl.value.isPlaying);
       });
       if (mounted) setState(() => _ctrl = ctrl);
     } on Object {
-      // Failed to init player — fallback to placeholder
+      // Не удалось инициализировать — останется иконка-плейсхолдер.
     }
   }
 
@@ -198,6 +241,12 @@ class _VideoNotePreviewState extends State<_VideoNotePreview> {
     }
   }
 
+  void _toggleMute() {
+    final ctrl = _ctrl;
+    setState(() => _muted = !_muted);
+    ctrl?.setVolume(_muted ? 0 : 1);
+  }
+
   @override
   void dispose() {
     _ctrl?.dispose();
@@ -209,76 +258,154 @@ class _VideoNotePreviewState extends State<_VideoNotePreview> {
     final isLight = Theme.of(context).brightness == Brightness.light;
     final ctrl = _ctrl;
     final ready = ctrl != null && ctrl.value.isInitialized;
+    const size = 192.0;
+    final dur = widget.media.durationMs ?? 0;
 
     return GestureDetector(
       onTap: _togglePlay,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 148,
-            height: 148,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isLight ? const Color(0xFFD0EAFE) : panelStrong,
-              border: Border.all(color: accent.withValues(alpha: 0.5), width: 3),
-            ),
-            child: ClipOval(
-              child: !ready
-                  ? Center(
-                      child: CircularProgressIndicator(
-                        color: accent,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        FittedBox(
-                          fit: BoxFit.cover,
-                          child: SizedBox(
-                            width: ctrl.value.size.width,
-                            height: ctrl.value.size.height,
-                            child: VideoPlayer(ctrl),
-                          ),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: Stack(
+          children: [
+            // Круг: видео либо иконка-плейсхолдер видеокружка.
+            Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isLight ? const Color(0xFFD0EAFE) : panelStrong,
+                border:
+                    Border.all(color: accent.withValues(alpha: 0.5), width: 3),
+              ),
+              child: ClipOval(
+                child: ready
+                    ? FittedBox(
+                        fit: BoxFit.cover,
+                        child: SizedBox(
+                          width: ctrl.value.size.width,
+                          height: ctrl.value.size.height,
+                          child: VideoPlayer(ctrl),
                         ),
-                        if (!_playing)
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.48),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.play_arrow_rounded,
-                              color: Colors.white,
-                              size: 30,
-                            ),
-                          ),
-                      ],
-                    ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Видеокружок',
-            style: TextStyle(
-              fontWeight: FontWeight.w900,
-              color: isLight ? const Color(0xFF17202B) : text,
-              fontSize: 13,
-            ),
-          ),
-          if ((widget.media.durationMs ?? 0) > 0)
-            Text(
-              formatDuration(widget.media.durationMs ?? 0),
-              style: TextStyle(
-                color: isLight ? const Color(0xFF637083) : muted,
-                fontSize: 12,
+                      )
+                    : Center(
+                        child: Icon(
+                          Icons.videocam_rounded,
+                          size: 46,
+                          color: isLight
+                              ? const Color(0xFF4E5B6B)
+                              : Colors.white.withValues(alpha: 0.85),
+                        ),
+                      ),
               ),
             ),
-        ],
+            // Кнопка play по центру, когда не воспроизводится.
+            if (ready && !_playing)
+              const Positioned.fill(
+                child: Center(
+                  child: _CircleIcon(icon: Icons.play_arrow_rounded, size: 52),
+                ),
+              ),
+            // Значок звука сверху по центру (тап — вкл/выкл).
+            Positioned(
+              top: 8,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: GestureDetector(
+                  onTap: _toggleMute,
+                  child: _CircleIcon(
+                    icon: _muted
+                        ? Icons.volume_off_rounded
+                        : Icons.volume_up_rounded,
+                    size: 30,
+                    iconSize: 16,
+                  ),
+                ),
+              ),
+            ),
+            // Длительность — пилюля снизу слева.
+            if (dur > 0)
+              Positioned(
+                left: 10,
+                bottom: 10,
+                child: _OverlayPill(
+                  child: Text(
+                    formatDuration(dur),
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ),
+              ),
+            // Время + галочки — снизу справа.
+            if (widget.timeLabel != null)
+              Positioned(
+                right: 10,
+                bottom: 10,
+                child: _OverlayPill(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(widget.timeLabel!,
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 12)),
+                      if (widget.own) ...[
+                        const SizedBox(width: 3),
+                        Icon(
+                          widget.read
+                              ? Icons.done_all_rounded
+                              : Icons.done_rounded,
+                          size: 14,
+                          color: widget.read ? softGold : Colors.white,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+/// Тёмный круглый бейдж с иконкой (play / звук) поверх видеокружка.
+class _CircleIcon extends StatelessWidget {
+  const _CircleIcon({required this.icon, required this.size, this.iconSize});
+
+  final IconData icon;
+  final double size;
+  final double? iconSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.45),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icon, color: Colors.white, size: iconSize ?? size * 0.6),
+    );
+  }
+}
+
+/// Полупрозрачная пилюля (длительность / время) поверх видеокружка.
+class _OverlayPill extends StatelessWidget {
+  const _OverlayPill({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: child,
     );
   }
 }

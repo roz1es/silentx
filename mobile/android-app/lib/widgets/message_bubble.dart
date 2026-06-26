@@ -66,6 +66,49 @@ class MessageBubble extends StatelessWidget {
     final msgTextColor = isLight ? lightText : text;
     final timeColor = isLight ? lightMuted : muted;
 
+    // Видеокружок (без текста) — отдельно, без прямоугольного пузыря.
+    final m = message.media;
+    final isCircleNote = !message.deleted &&
+        m != null &&
+        m.kind == 'video_note' &&
+        message.text.trim().isEmpty &&
+        (message.imageUrl?.isEmpty ?? true);
+    if (isCircleNote) {
+      return Align(
+        alignment: own ? Alignment.centerRight : Alignment.centerLeft,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Column(
+            crossAxisAlignment:
+                own ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!own && senderName != null && senderName!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4, left: 4),
+                  child: Text(
+                    senderName!,
+                    style: const TextStyle(
+                      color: accent,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              MediaPreview(
+                media: m,
+                serverUrl: serverUrl,
+                onPlayVoice: onPlayVoice,
+                timeLabel: formatTime(message.createdAt),
+                read: read,
+                own: own,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Align(
         alignment: own ? Alignment.centerRight : Alignment.centerLeft,
         child: Container(

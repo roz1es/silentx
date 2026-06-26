@@ -522,9 +522,11 @@ class _VideoCircleIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Визуальный размер ~22px — как у иконок скрепки/смайла (Icon size 24
+    // рисует глиф с внутренним отступом), чтобы все элементы были в ряд.
     return SizedBox(
-      width: 26,
-      height: 26,
+      width: 22,
+      height: 22,
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -534,7 +536,7 @@ class _VideoCircleIcon extends StatelessWidget {
               border: Border.all(color: color, width: 2),
             ),
           ),
-          Icon(Icons.videocam_rounded, color: color, size: 14),
+          Icon(Icons.videocam_rounded, color: color, size: 12),
         ],
       ),
     );

@@ -125,10 +125,10 @@ class MessageBubble extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: own ? ownBg : otherBg,
                   borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(18),
-                    topRight: const Radius.circular(18),
-                    bottomLeft: Radius.circular(own ? 18 : 6),
-                    bottomRight: Radius.circular(own ? 6 : 18),
+                    topLeft: const Radius.circular(20),
+                    topRight: const Radius.circular(20),
+                    bottomLeft: Radius.circular(own ? 20 : 6),
+                    bottomRight: Radius.circular(own ? 6 : 20),
                   ),
                   border: Border.all(color: own ? ownBorder : otherBorder),
                 ),
@@ -214,10 +214,10 @@ class MessageBubble extends StatelessWidget {
           ImagePreview(source: message.imageUrl!, serverUrl: serverUrl),
         if (body.isNotEmpty) ...[
           if (hasMedia) const SizedBox(height: 8),
-          Text(body, style: TextStyle(color: textColor, fontSize: 15.5)),
+          Text(body, style: TextStyle(color: textColor, fontSize: 16.5)),
         ],
         if (!hasMedia && body.isEmpty)
-          Text('Сообщение', style: TextStyle(color: textColor, fontSize: 15.5)),
+          Text('Сообщение', style: TextStyle(color: textColor, fontSize: 16.5)),
       ],
     );
   }

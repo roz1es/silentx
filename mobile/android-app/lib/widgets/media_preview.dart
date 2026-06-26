@@ -1,4 +1,5 @@
 import 'dart:io' as io;
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -223,17 +224,28 @@ class _VideoNotePreviewState extends State<_VideoNotePreview> {
     }
   }
 
-  Future<void> _togglePlay() async {
-    final ctrl = _ctrl;
-    if (ctrl == null) return;
-    if (ctrl.value.isPlaying) {
-      await ctrl.pause();
-    } else {
-      if (ctrl.value.position >= ctrl.value.duration) {
-        await ctrl.seekTo(Duration.zero);
-      }
-      await ctrl.play();
-    }
+  void _openViewer(BuildContext context) {
+    showGeneralDialog<void>(
+      context: context,
+      barrierColor: Colors.transparent,
+      barrierDismissible: true,
+      barrierLabel: 'note',
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (_, __, ___) => _VideoNoteViewer(
+        media: widget.media,
+        timeLabel: widget.timeLabel,
+      ),
+      transitionBuilder: (ctx, anim, _, child) {
+        final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+        return FadeTransition(
+          opacity: curved,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.85, end: 1).animate(curved),
+            child: child,
+          ),
+        );
+      },
+    );
   }
 
   void _toggleMute() {
@@ -257,7 +269,7 @@ class _VideoNotePreviewState extends State<_VideoNotePreview> {
     final dur = widget.media.durationMs ?? 0;
 
     return GestureDetector(
-      onTap: _togglePlay,
+      onTap: () => _openViewer(context),
       child: SizedBox(
         width: size,
         height: size,
@@ -474,4 +486,182 @@ class ImagePreview extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Увеличенный просмотр видеокружка: большой круг + кольцо-перемотка вокруг.
+class _VideoNoteViewer extends StatefulWidget {
+  const _VideoNoteViewer({required this.media, this.timeLabel});
+
+  final MessageMedia media;
+  final String? timeLabel;
+
+  @override
+  State<_VideoNoteViewer> createState() => _VideoNoteViewerState();
+}
+
+class _VideoNoteViewerState extends State<_VideoNoteViewer> {
+  VideoPlayerController? _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    final bytes = bytesFromDataUrl(widget.media.dataUrl);
+    if (bytes == null || bytes.isEmpty) return;
+    try {
+      final dir = await getTemporaryDirectory();
+      final path =
+          '${dir.path}/vnote_${widget.media.dataUrl.hashCode.abs()}.mp4';
+      await io.File(path).writeAsBytes(bytes);
+      final ctrl = VideoPlayerController.file(io.File(path));
+      await ctrl.initialize();
+      await ctrl.setLooping(true);
+      ctrl.addListener(() {
+        if (mounted) setState(() {});
+      });
+      await ctrl.play();
+      if (mounted) setState(() => _ctrl = ctrl);
+    } on Object {
+      // не удалось — закроется по тапу
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl?.dispose();
+    super.dispose();
+  }
+
+  void _togglePlay() {
+    final c = _ctrl;
+    if (c == null) return;
+    c.value.isPlaying ? c.pause() : c.play();
+  }
+
+  String _fmt(Duration d) {
+    final m = d.inMinutes;
+    final s = d.inSeconds % 60;
+    return '$m:${s.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _ctrl;
+    final ready = c != null && c.value.isInitialized;
+    final dia = (MediaQuery.of(context).size.width * 0.82).clamp(220.0, 360.0);
+    final dur = c?.value.duration ?? Duration.zero;
+    final pos = c?.value.position ?? Duration.zero;
+    final progress = dur.inMilliseconds == 0
+        ? 0.0
+        : (pos.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0);
+
+    return GestureDetector(
+      onTap: () => Navigator.of(context).pop(),
+      child: Material(
+        color: Colors.black.withValues(alpha: 0.86),
+        child: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                GestureDetector(
+                  onTap: _togglePlay,
+                  child: SizedBox(
+                    width: dia,
+                    height: dia,
+                    child: CustomPaint(
+                      painter: _RingPainter(
+                        progress: progress.toDouble(),
+                        color: accent,
+                        bg: Colors.white.withValues(alpha: 0.18),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: ClipOval(
+                          child: ready
+                              ? FittedBox(
+                                  fit: BoxFit.cover,
+                                  child: SizedBox(
+                                    width: c.value.size.width,
+                                    height: c.value.size.height,
+                                    child: VideoPlayer(c),
+                                  ),
+                                )
+                              : Container(
+                                  color: panelStrong,
+                                  child: const Center(
+                                    child: CircularProgressIndicator(
+                                        color: Colors.white, strokeWidth: 2),
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: dia - 8,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(_fmt(pos),
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 13)),
+                      if (widget.timeLabel != null)
+                        Text(widget.timeLabel!,
+                            style: const TextStyle(
+                                color: Colors.white70, fontSize: 13)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Кольцо-прогресс вокруг увеличенного видеокружка.
+class _RingPainter extends CustomPainter {
+  _RingPainter({required this.progress, required this.color, required this.bg});
+
+  final double progress;
+  final Color color;
+  final Color bg;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const stroke = 4.0;
+    final center = size.center(Offset.zero);
+    final radius = size.width / 2 - stroke / 2;
+    final bgPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..color = bg;
+    canvas.drawCircle(center, radius, bgPaint);
+    if (progress > 0) {
+      final fg = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = stroke
+        ..strokeCap = StrokeCap.round
+        ..color = color;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        -math.pi / 2,
+        2 * math.pi * progress,
+        false,
+        fg,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_RingPainter old) =>
+      old.progress != progress || old.color != color || old.bg != bg;
 }

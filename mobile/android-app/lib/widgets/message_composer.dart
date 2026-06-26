@@ -163,7 +163,9 @@ class _MessageComposerState extends State<MessageComposer> {
         AnimatedSize(
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeOutCubic,
-          child: _showEmoji ? _emojiPanel(isLight) : const SizedBox.shrink(),
+          child: _showEmoji && !widget.recordingVoice
+              ? _emojiPanel(isLight)
+              : const SizedBox.shrink(),
         ),
       ],
     );

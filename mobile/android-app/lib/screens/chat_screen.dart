@@ -187,6 +187,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _startVoice() async {
     if (_recordingVoice) return;
+    FocusScope.of(context).unfocus();
     try {
       await _audioService.startRecording();
       setState(() {

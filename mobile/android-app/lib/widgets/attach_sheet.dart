@@ -107,7 +107,7 @@ class _AttachSheetState extends State<AttachSheet> {
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  'Недавние',
+                  'Галерея',
                   style: TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 16,

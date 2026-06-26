@@ -121,9 +121,11 @@ class _MessageComposerState extends State<MessageComposer> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (widget.recordingVoice) _recordingBanner(isLight),
                 if (modeMessage != null) _modeBanner(modeMessage, isLight),
-                Row(
+                if (widget.recordingVoice)
+                  _voiceBar(isLight)
+                else
+                  Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     // Левый кружок — вложение
@@ -352,28 +354,86 @@ class _MessageComposerState extends State<MessageComposer> {
     );
   }
 
-  Widget _recordingBanner(bool isLight) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: danger.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: danger.withValues(alpha: 0.28)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.fiber_manual_record_rounded, color: danger, size: 16),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Запись голосового... ${formatDuration(widget.recordingMs)}',
-              style: const TextStyle(fontWeight: FontWeight.w800),
+  /// Панель записи голосового: строка ввода превращается в таймер + «Отмена» +
+  /// кнопку отправки (как при записи видеокружка).
+  Widget _voiceBar(bool isLight) {
+    final pillBg = isLight ? const Color(0xFFEDEFF3) : panelSoft;
+    final timeColor = isLight ? lightText : text;
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 52,
+            padding: const EdgeInsets.fromLTRB(16, 0, 6, 0),
+            decoration: BoxDecoration(
+              color: pillBg,
+              borderRadius: BorderRadius.circular(26),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 9,
+                  height: 9,
+                  decoration: const BoxDecoration(
+                    color: danger,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  _fmtVoice(widget.recordingMs),
+                  style: TextStyle(
+                    color: timeColor,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Spacer(),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: widget.onCancelVoice,
+                  child: const Padding(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    child: Text(
+                      'Отмена',
+                      style: TextStyle(
+                        color: danger,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 10),
+        Material(
+          color: accent,
+          shape: const CircleBorder(),
+          elevation: isLight ? 2 : 1,
+          shadowColor: Colors.black.withValues(alpha: 0.25),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: widget.onFinishVoice,
+            child: const SizedBox(
+              width: 52,
+              height: 52,
+              child: Icon(Icons.arrow_upward_rounded,
+                  color: Color(0xFF08131A), size: 26),
+            ),
+          ),
+        ),
+      ],
     );
+  }
+
+  String _fmtVoice(int ms) {
+    final s = (ms / 1000).truncate();
+    final d = (ms % 1000) ~/ 100;
+    return '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')},$d';
   }
 
   Widget _modeBanner(Message modeMessage, bool isLight) {

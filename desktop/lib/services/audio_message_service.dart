@@ -31,6 +31,14 @@ class AudioMessageService {
 
   Stream<PlayerState> get playerState => _player.onPlayerStateChanged;
 
+  Stream<double> amplitudeLevels(Duration interval) {
+    return _recorder.onAmplitudeChanged(interval).map((amplitude) {
+      final current = amplitude.current;
+      if (current.isNaN || current.isInfinite) return 0.0;
+      return ((current + 55) / 55).clamp(0.0, 1.0).toDouble();
+    });
+  }
+
   Future<bool> hasRecordingPermission() => _recorder.hasPermission();
 
   Future<void> startRecording() async {

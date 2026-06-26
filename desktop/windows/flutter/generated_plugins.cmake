@@ -4,6 +4,8 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   audioplayers_windows
+  desktop_drop
+  pasteboard
   record_windows
 )
 

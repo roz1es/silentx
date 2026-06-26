@@ -30,7 +30,8 @@ class BrenksCachedNetworkImage extends StatefulWidget {
       _BrenksCachedNetworkImageState();
 }
 
-class _BrenksCachedNetworkImageState extends State<BrenksCachedNetworkImage> {
+class _BrenksCachedNetworkImageState extends State<BrenksCachedNetworkImage>
+    with AutomaticKeepAliveClientMixin {
   static const _maxImageBytes = 18 * 1024 * 1024;
   static final Map<String, Uint8List> _memory = {};
   static final Map<String, Future<Uint8List?>> _inFlight = {};
@@ -53,6 +54,7 @@ class _BrenksCachedNetworkImageState extends State<BrenksCachedNetworkImage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final cached = _memory[widget.url];
     if (cached != null) return _image(cached);
 
@@ -70,6 +72,9 @@ class _BrenksCachedNetworkImageState extends State<BrenksCachedNetworkImage> {
       },
     );
   }
+
+  @override
+  bool get wantKeepAlive => true;
 
   Widget _image(Uint8List bytes) {
     return Image.memory(

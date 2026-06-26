@@ -36,6 +36,18 @@ class AuthResult {
   final bool emailCodeRequired;
 }
 
+class PasswordResetRequestResult {
+  const PasswordResetRequestResult({
+    required this.ticket,
+    required this.emailMasked,
+    required this.message,
+  });
+
+  final String? ticket;
+  final String? emailMasked;
+  final String? message;
+}
+
 class ApiClient {
   ApiClient({
     required this.baseUrl,
@@ -141,6 +153,39 @@ class ApiClient {
     );
   }
 
+  Future<AuthResult> register({
+    required String username,
+    required String email,
+    required String password,
+  }) async {
+    final json = await _request(
+      '/api/register',
+      method: 'POST',
+      body: {
+        'username': username,
+        'email': email,
+        'password': password,
+      },
+    );
+
+    if (json['emailVerificationRequired'] == true) {
+      return AuthResult.emailCodeRequired(
+        ticket: json['ticket']?.toString() ?? '',
+        emailMasked: json['emailMasked']?.toString() ?? '',
+      );
+    }
+
+    final token = json['token']?.toString() ?? '';
+    if (token.isEmpty) {
+      throw ApiException('Сервер не вернул токен авторизации.');
+    }
+
+    return AuthResult.success(
+      user: User.fromJson((json['user'] as Map).cast<String, dynamic>()),
+      token: token,
+    );
+  }
+
   Future<AuthResult> confirmLogin({
     required String ticket,
     required String code,
@@ -162,6 +207,61 @@ class ApiClient {
     return AuthResult.success(
       user: User.fromJson((json['user'] as Map).cast<String, dynamic>()),
       token: token,
+    );
+  }
+
+  Future<AuthResult> confirmRegister({
+    required String ticket,
+    required String code,
+  }) async {
+    final json = await _request(
+      '/api/register/confirm',
+      method: 'POST',
+      body: {
+        'ticket': ticket,
+        'code': code,
+      },
+    );
+
+    final token = json['token']?.toString() ?? '';
+    if (token.isEmpty) {
+      throw ApiException('Сервер не вернул токен авторизации.');
+    }
+
+    return AuthResult.success(
+      user: User.fromJson((json['user'] as Map).cast<String, dynamic>()),
+      token: token,
+    );
+  }
+
+  Future<PasswordResetRequestResult> requestPasswordReset({
+    required String login,
+  }) async {
+    final json = await _request(
+      '/api/password-reset/request',
+      method: 'POST',
+      body: {'login': login},
+    );
+    return PasswordResetRequestResult(
+      ticket: json['ticket']?.toString(),
+      emailMasked: json['emailMasked']?.toString(),
+      message: json['message']?.toString(),
+    );
+  }
+
+  Future<void> confirmPasswordReset({
+    required String ticket,
+    required String code,
+    required String password,
+  }) async {
+    await _request(
+      '/api/password-reset/confirm',
+      method: 'POST',
+      body: {
+        'ticket': ticket,
+        'code': code,
+        'password': password,
+      },
     );
   }
 

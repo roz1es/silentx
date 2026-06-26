@@ -8,11 +8,14 @@ environment:
 
 dependencies:
   audioplayers: ^6.5.1
+  camera_macos: ^0.0.9
+  desktop_drop: ^0.7.1
   file_picker: ^11.0.2
   flutter:
     sdk: flutter
   http: ^1.2.2
   mime: ^2.0.0
+  pasteboard: ^0.5.0
   path_provider: ^2.1.5
   record: ^6.1.2
   shared_preferences: ^2.3.2

@@ -12,6 +12,7 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 const MAX_AVATAR_BYTES = 6 * 1024 * 1024;
 const WINDOWS_INSTALLER_URL = '/desktop/windows/BrenksChatSetup-latest.exe';
+const MACOS_INSTALLER_URL = '/desktop/macos/BrenksChat-macOS-latest.dmg';
 
 type Props = {
   open: boolean;
@@ -745,8 +746,23 @@ export function ProfileModal({ open, onClose }: Props) {
                 Установить на Windows
               </a>
 
-              <div className="mt-2 grid grid-cols-3 gap-2">
-                {['Android', 'macOS', 'iPhone'].map((platform) => (
+              <a
+                href={MACOS_INSTALLER_URL}
+                download
+                className="brenks-profile-button mt-2 flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold no-underline"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  aria-hidden
+                  className="h-4 w-4 fill-current"
+                >
+                  <path d="M15.9 2.3c.2 1.5-.4 2.9-1.3 3.9-.9.9-2.2 1.7-3.6 1.6-.2-1.4.5-2.9 1.3-3.8.9-1 2.4-1.7 3.6-1.7Zm4.2 15.3c-.7 1.5-1.1 2.1-2 3.4-1.3 1.8-3.1 1.9-3.9 1.9-.9 0-1.8-.6-2.9-.6-1.1 0-2.1.6-3 .6-.9 0-2.5-.1-3.8-1.8C1.9 17.6 1.6 12.6 3.3 9.9c1.2-1.9 3-3 4.8-3 1 0 2 .6 2.9.6.9 0 2.5-.8 4.2-.7.7 0 2.8.3 4.1 2.2-3.6 2-3 7 .8 8.6Z" />
+                </svg>
+                Установить на macOS
+              </a>
+
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {['Android', 'iPhone'].map((platform) => (
                   <button
                     key={platform}
                     type="button"

@@ -12,6 +12,7 @@ type PendingCode = {
 };
 
 const windowsInstallerUrl = '/desktop/windows/BrenksChatSetup-latest.exe';
+const macosInstallerUrl = '/desktop/macos/BrenksChat-macOS-latest.dmg';
 
 type PlatformId = 'windows' | 'android' | 'macos' | 'iphone';
 
@@ -35,7 +36,8 @@ const downloadPlatforms: Array<{
   {
     id: 'macos',
     title: 'macOS',
-    subtitle: 'в разработке',
+    subtitle: 'Скачать .dmg',
+    href: macosInstallerUrl,
   },
   {
     id: 'iphone',

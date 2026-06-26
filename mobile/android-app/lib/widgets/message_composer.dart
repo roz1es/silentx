@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -45,7 +46,7 @@ class MessageComposer extends StatefulWidget {
   final Message? editing;
   final bool sendingMedia;
   final bool recordingVoice;
-  final int recordingMs;
+  final ValueListenable<int> recordingMs;
   final VoidCallback onAttach;
   final VoidCallback onSend;
   final VoidCallback onStartVoice;
@@ -382,12 +383,15 @@ class _MessageComposerState extends State<MessageComposer> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Text(
-                  _fmtVoice(widget.recordingMs),
-                  style: TextStyle(
-                    color: timeColor,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                ValueListenableBuilder<int>(
+                  valueListenable: widget.recordingMs,
+                  builder: (_, ms, __) => Text(
+                    _fmtVoice(ms),
+                    style: TextStyle(
+                      color: timeColor,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
                 const Spacer(),

@@ -48,7 +48,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Message? _editing;
   bool _sendingMedia = false;
   bool _recordingVoice = false;
-  int _recordingMs = 0;
+  final ValueNotifier<int> _recordingMs = ValueNotifier<int>(0);
   Timer? _recordingTimer;
   int _lastTick = -1;
   int _bgIndex = 0;
@@ -79,6 +79,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _messageController.dispose();
     _msgSearchController.dispose();
     _scrollController.dispose();
+    _recordingMs.dispose();
     super.dispose();
   }
 
@@ -192,14 +193,15 @@ class _ChatScreenState extends State<ChatScreen> {
       await _audioService.startRecording();
       setState(() {
         _recordingVoice = true;
-        _recordingMs = 0;
         _editing = null;
         _replyTo = null;
       });
+      _recordingMs.value = 0;
       _recordingTimer?.cancel();
       _recordingTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
         if (!mounted) return;
-        setState(() => _recordingMs += 250);
+        // Только обновляем таймер, без rebuild всего экрана (лента не прыгает).
+        _recordingMs.value += 250;
       });
     } on Object catch (err) {
       _showSnack('Не удалось начать запись: $err');
@@ -229,10 +231,8 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _cancelVoice() async {
     if (!_recordingVoice) return;
     _recordingTimer?.cancel();
-    setState(() {
-      _recordingVoice = false;
-      _recordingMs = 0;
-    });
+    setState(() => _recordingVoice = false);
+    _recordingMs.value = 0;
     await _audioService.cancelRecording();
   }
 

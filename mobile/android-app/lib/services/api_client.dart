@@ -130,6 +130,17 @@ class ApiClient {
     return parsed;
   }
 
+  /// ICE-серверы (STUN/TURN) для звонков. Контракт совпадает с веб-клиентом.
+  Future<List<Map<String, dynamic>>> fetchCallIceServers() async {
+    final res = await _request('/api/calls/ice-servers');
+    final list = res['iceServers'];
+    if (list is! List) return const [];
+    return list
+        .whereType<Map>()
+        .map((e) => e.cast<String, dynamic>())
+        .toList(growable: false);
+  }
+
   // --- Авторизация ---
 
   Future<AuthResult> login({

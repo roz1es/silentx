@@ -10,6 +10,7 @@ import 'services/api_client.dart';
 import 'services/auth_store.dart';
 import 'services/messenger_controller.dart';
 import 'theme/app_theme.dart';
+import 'widgets/call_overlay.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -130,6 +131,15 @@ class _BrenksChatAppState extends State<BrenksChatApp> {
       darkTheme: buildBrenksTheme(),
       themeMode: _themeMode,
       themeAnimationDuration: const Duration(milliseconds: 220),
+      builder: (context, child) {
+        final controller = _controller;
+        return Stack(
+          children: [
+            child ?? const SizedBox.shrink(),
+            if (controller != null) CallOverlay(controller: controller),
+          ],
+        );
+      },
       home: _buildHome(),
     );
   }

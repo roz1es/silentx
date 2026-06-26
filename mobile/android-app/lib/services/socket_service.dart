@@ -33,6 +33,7 @@ class BrenksSocket {
       required String username,
       required bool isTyping,
     }) onTyping,
+    required void Function(Map<String, dynamic> payload) onCallSignal,
   }) {
     final socket = socket_io.io(
       baseUrl,
@@ -108,6 +109,11 @@ class BrenksSocket {
       );
     });
 
+    socket.on('call_signal', (payload) {
+      if (payload is! Map) return;
+      onCallSignal(payload.cast<String, dynamic>());
+    });
+
     _socket = socket;
   }
 
@@ -175,6 +181,10 @@ class BrenksSocket {
 
   void markRead(String chatId) {
     _socket?.emit('mark_read', chatId);
+  }
+
+  void sendCallSignal(Map<String, dynamic> data) {
+    _socket?.emit('call_signal', data);
   }
 
   void dispose() {

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models.dart';
 import 'api_client.dart';
+import 'call_service.dart';
 import 'socket_service.dart';
 
 /// Единый источник состояния мессенджера для всех экранов.
@@ -17,7 +18,13 @@ class MessengerController extends ChangeNotifier {
     required this.currentUser,
     required this.serverUrl,
     required this.token,
-  });
+  }) {
+    call = CallService(
+      currentUserId: currentUser.id,
+      emitSignal: (data) => _socket?.sendCallSignal(data),
+      fetchIce: api.fetchCallIceServers,
+    );
+  }
 
   final ApiClient api;
   final User currentUser;
@@ -25,6 +32,7 @@ class MessengerController extends ChangeNotifier {
   final String token;
 
   BrenksSocket? _socket;
+  late final CallService call;
 
   List<Chat> _chats = const [];
   Set<String> _onlineUserIds = const {};
@@ -197,6 +205,7 @@ class MessengerController extends ChangeNotifier {
         _typingNames = next;
         notifyListeners();
       },
+      onCallSignal: (payload) => call.handleSignal(payload),
     );
     _socket = socket;
   }
@@ -452,6 +461,7 @@ class MessengerController extends ChangeNotifier {
   void dispose() {
     _typingTimer?.cancel();
     _socket?.dispose();
+    call.dispose();
     super.dispose();
   }
 }

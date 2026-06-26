@@ -571,6 +571,20 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
       actions: [
+        if (chat.type == ChatType.direct && _peerId(chat) != null) ...[
+          IconButton(
+            tooltip: 'Аудиозвонок',
+            icon: const Icon(Icons.call_rounded),
+            onPressed: () =>
+                _controller.call.startCall(_peerId(chat)!, 'audio'),
+          ),
+          IconButton(
+            tooltip: 'Видеозвонок',
+            icon: const Icon(Icons.videocam_rounded),
+            onPressed: () =>
+                _controller.call.startCall(_peerId(chat)!, 'video'),
+          ),
+        ],
         IconButton(
           tooltip: 'Поиск в чате',
           icon: const Icon(Icons.search_rounded),
@@ -739,6 +753,18 @@ class _ChatScreenState extends State<ChatScreen> {
             ChatProfileScreen(controller: _controller, chatId: chat.id),
       ),
     );
+  }
+
+  /// id собеседника в личном чате (для звонка), иначе null.
+  String? _peerId(Chat chat) {
+    if (chat.type != ChatType.direct) return null;
+    for (final p in chat.participants) {
+      if (p.id != _controller.currentUser.id) return p.id;
+    }
+    for (final id in chat.participantIds) {
+      if (id != _controller.currentUser.id) return id;
+    }
+    return null;
   }
 
   Widget _pinnedBanner(Message message) {

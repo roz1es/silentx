@@ -8,8 +8,8 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../theme/app_theme.dart';
 
-/// Инлайн-запись видеокружка прямо в чате (как в Telegram): живое видео в круге,
-/// переворот камеры, вспышка, пауза, таймер, «Отмена» и отправка.
+/// Инлайн-запись видеокружка: затемнённая область с кругом сверху, а строка
+/// ввода превращается в нижнюю панель записи (таймер + «Отмена» + отправка).
 class InlineVideoRecorder extends StatefulWidget {
   const InlineVideoRecorder({
     super.key,
@@ -31,7 +31,6 @@ class _InlineVideoRecorderState extends State<InlineVideoRecorder> {
   bool _ready = false;
   bool _busy = false;
   bool _torch = false;
-  bool _paused = false;
   int _elapsedMs = 0;
   Timer? _timer;
   String? _error;
@@ -83,13 +82,10 @@ class _InlineVideoRecorderState extends State<InlineVideoRecorder> {
     await ctrl.prepareForVideoRecording();
     await ctrl.startVideoRecording();
     if (!mounted) return;
-    setState(() {
-      _elapsedMs = 0;
-      _paused = false;
-    });
+    setState(() => _elapsedMs = 0);
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(milliseconds: 100), (_) {
-      if (!mounted || _paused) return;
+      if (!mounted) return;
       setState(() => _elapsedMs += 100);
       if (_elapsedMs >= _maxMs) _send();
     });
@@ -129,22 +125,6 @@ class _InlineVideoRecorderState extends State<InlineVideoRecorder> {
     } on Object {
       _torch = false; // фронталка обычно без вспышки
       if (mounted) setState(() {});
-    }
-  }
-
-  Future<void> _togglePause() async {
-    final cam = _camera;
-    if (cam == null || !cam.value.isInitialized) return;
-    try {
-      if (_paused) {
-        await cam.resumeVideoRecording();
-        if (mounted) setState(() => _paused = false);
-      } else {
-        await cam.pauseVideoRecording();
-        if (mounted) setState(() => _paused = true);
-      }
-    } on Object {
-      // игнорируем
     }
   }
 
@@ -206,61 +186,137 @@ class _InlineVideoRecorderState extends State<InlineVideoRecorder> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.black.withValues(alpha: 0.72),
-      child: SafeArea(
-        child: Column(
-          children: [
-            const Spacer(),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(_error!,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white)),
-              )
-            else if (!_ready || _camera == null)
-              const CircularProgressIndicator(color: Colors.white)
-            else
-              _circle(context),
-            const Spacer(),
-            // Нижний блок управления.
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+    final ready = _ready && _camera != null;
+    return Column(
+      children: [
+        // Затемнённая область с кругом и кнопками камеры.
+        Expanded(
+          child: Container(
+            color: Colors.black.withValues(alpha: 0.72),
+            child: SafeArea(
+              bottom: false,
               child: Column(
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    children: [
-                      _smallBtn(Icons.cameraswitch_rounded, _flip),
-                      const SizedBox(width: 10),
-                      _smallBtn(
-                        _torch
-                            ? Icons.flash_on_rounded
-                            : Icons.flash_off_rounded,
-                        _toggleTorch,
+                  const Spacer(),
+                  if (_error != null)
+                    Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(_error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white)),
+                    )
+                  else if (!ready)
+                    const CircularProgressIndicator(color: Colors.white)
+                  else
+                    _circle(context),
+                  const Spacer(),
+                  if (ready)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                      child: Row(
+                        children: [
+                          _smallBtn(Icons.cameraswitch_rounded, _flip),
+                          const SizedBox(width: 12),
+                          _smallBtn(
+                            _torch
+                                ? Icons.flash_on_rounded
+                                : Icons.flash_off_rounded,
+                            _toggleTorch,
+                          ),
+                        ],
                       ),
-                      const Spacer(),
-                      _smallBtn(
-                        _paused
-                            ? Icons.play_arrow_rounded
-                            : Icons.pause_rounded,
-                        _togglePause,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(child: _recordPill()),
-                      const SizedBox(width: 12),
-                      _sendBtn(),
-                    ],
-                  ),
+                    ),
                 ],
               ),
             ),
-          ],
+          ),
+        ),
+        // Нижняя панель — «превращённая» строка ввода (непрозрачная).
+        _bottomPanel(),
+      ],
+    );
+  }
+
+  Widget _bottomPanel() {
+    return Material(
+      color: bg,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          child: Row(
+            children: [
+              Expanded(child: _recordPill()),
+              const SizedBox(width: 10),
+              _sendBtn(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _recordPill() {
+    return Container(
+      height: 52,
+      padding: const EdgeInsets.fromLTRB(16, 0, 6, 0),
+      decoration: BoxDecoration(
+        color: panelSoft,
+        borderRadius: BorderRadius.circular(26),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 9,
+            height: 9,
+            decoration: const BoxDecoration(
+              color: danger,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            _fmt(_elapsedMs),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const Spacer(),
+          // Кнопка «Отмена» с большой зоной нажатия.
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _busy ? null : _cancel,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Text(
+                'Отмена',
+                style: TextStyle(
+                  color: danger,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sendBtn() {
+    return Material(
+      color: accent,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: _busy ? null : _send,
+        child: const SizedBox(
+          width: 52,
+          height: 52,
+          child: Icon(Icons.arrow_upward_rounded,
+              color: Color(0xFF08131A), size: 26),
         ),
       ),
     );
@@ -310,67 +366,6 @@ class _InlineVideoRecorderState extends State<InlineVideoRecorder> {
           width: 46,
           height: 46,
           child: Icon(icon, color: Colors.white, size: 22),
-        ),
-      ),
-    );
-  }
-
-  Widget _recordPill() {
-    return Container(
-      height: 46,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(23),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 9,
-            height: 9,
-            decoration: const BoxDecoration(
-              color: danger,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            _fmt(_elapsedMs),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const Spacer(),
-          GestureDetector(
-            onTap: _busy ? null : _cancel,
-            child: const Text(
-              'Отмена',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _sendBtn() {
-    return Material(
-      color: accent,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: _busy ? null : _send,
-        child: const SizedBox(
-          width: 58,
-          height: 58,
-          child: Icon(Icons.arrow_upward_rounded,
-              color: Color(0xFF08131A), size: 28),
         ),
       ),
     );

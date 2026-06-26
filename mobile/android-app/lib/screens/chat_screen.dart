@@ -395,7 +395,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      MessageComposer(
+                      if (!_recordingCircle)
+                        MessageComposer(
                         controller: _messageController,
                         replyTo: _replyTo,
                         editing: _editing,

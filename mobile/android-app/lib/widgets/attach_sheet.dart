@@ -42,7 +42,14 @@ class _AttachSheetState extends State<AttachSheet> {
 
   Future<void> _load() async {
     try {
-      final ps = await PhotoManager.requestPermissionExtend();
+      final ps = await PhotoManager.requestPermissionExtend(
+        requestOption: const PermissionRequestOption(
+          androidPermission: AndroidPermission(
+            type: RequestType.image,
+            mediaLocation: false,
+          ),
+        ),
+      );
       if (!ps.hasAccess) {
         if (mounted) {
           setState(() {
@@ -187,30 +194,38 @@ class _AttachSheetState extends State<AttachSheet> {
 
   Widget _emptyState(Color mutedColor) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            _denied ? 'Нет доступа к недавним' : 'Недавние фото не найдены',
-            style: TextStyle(color: mutedColor),
-          ),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: _pickSystemImage,
-            style: FilledButton.styleFrom(
-                backgroundColor: accent,
-                foregroundColor: const Color(0xFF08131A)),
-            icon: const Icon(Icons.photo_library_rounded, size: 18),
-            label: const Text('Открыть галерею'),
-          ),
-          if (_denied) ...[
-            const SizedBox(height: 6),
-            TextButton(
-              onPressed: PhotoManager.openSetting,
-              child: const Text('Открыть настройки'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.photo_library_outlined, size: 46, color: mutedColor),
+            const SizedBox(height: 12),
+            Text(
+              'Нажми, чтобы выбрать фото из галереи',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: mutedColor),
             ),
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              onPressed: _pickSystemImage,
+              style: FilledButton.styleFrom(
+                backgroundColor: accent,
+                foregroundColor: const Color(0xFF08131A),
+                minimumSize: const Size(230, 48),
+              ),
+              icon: const Icon(Icons.photo_library_rounded, size: 18),
+              label: const Text('Открыть галерею'),
+            ),
+            if (_denied) ...[
+              const SizedBox(height: 4),
+              TextButton(
+                onPressed: PhotoManager.openSetting,
+                child: const Text('Разрешить ленту в настройках'),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

@@ -283,7 +283,9 @@ class _ChatProfileScreenState extends State<ChatProfileScreen> {
                         ),
                       const SizedBox(height: 14),
                       // Карточки информации.
-                      _infoCard('ID', peer?.id ?? chat.id, textColor, mutedColor),
+                      if (peer != null)
+                        _infoCard('Юзернейм', '@${peer.username}', textColor,
+                            mutedColor),
                       if (phone != null && phone.isNotEmpty) ...[
                         const SizedBox(height: 10),
                         _infoCard('Телефон', phone, textColor, mutedColor),
@@ -308,12 +310,13 @@ class _ChatProfileScreenState extends State<ChatProfileScreen> {
                       Row(
                         children: [
                           _segItem('Фото ${photos.length}', 0, isLight),
-                          const SizedBox(width: 6),
-                          _segItem('ГС ${voices.length}', 1, isLight),
-                          const SizedBox(width: 6),
-                          _segItem('Кружки ${circles.length}', 2, isLight),
-                          const SizedBox(width: 6),
-                          _segItem('Файлы ${files.length}', 3, isLight),
+                          const SizedBox(width: 8),
+                          _segItem(
+                              'Голосовые ${voices.length + circles.length}',
+                              1,
+                              isLight),
+                          const SizedBox(width: 8),
+                          _segItem('Файлы ${files.length}', 2, isLight),
                         ],
                       ),
                       const SizedBox(height: 14),
@@ -433,7 +436,7 @@ class _ChatProfileScreenState extends State<ChatProfileScreen> {
         if (photos.isEmpty) return _empty(mutedColor);
         return _grid(photos);
       case 1:
-        if (voices.isEmpty) return _empty(mutedColor);
+        if (voices.isEmpty && circles.isEmpty) return _empty(mutedColor);
         return Column(
           children: [
             for (final m in voices)
@@ -443,11 +446,15 @@ class _ChatProfileScreenState extends State<ChatProfileScreen> {
                 formatDuration(m.media?.durationMs ?? 0),
                 mutedColor,
               ),
+            for (final m in circles)
+              _row(
+                Icons.videocam_rounded,
+                'Видеокружок',
+                formatDuration(m.media?.durationMs ?? 0),
+                mutedColor,
+              ),
           ],
         );
-      case 2:
-        if (circles.isEmpty) return _empty(mutedColor);
-        return _grid(circles);
       default:
         if (files.isEmpty) return _empty(mutedColor);
         return Column(

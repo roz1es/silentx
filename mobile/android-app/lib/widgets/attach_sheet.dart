@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 
@@ -76,6 +77,18 @@ class _AttachSheetState extends State<AttachSheet> {
     widget.onImage(bytes, title.isEmpty ? 'photo.jpg' : title);
   }
 
+  /// Системный выбор фото — надёжный путь на любой версии Android.
+  Future<void> _pickSystemImage() async {
+    final res =
+        await FilePicker.pickFiles(type: FileType.image, withData: true);
+    final file = res?.files.single;
+    final bytes = file?.bytes;
+    if (file == null || bytes == null || bytes.isEmpty) return;
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    widget.onImage(bytes, file.name);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
@@ -139,14 +152,26 @@ class _AttachSheetState extends State<AttachSheet> {
             Divider(height: 1, color: border),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 10),
-              child: _category(
-                Icons.insert_drive_file_rounded,
-                'Файл',
-                () {
-                  Navigator.of(context).pop();
-                  widget.onFile();
-                },
-                titleColor,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _category(
+                    Icons.photo_library_rounded,
+                    'Галерея',
+                    _pickSystemImage,
+                    titleColor,
+                  ),
+                  const SizedBox(width: 28),
+                  _category(
+                    Icons.insert_drive_file_rounded,
+                    'Файл',
+                    () {
+                      Navigator.of(context).pop();
+                      widget.onFile();
+                    },
+                    titleColor,
+                  ),
+                ],
               ),
             ),
           ],
@@ -161,11 +186,20 @@ class _AttachSheetState extends State<AttachSheet> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            _denied ? 'Нет доступа к галерее' : 'Фото не найдены',
+            _denied ? 'Нет доступа к недавним' : 'Недавние фото не найдены',
             style: TextStyle(color: mutedColor),
           ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _pickSystemImage,
+            style: FilledButton.styleFrom(
+                backgroundColor: accent,
+                foregroundColor: const Color(0xFF08131A)),
+            icon: const Icon(Icons.photo_library_rounded, size: 18),
+            label: const Text('Открыть галерею'),
+          ),
           if (_denied) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
             TextButton(
               onPressed: PhotoManager.openSetting,
               child: const Text('Открыть настройки'),

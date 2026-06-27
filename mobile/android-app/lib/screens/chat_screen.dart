@@ -156,11 +156,96 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => AttachSheet(onImage: _sendPhotoBytes, onFile: _attach),
+      builder: (_) =>
+          AttachSheet(onImage: _previewAndSendImage, onFile: _attach),
     );
   }
 
-  Future<void> _sendPhotoBytes(Uint8List bytes, String name) async {
+  /// Предпросмотр изображения перед отправкой: подпись + «отправить как файл».
+  Future<void> _previewAndSendImage(Uint8List bytes, String name) async {
+    final captionController = TextEditingController();
+    var asFile = false;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => Dialog(
+          backgroundColor: isLight ? Colors.white : panel,
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Отправить изображение',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 17,
+                        color: isLight ? lightText : text),
+                  ),
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 300),
+                      child: Image.memory(bytes, fit: BoxFit.contain),
+                    ),
+                  ),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    dense: true,
+                    activeColor: accent,
+                    value: asFile,
+                    onChanged: (v) => setLocal(() => asFile = v ?? false),
+                    title: const Text('Отправить как файл'),
+                  ),
+                  TextField(
+                    controller: captionController,
+                    minLines: 1,
+                    maxLines: 4,
+                    decoration: const InputDecoration(hintText: 'Подпись'),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Отмена'),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: FilledButton.styleFrom(
+                            backgroundColor: accent,
+                            foregroundColor: const Color(0xFF08131A)),
+                        child: const Text('Отправить'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    if (confirmed == true) {
+      await _sendMediaBytes(bytes, name,
+          caption: captionController.text.trim(), asFile: asFile);
+    }
+    captionController.dispose();
+  }
+
+  Future<void> _sendMediaBytes(Uint8List bytes, String name,
+      {String caption = '', bool asFile = false}) async {
     if (bytes.isEmpty) return;
     setState(() => _sendingMedia = true);
     try {
@@ -172,19 +257,19 @@ class _ChatScreenState extends State<ChatScreen> {
         _showSnack('Фото слишком большое для текущего сервера.');
         return;
       }
+      final isImage = !asFile && mimeType.startsWith('image/');
       final media = MessageMedia(
-        kind: mimeType.startsWith('image/') ? 'image' : 'file',
+        kind: isImage ? 'image' : 'file',
         dataUrl: dataUrl,
         fileName: name,
         mimeType: mimeType,
       );
       _controller.sendMessage(
-        text: _messageController.text.trim(),
+        text: caption,
         media: media,
         replyToMessageId: _replyTo?.id,
       );
       setState(() => _replyTo = null);
-      _messageController.clear();
     } on Object catch (err) {
       _showSnack('Не удалось отправить фото: $err');
     } finally {

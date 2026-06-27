@@ -20,6 +20,9 @@ class User {
     this.email,
     this.emailVerified = false,
     this.isAdmin = false,
+    this.phone,
+    this.bio,
+    this.birthDate,
   });
 
   final String id;
@@ -29,6 +32,9 @@ class User {
   final String? email;
   final bool emailVerified;
   final bool isAdmin;
+  final String? phone;
+  final String? bio;
+  final String? birthDate;
 
   String get title {
     final name = displayName?.trim();
@@ -44,6 +50,9 @@ class User {
       email: json['email']?.toString(),
       emailVerified: json['emailVerified'] == true,
       isAdmin: json['isAdmin'] == true,
+      phone: json['phone']?.toString(),
+      bio: json['bio']?.toString(),
+      birthDate: json['birthDate']?.toString(),
     );
   }
 }

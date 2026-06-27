@@ -538,14 +538,26 @@ class _ChatScreenState extends State<ChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    chat.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          chat.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      if (chat.type == ChatType.channel && chat.verified) ...[
+                        const SizedBox(width: 4),
+                        const Icon(Icons.verified_rounded,
+                            size: 17, color: accent),
+                      ],
+                    ],
                   ),
                   Builder(
                     builder: (context) {
@@ -605,6 +617,13 @@ class _ChatScreenState extends State<ChatScreen> {
               value: 'pin',
               child: Text(chat.pinnedToTop ? 'Открепить чат' : 'Закрепить чат'),
             ),
+            if (_controller.currentUser.isAdmin &&
+                chat.type == ChatType.channel)
+              PopupMenuItem(
+                value: 'verify',
+                child: Text(
+                    chat.verified ? 'Снять галочку' : 'Выдать галочку'),
+              ),
             const PopupMenuItem(value: 'clear', child: Text('Очистить чат')),
             const PopupMenuItem(
               value: 'delete',
@@ -618,6 +637,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _onMenu(String value, Chat chat) async {
     switch (value) {
+      case 'verify':
+        try {
+          await _controller.setChannelVerified(chat.id, !chat.verified);
+        } on Object catch (e) {
+          _showSnack('Не удалось изменить галочку: $e');
+        }
       case 'profile':
         _openProfile(chat);
       case 'bg':

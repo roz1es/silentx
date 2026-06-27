@@ -1,10 +1,10 @@
 /// Конфигурация мобильного клиента BrenksChat.
 ///
 /// Значения можно переопределить при сборке через --dart-define, например:
-///   flutter run --dart-define=BRENKS_API_URL=https://silentx.ru
+///   flutter run --dart-define=BRENKS_API_URL=https://api.brenkschat.ru
 const defaultApiUrl = String.fromEnvironment(
   'BRENKS_API_URL',
-  defaultValue: 'https://silentx.ru',
+  defaultValue: 'https://api.brenkschat.ru',
 );
 
 const appVersion = String.fromEnvironment(

@@ -83,6 +83,13 @@ class ChatParticipant {
       avatarUrl: json['avatarUrl']?.toString(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'username': username,
+        'displayName': displayName,
+        'avatarUrl': avatarUrl,
+      };
 }
 
 class Chat {
@@ -100,6 +107,8 @@ class Chat {
     this.pinnedMessageId,
     this.muted = false,
     this.pinnedToTop = false,
+    this.verified = false,
+    this.channelOwnerId,
   });
 
   final String id;
@@ -116,11 +125,57 @@ class Chat {
   final String? pinnedMessageId;
   final bool muted;
   final bool pinnedToTop;
+  final bool verified;
+  final String? channelOwnerId;
 
   String get title {
     final custom = displayName?.trim();
     return custom == null || custom.isEmpty ? name : custom;
   }
+
+  Chat copyWith({
+    LastMessage? lastMessage,
+    Map<String, int>? unread,
+    bool? muted,
+    bool? pinnedToTop,
+    bool? verified,
+  }) {
+    return Chat(
+      id: id,
+      type: type,
+      name: name,
+      displayName: displayName,
+      avatarUrl: avatarUrl,
+      participantIds: participantIds,
+      participants: participants,
+      lastMessage: lastMessage ?? this.lastMessage,
+      unread: unread ?? this.unread,
+      lastReadAt: lastReadAt,
+      pinnedMessageId: pinnedMessageId,
+      muted: muted ?? this.muted,
+      pinnedToTop: pinnedToTop ?? this.pinnedToTop,
+      verified: verified ?? this.verified,
+      channelOwnerId: channelOwnerId,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'type': type.name,
+        'name': name,
+        'displayName': displayName,
+        'avatarUrl': avatarUrl,
+        'participantIds': participantIds,
+        'participants': participants.map((p) => p.toJson()).toList(),
+        'lastMessage': lastMessage?.toJson(),
+        'unread': unread,
+        'lastReadAt': lastReadAt,
+        'pinnedMessageId': pinnedMessageId,
+        'muted': muted,
+        'pinnedToTop': pinnedToTop,
+        'verified': verified,
+        'channelOwnerId': channelOwnerId,
+      };
 
   factory Chat.fromJson(Map<String, dynamic> json) {
     final participantsJson = json['participants'];
@@ -160,6 +215,8 @@ class Chat {
       pinnedMessageId: json['pinnedMessageId']?.toString(),
       muted: json['muted'] == true,
       pinnedToTop: json['pinnedToTop'] == true,
+      verified: json['verified'] == true,
+      channelOwnerId: json['channelOwnerId']?.toString(),
     );
   }
 }
@@ -210,6 +267,12 @@ class LastMessage {
       senderId: json['senderId']?.toString() ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'text': text,
+        'time': time,
+        'senderId': senderId,
+      };
 }
 
 class MessageMedia {

@@ -83,14 +83,26 @@ class ChatTile extends StatelessWidget {
                           const SizedBox(width: 4),
                         ],
                         Expanded(
-                          child: Text(
-                            chat.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                            ),
+                          child: Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  chat.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                              if (chat.type == ChatType.channel &&
+                                  chat.verified) ...[
+                                const SizedBox(width: 4),
+                                const Icon(Icons.verified_rounded,
+                                    size: 16, color: accent),
+                              ],
+                            ],
                           ),
                         ),
                         if (chat.lastMessage != null)

@@ -1,9 +1,13 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../format.dart';
 
 /// Круглый аватар с поддержкой сетевых картинок, data-url и буквы-заглушки.
-class BrenksAvatar extends StatelessWidget {
+/// Байты data-url декодируются один раз и кешируются — иначе при каждом
+/// rebuild (typing/chat_updated) аватар мерцал.
+class BrenksAvatar extends StatefulWidget {
   const BrenksAvatar({
     super.key,
     required this.title,
@@ -17,34 +21,68 @@ class BrenksAvatar extends StatelessWidget {
   final String? baseUrl;
   final double size;
 
+  @override
+  State<BrenksAvatar> createState() => _BrenksAvatarState();
+}
+
+class _BrenksAvatarState extends State<BrenksAvatar> {
   // Приглушённая палитра — не «кричит» и не бросается в глаза.
   static const _palette = [
-    Color(0xFF5B7C99), // приглушённый синий
-    Color(0xFF5E927A), // приглушённый зелёный
-    Color(0xFFBE9266), // тёплый песочный
-    Color(0xFFA9707F), // приглушённый розово-лиловый
-    Color(0xFF836F9E), // приглушённый фиолетовый
-    Color(0xFFA87A66), // терракота
-    Color(0xFF5E97A0), // приглушённый бирюзовый
-    Color(0xFF6D77A1), // приглушённый индиго
-    Color(0xFF629285), // морская волна
-    Color(0xFF7E9468), // оливковый
+    Color(0xFF5B7C99),
+    Color(0xFF5E927A),
+    Color(0xFFBE9266),
+    Color(0xFFA9707F),
+    Color(0xFF836F9E),
+    Color(0xFFA87A66),
+    Color(0xFF5E97A0),
+    Color(0xFF6D77A1),
+    Color(0xFF629285),
+    Color(0xFF7E9468),
   ];
 
+  Uint8List? _bytes;
+  String? _resolvedUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _prepare();
+  }
+
+  @override
+  void didUpdateWidget(BrenksAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageUrl != widget.imageUrl ||
+        oldWidget.baseUrl != widget.baseUrl) {
+      _prepare();
+    }
+  }
+
+  void _prepare() {
+    final url = widget.imageUrl?.trim();
+    if (url != null && url.startsWith('data:')) {
+      _bytes = bytesFromDataUrl(url);
+      _resolvedUrl = null;
+    } else {
+      _bytes = null;
+      _resolvedUrl = _resolveUrl(url, widget.baseUrl);
+    }
+  }
+
   Color _avatarColor() {
-    if (title.trim().isEmpty) return _palette[0];
-    final code = title.trim().codeUnitAt(0);
-    return _palette[code % _palette.length];
+    final t = widget.title.trim();
+    if (t.isEmpty) return _palette[0];
+    return _palette[t.codeUnitAt(0) % _palette.length];
   }
 
   @override
   Widget build(BuildContext context) {
-    final first = title.trim().isEmpty ? 'B' : title.trim()[0].toUpperCase();
-    final url = _resolveUrl(imageUrl, baseUrl);
-    final hasImage = url != null && url.isNotEmpty;
+    final size = widget.size;
+    final first =
+        widget.title.trim().isEmpty ? 'B' : widget.title.trim()[0].toUpperCase();
+    final hasImage = _bytes != null ||
+        (_resolvedUrl != null && _resolvedUrl!.isNotEmpty);
     final isLight = Theme.of(context).brightness == Brightness.light;
-    // Под картинкой — нейтральный фон. Если аватар PNG с прозрачными краями,
-    // цветная хеш-заливка раньше «вылезала» зелёным ободком из-под фото.
     final bgColor = hasImage
         ? (isLight ? const Color(0xFFE6EAF0) : const Color(0xFF2A2F38))
         : _avatarColor();
@@ -55,32 +93,30 @@ class BrenksAvatar extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: bgColor,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 1),
+        border:
+            Border.all(color: Colors.white.withValues(alpha: 0.12), width: 1),
       ),
-      child: _image(url, first),
+      child: _image(first),
     );
   }
 
-  Widget _image(String? url, String first) {
-    if (url == null || url.isEmpty) {
-      return Center(child: _initial(first));
-    }
-    // data:image/...;base64,... — Image.network не умеет, нужен Image.memory.
-    if (url.startsWith('data:')) {
-      final bytes = bytesFromDataUrl(url);
-      if (bytes == null || bytes.isEmpty) {
-        return Center(child: _initial(first));
-      }
+  Widget _image(String first) {
+    final size = widget.size;
+    final bytes = _bytes;
+    if (bytes != null && bytes.isNotEmpty) {
       return Image.memory(
         bytes,
         fit: BoxFit.cover,
-        // Смещаем кадр к верху: у вертикальных фото cover иначе срезает макушку.
         alignment: const Alignment(0, -0.55),
         width: size,
         height: size,
         gaplessPlayback: true,
         errorBuilder: (_, __, ___) => Center(child: _initial(first)),
       );
+    }
+    final url = _resolvedUrl;
+    if (url == null || url.isEmpty) {
+      return Center(child: _initial(first));
     }
     return Image.network(
       url,
@@ -99,7 +135,7 @@ class BrenksAvatar extends StatelessWidget {
       style: TextStyle(
         color: Colors.white,
         fontWeight: FontWeight.w800,
-        fontSize: size * 0.42,
+        fontSize: widget.size * 0.42,
       ),
     );
   }

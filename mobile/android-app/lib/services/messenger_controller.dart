@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../models.dart';
 import 'api_client.dart';
 import 'call_service.dart';
+import 'chat_cache.dart';
 import 'socket_service.dart';
 
 /// Единый источник состояния мессенджера для всех экранов.
@@ -125,7 +126,19 @@ class MessengerController extends ChangeNotifier {
 
   void start() {
     _connectSocket();
-    unawaited(loadChats());
+    unawaited(_loadCachedThenFresh());
+  }
+
+  /// Сначала показываем кешированные чаты (без пустого экрана), затем тянем
+  /// свежие с API и перезаписываем кеш.
+  Future<void> _loadCachedThenFresh() async {
+    final cached = await ChatCache.loadChats();
+    if (cached.isNotEmpty && _chats.isEmpty) {
+      _chats = _sortChats(cached);
+      _loadingChats = false;
+      notifyListeners();
+    }
+    await loadChats();
   }
 
   void reconnect() {
@@ -220,6 +233,7 @@ class MessengerController extends ChangeNotifier {
       _loadingChats = false;
       _joinAllChats();
       notifyListeners();
+      unawaited(ChatCache.saveChats(_chats));
     } on Object catch (err) {
       _chatsError = err.toString();
       _loadingChats = false;
@@ -252,24 +266,12 @@ class MessengerController extends ChangeNotifier {
     if (index == -1) return;
     final chat = _chats[index];
     if ((chat.lastMessage?.time ?? 0) >= message.createdAt) return;
-    final updated = Chat(
-      id: chat.id,
-      type: chat.type,
-      name: chat.name,
-      displayName: chat.displayName,
-      avatarUrl: chat.avatarUrl,
-      participantIds: chat.participantIds,
-      participants: chat.participants,
+    final updated = chat.copyWith(
       lastMessage: LastMessage(
         text: message.text,
         time: message.createdAt,
         senderId: message.senderId,
       ),
-      unread: chat.unread,
-      lastReadAt: chat.lastReadAt,
-      pinnedMessageId: chat.pinnedMessageId,
-      muted: chat.muted,
-      pinnedToTop: chat.pinnedToTop,
     );
     final next = [..._chats];
     next[index] = updated;
@@ -289,7 +291,7 @@ class MessengerController extends ChangeNotifier {
     _socket?.joinChat(chatId);
     _socket?.markRead(chatId);
     try {
-      final messages = await api.fetchMessages(chatId);
+      final messages = await api.fetchMessages(chatId, limit: 80);
       if (_activeChatId != chatId) return;
       _messages = messages;
       _loadingMessages = false;
@@ -320,21 +322,7 @@ class MessengerController extends ChangeNotifier {
     final chat = _chats[index];
     if ((chat.unread[currentUser.id] ?? 0) == 0) return;
     final next = [..._chats];
-    next[index] = Chat(
-      id: chat.id,
-      type: chat.type,
-      name: chat.name,
-      displayName: chat.displayName,
-      avatarUrl: chat.avatarUrl,
-      participantIds: chat.participantIds,
-      participants: chat.participants,
-      lastMessage: chat.lastMessage,
-      unread: {...chat.unread, currentUser.id: 0},
-      lastReadAt: chat.lastReadAt,
-      pinnedMessageId: chat.pinnedMessageId,
-      muted: chat.muted,
-      pinnedToTop: chat.pinnedToTop,
-    );
+    next[index] = chat.copyWith(unread: {...chat.unread, currentUser.id: 0});
     _chats = next;
     notifyListeners();
   }
@@ -409,6 +397,14 @@ class MessengerController extends ChangeNotifier {
   Future<void> togglePinTop(Chat chat) async {
     await api.setChatPinnedTop(chatId: chat.id, pinned: !chat.pinnedToTop);
     await loadChats();
+  }
+
+  /// Админ: выдать/снять галочку каналу. Обновляет чат локально и в кеше.
+  Future<void> setChannelVerified(String chatId, bool verified) async {
+    final updated = await api.setChannelVerified(chatId, verified);
+    _upsertChat(updated);
+    notifyListeners();
+    unawaited(ChatCache.saveChats(_chats));
   }
 
   Future<void> clearChat(Chat chat) async {

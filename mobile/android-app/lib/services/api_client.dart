@@ -312,15 +312,30 @@ class ApiClient {
         .toList(growable: false);
   }
 
-  Future<List<Message>> fetchMessages(String chatId) async {
-    final json =
-        await _request('/api/chats/${Uri.encodeComponent(chatId)}/messages');
+  /// Последние сообщения чата (по умолчанию 80). [before] — createdAt самого
+  /// старого загруженного сообщения для подгрузки истории при скролле вверх.
+  Future<List<Message>> fetchMessages(String chatId,
+      {int limit = 80, int? before}) async {
+    final query = StringBuffer('?limit=$limit');
+    if (before != null) query.write('&before=$before');
+    final json = await _request(
+        '/api/chats/${Uri.encodeComponent(chatId)}/messages$query');
     final messages = json['messages'];
     if (messages is! List) return const [];
     return messages
         .whereType<Map>()
         .map((item) => Message.fromJson(item.cast<String, dynamic>()))
         .toList(growable: false);
+  }
+
+  /// Выдать/снять галочку каналу (только админ). Возвращает обновлённый чат.
+  Future<Chat> setChannelVerified(String chatId, bool verified) async {
+    final json = await _request(
+      '/api/admin/chats/${Uri.encodeComponent(chatId)}/verified',
+      method: 'POST',
+      body: {'verified': verified},
+    );
+    return Chat.fromJson((json['chat'] as Map).cast<String, dynamic>());
   }
 
   Future<Chat> createDirectChat({required String targetUserId}) async {

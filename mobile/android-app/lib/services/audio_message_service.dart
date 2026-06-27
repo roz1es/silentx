@@ -97,7 +97,15 @@ class AudioMessageService {
     final bytes = _bytesFromDataUrl(dataUrl);
     if (bytes == null || bytes.isEmpty) return;
     await _player.stop();
-    await _player.play(BytesSource(bytes));
+    // Проигрываем из временного файла: BytesSource на Android часто
+    // не воспроизводит m4a/aac.
+    final dir = await getTemporaryDirectory();
+    final path = '${dir.path}/play-${dataUrl.hashCode.abs()}.m4a';
+    final file = io.File(path);
+    if (!await file.exists()) {
+      await file.writeAsBytes(bytes);
+    }
+    await _player.play(DeviceFileSource(path));
   }
 
   Future<void> stopPlayback() => _player.stop();

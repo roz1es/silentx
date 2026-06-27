@@ -39,14 +39,26 @@ class CallOverlay extends StatelessWidget {
         final isVideo = call.callType == 'video';
         final showRemoteVideo =
             call.phase == CallPhase.connected && call.hasRemoteVideo;
+        final hasLocalVideo = isVideo && !call.cameraOff;
+        final bothVideo = showRemoteVideo && hasLocalVideo;
 
         return Material(
           color: const Color(0xFF0E0F12),
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // Видео собеседника на весь экран (когда есть).
-              if (showRemoteVideo)
+              // Большое видео на весь экран (тап — поменять местами своё и чужое).
+              if (bothVideo)
+                GestureDetector(
+                  onTap: call.toggleLocalLarge,
+                  child: RTCVideoView(
+                    call.localLarge ? call.localRenderer : call.remoteRenderer,
+                    mirror: call.localLarge,
+                    objectFit:
+                        RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                  ),
+                )
+              else if (showRemoteVideo)
                 RTCVideoView(
                   call.remoteRenderer,
                   objectFit:
@@ -55,35 +67,26 @@ class CallOverlay extends StatelessWidget {
               else
                 _avatarStage(name, peer, call),
 
-              // Своё видео — маленьким окном сверху справа.
-              if (isVideo && call.phase != CallPhase.incoming)
+              // Маленькое видео в углу (тап по нему тоже меняет местами).
+              if (bothVideo)
                 Positioned(
                   top: 50,
                   right: 16,
                   child: GestureDetector(
-                    onTap: call.switchCamera,
-                    child: Container(
-                      width: 104,
-                      height: 150,
-                      clipBehavior: Clip.antiAlias,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.25)),
-                        color: Colors.black,
-                      ),
-                      child: call.cameraOff
-                          ? const Center(
-                              child: Icon(Icons.videocam_off_rounded,
-                                  color: Colors.white54))
-                          : RTCVideoView(
-                              call.localRenderer,
-                              mirror: true,
-                              objectFit: RTCVideoViewObjectFit
-                                  .RTCVideoViewObjectFitCover,
-                            ),
+                    onTap: call.toggleLocalLarge,
+                    child: _cornerVideo(
+                      call.localLarge
+                          ? call.remoteRenderer
+                          : call.localRenderer,
+                      mirror: !call.localLarge,
                     ),
                   ),
+                )
+              else if (hasLocalVideo && !showRemoteVideo)
+                Positioned(
+                  top: 50,
+                  right: 16,
+                  child: _cornerVideo(call.localRenderer, mirror: true),
                 ),
 
               // Верхняя плашка статуса.
@@ -123,6 +126,24 @@ class CallOverlay extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _cornerVideo(RTCVideoRenderer renderer, {required bool mirror}) {
+    return Container(
+      width: 104,
+      height: 150,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+        color: Colors.black,
+      ),
+      child: RTCVideoView(
+        renderer,
+        mirror: mirror,
+        objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+      ),
     );
   }
 

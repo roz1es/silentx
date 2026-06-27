@@ -493,13 +493,20 @@ class _ImagePreviewState extends State<ImagePreview> {
         child: Stack(
           children: [
             Positioned.fill(
-              child: InteractiveViewer(
-                minScale: 0.6,
-                maxScale: 5,
-                child: Center(
-                  child: bytes != null
-                      ? Image.memory(bytes, fit: BoxFit.contain)
-                      : Image.network(url!, fit: BoxFit.contain),
+              child: GestureDetector(
+                onVerticalDragEnd: (d) {
+                  if ((d.primaryVelocity ?? 0).abs() > 250) {
+                    Navigator.pop(context);
+                  }
+                },
+                child: InteractiveViewer(
+                  minScale: 0.6,
+                  maxScale: 5,
+                  child: Center(
+                    child: bytes != null
+                        ? Image.memory(bytes, fit: BoxFit.contain)
+                        : Image.network(url!, fit: BoxFit.contain),
+                  ),
                 ),
               ),
             ),

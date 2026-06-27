@@ -528,7 +528,24 @@ class _ChatListScreenState extends State<ChatListScreen>
   @override
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
-    return GlassBackground(
+    final canExit = !_searchVisible && _tabIndex == 0 && _activeFolder == 0;
+    return PopScope(
+      canPop: canExit,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        setState(() {
+          if (_searchVisible) {
+            _searchVisible = false;
+            _searchController.clear();
+            _searchReveal.reverse();
+          } else if (_tabIndex != 0) {
+            _tabIndex = 0;
+          } else if (_activeFolder != 0) {
+            _activeFolder = 0;
+          }
+        });
+      },
+      child: GlassBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: IndexedStack(
@@ -539,6 +556,7 @@ class _ChatListScreenState extends State<ChatListScreen>
           ],
         ),
         bottomNavigationBar: _bottomNav(isLight),
+      ),
       ),
     );
   }
@@ -1582,15 +1600,18 @@ class _SettingsViewState extends State<_SettingsView> {
                             loading: _uploadingPhoto,
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _photoBtn(
-                            icon: Icons.delete_outline_rounded,
-                            label: 'Убрать',
-                            onTap: _removePhoto,
-                            danger: true,
+                        if (_ctrl.currentUser.avatarUrl != null &&
+                            _ctrl.currentUser.avatarUrl!.isNotEmpty) ...[
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _photoBtn(
+                              icon: Icons.delete_outline_rounded,
+                              label: 'Убрать',
+                              onTap: _removePhoto,
+                              danger: true,
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 20),

@@ -33,6 +33,7 @@ class CallService extends ChangeNotifier {
   bool micMuted = false;
   bool speakerOn = false;
   bool cameraOff = false;
+  bool localLarge = false;
   bool mediaConnected = false;
   DateTime? _startedAt;
   Timer? _ticker;
@@ -463,6 +464,11 @@ class CallService extends ChangeNotifier {
     }
   }
 
+  void toggleLocalLarge() {
+    localLarge = !localLarge;
+    notifyListeners();
+  }
+
   void toggleSpeaker() {
     speakerOn = !speakerOn;
     try {
@@ -504,6 +510,7 @@ class CallService extends ChangeNotifier {
     micMuted = false;
     speakerOn = false;
     cameraOff = false;
+    localLarge = false;
     hint = null;
     if (notify) notifyListeners();
   }

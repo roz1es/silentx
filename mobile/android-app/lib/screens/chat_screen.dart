@@ -571,7 +571,9 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
       actions: [
-        if (chat.type == ChatType.direct && _peerId(chat) != null) ...[
+        if (chat.type == ChatType.direct &&
+            _peerId(chat) != null &&
+            chat.title != 'БренксЧат') ...[
           IconButton(
             tooltip: 'Аудиозвонок',
             icon: const Icon(Icons.call_rounded),

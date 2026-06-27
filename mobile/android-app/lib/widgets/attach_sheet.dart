@@ -1,8 +1,8 @@
+import 'dart:io' as io;
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:photo_manager/photo_manager.dart';
 
 import '../theme/app_theme.dart';
 
@@ -19,89 +19,27 @@ class AttachResult {
   final bool isFile;
 }
 
-/// Лист вложений: сетка недавних фото + «Галерея»/«Файл». Возвращает
-/// [AttachResult] через Navigator.pop — диалог открывается уже ПОСЛЕ закрытия
-/// листа (синхронный showDialog во время pop ломает overlay).
-class AttachSheet extends StatefulWidget {
+/// Лист вложений: «Галерея» (системный выбор изображения — открывает галерею
+/// телефона) и «Файл». Возвращает [AttachResult] через Navigator.pop.
+class AttachSheet extends StatelessWidget {
   const AttachSheet({super.key});
 
-  @override
-  State<AttachSheet> createState() => _AttachSheetState();
-}
-
-class _AttachSheetState extends State<AttachSheet> {
-  List<AssetEntity> _assets = const [];
-  bool _loading = true;
-  bool _denied = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
+  Future<void> _pickGallery(BuildContext context) async {
     try {
-      final ps = await PhotoManager.requestPermissionExtend(
-        requestOption: const PermissionRequestOption(
-          androidPermission: AndroidPermission(
-            type: RequestType.image,
-            mediaLocation: false,
-          ),
-        ),
-      );
-      if (!ps.hasAccess) {
-        if (mounted) {
-          setState(() {
-            _loading = false;
-            _denied = true;
-          });
-        }
-        return;
-      }
-      final paths = await PhotoManager.getAssetPathList(
-        type: RequestType.image,
-        onlyAll: true,
-      );
-      if (paths.isEmpty) {
-        if (mounted) setState(() => _loading = false);
-        return;
-      }
-      final recent = await paths.first.getAssetListPaged(page: 0, size: 60);
-      if (mounted) {
-        setState(() {
-          _assets = recent;
-          _loading = false;
-        });
-      }
+      final res =
+          await FilePicker.pickFiles(type: FileType.image, withData: true);
+      final file = res?.files.single;
+      if (file == null) return;
+      final bytes = file.bytes ??
+          (file.path == null
+              ? null
+              : await io.File(file.path!).readAsBytes());
+      if (bytes == null || bytes.isEmpty) return;
+      if (!context.mounted) return;
+      Navigator.of(context).pop(AttachResult.image(bytes, file.name));
     } on Object {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _denied = true;
-        });
-      }
+      if (context.mounted) Navigator.of(context).pop();
     }
-  }
-
-  Future<void> _pick(AssetEntity asset) async {
-    final bytes = await asset.originBytes;
-    if (bytes == null || bytes.isEmpty) return;
-    final title = await asset.titleAsync;
-    if (!mounted) return;
-    Navigator.of(context)
-        .pop(AttachResult.image(bytes, title.isEmpty ? 'photo.jpg' : title));
-  }
-
-  /// Системный выбор фото — надёжный путь на любой версии Android.
-  Future<void> _pickSystemImage() async {
-    final res =
-        await FilePicker.pickFiles(type: FileType.image, withData: true);
-    final file = res?.files.single;
-    final bytes = file?.bytes;
-    if (file == null || bytes == null || bytes.isEmpty) return;
-    if (!mounted) return;
-    Navigator.of(context).pop(AttachResult.image(bytes, file.name));
   }
 
   @override
@@ -122,7 +60,7 @@ class _AttachSheetState extends State<AttachSheet> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              margin: const EdgeInsets.only(top: 10, bottom: 4),
+              margin: const EdgeInsets.only(top: 10, bottom: 6),
               width: 40,
               height: 4,
               decoration: BoxDecoration(
@@ -131,11 +69,11 @@ class _AttachSheetState extends State<AttachSheet> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 8, 18, 8),
+              padding: const EdgeInsets.fromLTRB(18, 6, 18, 4),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  'Галерея',
+                  'Вложение',
                   style: TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 16,
@@ -143,41 +81,18 @@ class _AttachSheetState extends State<AttachSheet> {
                 ),
               ),
             ),
-            SizedBox(
-              height: 330,
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _assets.isEmpty
-                      ? _emptyState(mutedColor)
-                      : GridView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
-                            mainAxisSpacing: 4,
-                            crossAxisSpacing: 4,
-                          ),
-                          itemCount: _assets.length,
-                          itemBuilder: (_, i) => _Thumb(
-                            asset: _assets[i],
-                            onTap: () => _pick(_assets[i]),
-                          ),
-                        ),
-            ),
-            Divider(height: 1, color: border),
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
+              padding: const EdgeInsets.symmetric(vertical: 16),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _category(
+                  _option(
                     Icons.photo_library_rounded,
                     'Галерея',
-                    _pickSystemImage,
+                    () => _pickGallery(context),
                     titleColor,
                   ),
-                  const SizedBox(width: 28),
-                  _category(
+                  _option(
                     Icons.insert_drive_file_rounded,
                     'Файл',
                     () => Navigator.of(context).pop(const AttachResult.file()),
@@ -192,107 +107,29 @@ class _AttachSheetState extends State<AttachSheet> {
     );
   }
 
-  Widget _emptyState(Color mutedColor) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.photo_library_outlined, size: 46, color: mutedColor),
-            const SizedBox(height: 12),
-            Text(
-              'Нажми, чтобы выбрать фото из галереи',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: mutedColor),
-            ),
-            const SizedBox(height: 14),
-            FilledButton.icon(
-              onPressed: _pickSystemImage,
-              style: FilledButton.styleFrom(
-                backgroundColor: accent,
-                foregroundColor: const Color(0xFF08131A),
-                minimumSize: const Size(230, 48),
-              ),
-              icon: const Icon(Icons.photo_library_rounded, size: 18),
-              label: const Text('Открыть галерею'),
-            ),
-            if (_denied) ...[
-              const SizedBox(height: 4),
-              TextButton(
-                onPressed: PhotoManager.openSetting,
-                child: const Text('Разрешить ленту в настройках'),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _category(
+  Widget _option(
       IconData icon, String label, VoidCallback onTap, Color textColor) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(16),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 48,
-              height: 48,
+              width: 58,
+              height: 58,
               decoration: BoxDecoration(
                 color: accent.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: accent),
+              child: Icon(icon, color: accent, size: 26),
             ),
-            const SizedBox(height: 6),
-            Text(label, style: TextStyle(fontSize: 12, color: textColor)),
+            const SizedBox(height: 8),
+            Text(label, style: TextStyle(fontSize: 13, color: textColor)),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// Миниатюра фото в сетке (грузит превью один раз).
-class _Thumb extends StatefulWidget {
-  const _Thumb({required this.asset, required this.onTap});
-
-  final AssetEntity asset;
-  final VoidCallback onTap;
-
-  @override
-  State<_Thumb> createState() => _ThumbState();
-}
-
-class _ThumbState extends State<_Thumb> {
-  Uint8List? _data;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    final d = await widget.asset
-        .thumbnailDataWithSize(const ThumbnailSize.square(300));
-    if (mounted) setState(() => _data = d);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: widget.onTap,
-      child: Container(
-        color: Colors.black.withValues(alpha: 0.18),
-        child: _data == null
-            ? null
-            : Image.memory(_data!, fit: BoxFit.cover, gaplessPlayback: true),
       ),
     );
   }

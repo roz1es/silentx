@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -32,6 +33,13 @@ class CallService extends ChangeNotifier {
   bool micMuted = false;
   bool speakerOn = false;
   bool cameraOff = false;
+  bool mediaConnected = false;
+  DateTime? _startedAt;
+  Timer? _ticker;
+
+  Duration get elapsed => _startedAt == null
+      ? Duration.zero
+      : DateTime.now().difference(_startedAt!);
 
   final RTCVideoRenderer localRenderer = RTCVideoRenderer();
   final RTCVideoRenderer remoteRenderer = RTCVideoRenderer();
@@ -45,7 +53,8 @@ class CallService extends ChangeNotifier {
   final List<RTCIceCandidate> _iceQueue = [];
   List<Map<String, dynamic>> _iceServers = _fallbackIce;
 
-  bool get hasRemoteVideo => remoteRenderer.srcObject != null;
+  bool get hasRemoteVideo =>
+      remoteRenderer.srcObject?.getVideoTracks().isNotEmpty ?? false;
 
   Future<void> _ensureRenderers() async {
     if (_renderersReady) return;
@@ -88,6 +97,14 @@ class CallService extends ChangeNotifier {
       if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
         hint = null;
         error = null;
+        if (!mediaConnected) {
+          mediaConnected = true;
+          _startedAt = DateTime.now();
+          _ticker?.cancel();
+          _ticker = Timer.periodic(
+              const Duration(seconds: 1), (_) => notifyListeners());
+          _applyAudioRoute();
+        }
         notifyListeners();
       } else if (state ==
           RTCPeerConnectionState.RTCPeerConnectionStateFailed) {
@@ -106,9 +123,11 @@ class CallService extends ChangeNotifier {
   }
 
   void _applyAudioRoute() {
-    speakerOn = callType == 'video';
+    // По умолчанию громкая связь — иначе звук идёт в тихий динамик у уха
+    // и собеседника не слышно, когда телефон в руке.
+    speakerOn = true;
     try {
-      Helper.setSpeakerphoneOn(speakerOn);
+      Helper.setSpeakerphoneOn(true);
     } on Object {
       // не критично
     }
@@ -251,6 +270,32 @@ class CallService extends ChangeNotifier {
     if (from == null || from == currentUserId) return;
 
     if (kind == 'offer' && payload['sdp'] != null) {
+      // Доп. offer во время активного звонка от того же собеседника —
+      // это перенастройка (включили камеру). Отвечаем без нового вызова.
+      if (phase == CallPhase.connected &&
+          from == peerId &&
+          (payload['callId'] == null || _callId == payload['callId'])) {
+        final pc = _pc;
+        if (pc == null) return;
+        try {
+          await pc.setRemoteDescription(
+              RTCSessionDescription(payload['sdp'].toString(), 'offer'));
+          await _flushIce(pc);
+          final answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          emitSignal({
+            'toUserId': from,
+            'kind': 'answer',
+            'callId': _callId,
+            'sdp': answer.sdp,
+          });
+          callType = payload['callType']?.toString() ?? callType;
+          notifyListeners();
+        } on Object {
+          // noop
+        }
+        return;
+      }
       if (phase != CallPhase.idle) {
         emitSignal({
           'toUserId': from,
@@ -374,6 +419,50 @@ class CallService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Кнопка камеры: если видео ещё нет (аудиозвонок) — включаем камеру и
+  /// договариваемся заново; иначе просто вкл/выкл существующее видео.
+  void toggleVideo() {
+    final hasVideo = _localStream?.getVideoTracks().isNotEmpty ?? false;
+    if (hasVideo) {
+      toggleCamera();
+    } else {
+      enableCamera();
+    }
+  }
+
+  Future<void> enableCamera() async {
+    final pc = _pc;
+    final local = _localStream;
+    if (pc == null || local == null) return;
+    try {
+      final vstream = await navigator.mediaDevices.getUserMedia({
+        'audio': false,
+        'video': {'facingMode': 'user'},
+      });
+      final vtrack = vstream.getVideoTracks().first;
+      await local.addTrack(vtrack);
+      localRenderer.srcObject = local;
+      await pc.addTrack(vtrack, local);
+      callType = 'video';
+      cameraOff = false;
+      notifyListeners();
+      final offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      final target = _signalTarget;
+      if (target != null) {
+        emitSignal({
+          'toUserId': target,
+          'kind': 'offer',
+          'callId': _callId,
+          'callType': 'video',
+          'sdp': offer.sdp,
+        });
+      }
+    } on Object {
+      // noop
+    }
+  }
+
   void toggleSpeaker() {
     speakerOn = !speakerOn;
     try {
@@ -405,6 +494,10 @@ class CallService extends ChangeNotifier {
     _localStream = null;
     localRenderer.srcObject = null;
     remoteRenderer.srcObject = null;
+    _ticker?.cancel();
+    _ticker = null;
+    _startedAt = null;
+    mediaConnected = false;
     _iceQueue.clear();
     _signalTarget = null;
     _callId = null;

@@ -38,7 +38,7 @@ class CallOverlay extends StatelessWidget {
                 : peer.username);
         final isVideo = call.callType == 'video';
         final showRemoteVideo =
-            isVideo && call.phase == CallPhase.connected && call.hasRemoteVideo;
+            call.phase == CallPhase.connected && call.hasRemoteVideo;
 
         return Material(
           color: const Color(0xFF0E0F12),
@@ -183,10 +183,17 @@ class CallOverlay extends StatelessWidget {
             ? 'Входящий видеозвонок'
             : 'Входящий звонок';
       case CallPhase.connected:
-        return call.hint ?? 'Идёт звонок';
+        if (call.mediaConnected) return _fmtDur(call.elapsed);
+        return call.hint ?? 'Соединяем…';
       case CallPhase.idle:
         return '';
     }
+  }
+
+  String _fmtDur(Duration d) {
+    final m = d.inMinutes.toString().padLeft(2, '0');
+    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
   }
 
   Widget _controls(CallService call) {
@@ -227,16 +234,14 @@ class CallOverlay extends StatelessWidget {
               active: call.speakerOn,
               onTap: call.toggleSpeaker,
             ),
-            if (call.callType == 'video') ...[
-              const SizedBox(width: 18),
-              _smallButton(
-                icon: call.cameraOff
-                    ? Icons.videocam_off_rounded
-                    : Icons.videocam_rounded,
-                active: call.cameraOff,
-                onTap: call.toggleCamera,
-              ),
-            ],
+            const SizedBox(width: 18),
+            _smallButton(
+              icon: call.callType == 'video' && !call.cameraOff
+                  ? Icons.videocam_rounded
+                  : Icons.videocam_off_rounded,
+              active: call.callType == 'video' && call.cameraOff,
+              onTap: call.toggleVideo,
+            ),
           ],
         ),
         const SizedBox(height: 24),

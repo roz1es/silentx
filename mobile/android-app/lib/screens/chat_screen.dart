@@ -150,15 +150,20 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
   }
 
-  void _openAttachSheet() {
+  Future<void> _openAttachSheet() async {
     FocusScope.of(context).unfocus();
-    showModalBottomSheet<void>(
+    final result = await showModalBottomSheet<AttachResult>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) =>
-          AttachSheet(onImage: _previewAndSendImage, onFile: _attach),
+      builder: (_) => const AttachSheet(),
     );
+    if (!mounted || result == null) return;
+    if (result.isFile) {
+      await _attach();
+    } else if (result.bytes != null) {
+      await _previewAndSendImage(result.bytes!, result.name ?? 'photo.jpg');
+    }
   }
 
   /// Предпросмотр изображения перед отправкой: подпись + «отправить как файл».

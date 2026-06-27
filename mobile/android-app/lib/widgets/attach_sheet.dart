@@ -6,15 +6,24 @@ import 'package:photo_manager/photo_manager.dart';
 
 import '../theme/app_theme.dart';
 
-/// Лист вложений в стиле Telegram: сетка недавних фото галереи + «Файл».
+/// Результат листа вложений: фото (байты + имя) или запрос системного файла.
+class AttachResult {
+  const AttachResult.image(this.bytes, this.name) : isFile = false;
+  const AttachResult.file()
+      : bytes = null,
+        name = null,
+        isFile = true;
+
+  final Uint8List? bytes;
+  final String? name;
+  final bool isFile;
+}
+
+/// Лист вложений: сетка недавних фото + «Галерея»/«Файл». Возвращает
+/// [AttachResult] через Navigator.pop — диалог открывается уже ПОСЛЕ закрытия
+/// листа (синхронный showDialog во время pop ломает overlay).
 class AttachSheet extends StatefulWidget {
-  const AttachSheet({super.key, required this.onImage, required this.onFile});
-
-  /// Выбрано фото из галереи (готовые байты + имя).
-  final void Function(Uint8List bytes, String name) onImage;
-
-  /// Нажата кнопка «Файл» — обычный системный выбор файла.
-  final VoidCallback onFile;
+  const AttachSheet({super.key});
 
   @override
   State<AttachSheet> createState() => _AttachSheetState();
@@ -73,8 +82,8 @@ class _AttachSheetState extends State<AttachSheet> {
     if (bytes == null || bytes.isEmpty) return;
     final title = await asset.titleAsync;
     if (!mounted) return;
-    Navigator.of(context).pop();
-    widget.onImage(bytes, title.isEmpty ? 'photo.jpg' : title);
+    Navigator.of(context)
+        .pop(AttachResult.image(bytes, title.isEmpty ? 'photo.jpg' : title));
   }
 
   /// Системный выбор фото — надёжный путь на любой версии Android.
@@ -85,8 +94,7 @@ class _AttachSheetState extends State<AttachSheet> {
     final bytes = file?.bytes;
     if (file == null || bytes == null || bytes.isEmpty) return;
     if (!mounted) return;
-    Navigator.of(context).pop();
-    widget.onImage(bytes, file.name);
+    Navigator.of(context).pop(AttachResult.image(bytes, file.name));
   }
 
   @override
@@ -165,10 +173,7 @@ class _AttachSheetState extends State<AttachSheet> {
                   _category(
                     Icons.insert_drive_file_rounded,
                     'Файл',
-                    () {
-                      Navigator.of(context).pop();
-                      widget.onFile();
-                    },
+                    () => Navigator.of(context).pop(const AttachResult.file()),
                     titleColor,
                   ),
                 ],

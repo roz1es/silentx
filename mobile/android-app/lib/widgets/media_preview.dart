@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:io' as io;
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
@@ -36,7 +38,7 @@ class MediaPreview extends StatelessWidget {
       case 'image':
         return ImagePreview(source: media.dataUrl, serverUrl: serverUrl);
       case 'voice':
-        return VoicePreview(media: media, onPlay: () => onPlayVoice(media));
+        return VoicePreview(media: media);
       case 'video_note':
         return _VideoNotePreview(
           media: media,
@@ -92,23 +94,110 @@ class _FilePreview extends StatelessWidget {
   }
 }
 
-class VoicePreview extends StatelessWidget {
-  const VoicePreview({super.key, required this.media, required this.onPlay});
+class VoicePreview extends StatefulWidget {
+  const VoicePreview({super.key, required this.media});
 
   final MessageMedia media;
-  final VoidCallback onPlay;
+
+  @override
+  State<VoicePreview> createState() => _VoicePreviewState();
+}
+
+class _VoicePreviewState extends State<VoicePreview> {
+  final AudioPlayer _player = AudioPlayer();
+  final List<StreamSubscription<dynamic>> _subs = [];
+  PlayerState _state = PlayerState.stopped;
+  Duration _pos = Duration.zero;
+  Duration _dur = Duration.zero;
+  String? _path;
+  bool _preparing = false;
+
+  bool get _playing => _state == PlayerState.playing;
+
+  @override
+  void initState() {
+    super.initState();
+    _subs.add(_player.onPlayerStateChanged.listen((s) {
+      if (mounted) setState(() => _state = s);
+    }));
+    _subs.add(_player.onPositionChanged.listen((p) {
+      if (mounted) setState(() => _pos = p);
+    }));
+    _subs.add(_player.onDurationChanged.listen((d) {
+      if (mounted) setState(() => _dur = d);
+    }));
+    _subs.add(_player.onPlayerComplete.listen((_) {
+      if (mounted) {
+        setState(() {
+          _state = PlayerState.completed;
+          _pos = Duration.zero;
+        });
+      }
+    }));
+  }
+
+  Future<void> _toggle() async {
+    try {
+      if (_state == PlayerState.playing) {
+        await _player.pause();
+        return;
+      }
+      if (_state == PlayerState.paused) {
+        await _player.resume();
+        return;
+      }
+      if (_preparing) return;
+      _preparing = true;
+      if (_path == null) {
+        final bytes = bytesFromDataUrl(widget.media.dataUrl);
+        if (bytes == null || bytes.isEmpty) {
+          _preparing = false;
+          return;
+        }
+        final dir = await getTemporaryDirectory();
+        final p =
+            '${dir.path}/voice-${widget.media.dataUrl.hashCode.abs()}.m4a';
+        final f = io.File(p);
+        if (!await f.exists()) await f.writeAsBytes(bytes);
+        _path = p;
+      }
+      await _player.stop();
+      await _player.play(DeviceFileSource(_path!));
+      _preparing = false;
+    } on Object {
+      _preparing = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final s in _subs) {
+      s.cancel();
+    }
+    _player.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final bytes = bytesFromDataUrl(media.dataUrl);
+    final bytes = bytesFromDataUrl(widget.media.dataUrl);
     final size = _formatSize(bytes?.length ?? 0);
-    final dur = formatDuration(media.durationMs ?? 0);
-    final meta = size.isEmpty ? dur : '$dur, $size';
+    final totalMs = _dur.inMilliseconds > 0
+        ? _dur.inMilliseconds
+        : (widget.media.durationMs ?? 0);
+    final progress =
+        totalMs == 0 ? 0.0 : (_pos.inMilliseconds / totalMs).clamp(0.0, 1.0);
+    final shownMs = (_playing || _state == PlayerState.paused)
+        ? _pos.inMilliseconds
+        : totalMs;
+    final time = formatDuration(shownMs);
+    final meta = size.isEmpty ? time : '$time, $size';
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         GestureDetector(
-          onTap: onPlay,
+          onTap: _toggle,
           child: Container(
             width: 42,
             height: 42,
@@ -116,8 +205,11 @@ class VoicePreview extends StatelessWidget {
               shape: BoxShape.circle,
               color: accent,
             ),
-            child: const Icon(Icons.play_arrow_rounded,
-                color: Color(0xFF08131A), size: 26),
+            child: Icon(
+              _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              color: const Color(0xFF08131A),
+              size: 26,
+            ),
           ),
         ),
         const SizedBox(width: 12),
@@ -125,7 +217,7 @@ class VoicePreview extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const _VoiceWave(),
+            _VoiceWave(progress: progress),
             const SizedBox(height: 6),
             Text(meta, style: const TextStyle(color: muted, fontSize: 11.5)),
           ],
@@ -143,9 +235,11 @@ String _formatSize(int bytes) {
 }
 
 class _VoiceWave extends StatelessWidget {
-  const _VoiceWave();
+  const _VoiceWave({this.progress = 0});
 
-  // Статичная «волна» из палочек разной высоты.
+  /// 0..1 — доля проигранного (закрашивается ярким золотом).
+  final double progress;
+
   static const _bars = <double>[
     5, 9, 14, 8, 12, 18, 13, 7, 11, 17, 10, 6, //
     13, 8, 15, 10, 7, 12, 18, 9, 11, 7, 14, 9,
@@ -153,19 +247,20 @@ class _VoiceWave extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final active = (_bars.length * progress).round();
     return SizedBox(
       height: 22,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          for (final h in _bars)
+          for (var i = 0; i < _bars.length; i++)
             Container(
               width: 2.5,
-              height: h,
+              height: _bars[i],
               margin: const EdgeInsets.symmetric(horizontal: 1),
               decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.85),
+                color: i < active ? accent : accent.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),

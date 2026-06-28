@@ -46,10 +46,15 @@ class MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    final body = GestureDetector(
       onLongPressStart: (d) => _openMenu(context, d.globalPosition),
+      // Двойной тап — быстрая реакция «сердце».
+      onDoubleTap: message.deleted ? null : () => onReaction('❤️'),
       child: _bubbleBody(context),
     );
+    if (message.deleted) return body;
+    // Свайп для ответа: входящее — влево, своё — вправо.
+    return _SwipeToReply(own: own, onReply: onReply, child: body);
   }
 
   /// Тело пузыря без жестов — переиспользуется как «приподнятая» копия в меню.
@@ -647,6 +652,110 @@ class _ReplyChip extends StatelessWidget {
           color: isLight ? const Color(0xFF637083) : muted,
           fontSize: 13,
         ),
+      ),
+    );
+  }
+}
+
+/// Свайп-жест ответа: пузырь тянется в сторону, появляется иконка ответа, и при
+/// достижении порога вызывается [onReply]. Направление зависит от автора:
+/// входящее тянем влево, своё — вправо (как просил пользователь).
+class _SwipeToReply extends StatefulWidget {
+  const _SwipeToReply({
+    required this.child,
+    required this.onReply,
+    required this.own,
+  });
+
+  final Widget child;
+  final VoidCallback onReply;
+  final bool own;
+
+  @override
+  State<_SwipeToReply> createState() => _SwipeToReplyState();
+}
+
+class _SwipeToReplyState extends State<_SwipeToReply>
+    with SingleTickerProviderStateMixin {
+  static const _maxDrag = 78.0;
+  static const _trigger = 52.0;
+
+  double _dx = 0;
+  bool _passed = false;
+  late final AnimationController _return = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 200),
+  );
+  Animation<double>? _anim;
+
+  @override
+  void dispose() {
+    _return.dispose();
+    super.dispose();
+  }
+
+  void _onUpdate(DragUpdateDetails d) {
+    if (_return.isAnimating) return;
+    setState(() {
+      final next = _dx + d.delta.dx;
+      _dx = widget.own
+          ? next.clamp(0.0, _maxDrag)
+          : next.clamp(-_maxDrag, 0.0);
+    });
+    final passed = _dx.abs() >= _trigger;
+    if (passed && !_passed) HapticFeedback.mediumImpact();
+    _passed = passed;
+  }
+
+  void _onEnd(DragEndDetails d) {
+    final fire = _dx.abs() >= _trigger;
+    _passed = false;
+    if (fire) widget.onReply();
+    final from = _dx;
+    if (from == 0) return;
+    _anim = Tween<double>(begin: from, end: 0).animate(
+      CurvedAnimation(parent: _return, curve: Curves.easeOut),
+    )..addListener(() {
+        if (mounted) setState(() => _dx = _anim!.value);
+      });
+    _return.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = (_dx.abs() / _trigger).clamp(0.0, 1.0);
+    return GestureDetector(
+      onHorizontalDragUpdate: _onUpdate,
+      onHorizontalDragEnd: _onEnd,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Иконка ответа появляется со стороны, противоположной свайпу.
+          Positioned(
+            left: widget.own ? 18 : null,
+            right: widget.own ? null : 18,
+            child: Opacity(
+              opacity: progress,
+              child: Transform.scale(
+                scale: 0.5 + 0.5 * progress,
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.reply_rounded,
+                      size: 18, color: accent),
+                ),
+              ),
+            ),
+          ),
+          Transform.translate(
+            offset: Offset(_dx, 0),
+            child: widget.child,
+          ),
+        ],
       ),
     );
   }

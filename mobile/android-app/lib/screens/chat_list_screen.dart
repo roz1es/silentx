@@ -73,6 +73,9 @@ class _ChatListScreenState extends State<ChatListScreen>
   final GlobalKey _headerKey = GlobalKey();
   double _listTopInset = 0;
 
+  // Прокрутка списка чатов — чтобы при открытии поиска перебросить наверх.
+  final ScrollController _chatScroll = ScrollController();
+
   MessengerController get _controller => widget.controller;
 
   Future<void> _loadFolders() async {
@@ -104,6 +107,13 @@ class _ChatListScreenState extends State<ChatListScreen>
       _searchVisible = true;
     });
     _searchReveal.forward();
+    // Перебрасываем список в начало, чтобы под строкой поиска был верх списка,
+    // а не середина (иначе чаты «просвечивают» под плавающей шапкой).
+    if (_chatScroll.hasClients) {
+      _chatScroll.animateTo(0,
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic);
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _searchFocus.requestFocus();
     });
@@ -140,6 +150,7 @@ class _ChatListScreenState extends State<ChatListScreen>
     _searchController.dispose();
     _searchFocus.dispose();
     _searchReveal.dispose();
+    _chatScroll.dispose();
     super.dispose();
   }
 
@@ -1331,6 +1342,7 @@ class _ChatListScreenState extends State<ChatListScreen>
     // последние чаты можно было выкрутить из-под кнопок.
     final bottomInset = MediaQuery.of(context).padding.bottom + 80;
     return ListView.builder(
+      controller: _chatScroll,
       padding: EdgeInsets.fromLTRB(10, _listTopInset + 8, 10, bottomInset),
       itemCount: chats.length,
       itemBuilder: (context, index) {

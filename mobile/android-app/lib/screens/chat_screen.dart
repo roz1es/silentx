@@ -470,21 +470,7 @@ class _ChatScreenState extends State<ChatScreen> {
         : _controller.messages;
     final pinned = _controller.pinnedMessage;
 
-    return PopScope(
-      canPop: false,
-      // Системный «назад»/свайп от края НЕ выходит из чата (иначе случайный
-      // свайп по сообщению выкидывал). В поиске — закрывает поиск; выход из
-      // чата — стрелкой «назад» в шапке.
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        if (_msgSearch) {
-          setState(() {
-            _msgSearch = false;
-            _msgSearchController.clear();
-          });
-        }
-      },
-      child: GlassBackground(
+    return GlassBackground(
       child: Scaffold(
       backgroundColor: Colors.transparent,
       appBar: _appBar(chat),
@@ -598,7 +584,6 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
       ),
-      ),
     );
   }
 
@@ -638,11 +623,6 @@ class _ChatScreenState extends State<ChatScreen> {
     return AppBar(
       backgroundColor: Colors.transparent,
       flexibleSpace: const GlassBar(bottomBorder: true),
-      // Явный pop (в обход PopScope canPop:false) — выход из чата.
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_rounded),
-        onPressed: () => Navigator.of(context).pop(),
-      ),
       titleSpacing: 0,
       title: InkWell(
         onTap: () => _openProfile(chat),

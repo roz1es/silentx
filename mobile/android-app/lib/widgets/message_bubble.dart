@@ -28,7 +28,9 @@ class MessageBubble extends StatelessWidget {
     required this.onPlayVoice,
     this.senderName,
     this.replyPreview,
+    this.onReplyTap,
     this.read = false,
+    this.highlighted = false,
   });
 
   final Message message;
@@ -44,6 +46,8 @@ class MessageBubble extends StatelessWidget {
   final ValueChanged<MessageMedia> onPlayVoice;
   final String? senderName;
   final String? replyPreview;
+  final VoidCallback? onReplyTap;
+  final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
@@ -53,9 +57,15 @@ class MessageBubble extends StatelessWidget {
       onDoubleTap: message.deleted ? null : () => onReaction('❤️'),
       child: _bubbleBody(context),
     );
-    if (message.deleted) return body;
-    // Свайп влево по всей строке — ответ на сообщение.
-    return _SwipeToReply(onReply: onReply, child: body);
+    // Свайп влево — ответ; на удалённых жест не нужен.
+    final swipeable =
+        message.deleted ? body : _SwipeToReply(onReply: onReply, child: body);
+    // Кратковременная подсветка при переходе к сообщению (тап по ответу).
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      color: highlighted ? accent.withValues(alpha: 0.12) : Colors.transparent,
+      child: swipeable,
+    );
   }
 
   /// Тело пузыря без жестов — переиспользуется как «приподнятая» копия в меню.
@@ -212,7 +222,11 @@ class MessageBubble extends StatelessWidget {
                         ),
                       ),
                     if (replyPreview != null && !message.deleted)
-                      _ReplyChip(preview: replyPreview!, isLight: isLight),
+                      _ReplyChip(
+                        preview: replyPreview!,
+                        isLight: isLight,
+                        onTap: onReplyTap,
+                      ),
                     ..._bubbleInner(msgTextColor, timeColor, isLight),
                   ],
                 ),
@@ -628,30 +642,36 @@ class _ContextMenuState extends State<_ContextMenu> {
 }
 
 class _ReplyChip extends StatelessWidget {
-  const _ReplyChip({required this.preview, required this.isLight});
+  const _ReplyChip(
+      {required this.preview, required this.isLight, this.onTap});
 
   final String preview;
   final bool isLight;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: isLight
-            ? const Color(0xFF96BFDF).withValues(alpha: 0.25)
-            : Colors.black.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(10),
-        border: Border(left: BorderSide(color: accent, width: 3)),
-      ),
-      child: Text(
-        preview,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          color: isLight ? const Color(0xFF637083) : muted,
-          fontSize: 13,
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isLight
+              ? const Color(0xFF96BFDF).withValues(alpha: 0.25)
+              : Colors.black.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(10),
+          border: Border(left: BorderSide(color: accent, width: 3)),
+        ),
+        child: Text(
+          preview,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: isLight ? const Color(0xFF637083) : muted,
+            fontSize: 13,
+          ),
         ),
       ),
     );

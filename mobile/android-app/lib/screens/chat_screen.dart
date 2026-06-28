@@ -47,6 +47,11 @@ class _ChatScreenState extends State<ChatScreen> {
   final _scrollController = ScrollController();
   final _audioService = AudioMessageService();
 
+  // Ключи сообщений по id — для перехода к оригиналу при тапе на ответ.
+  final Map<String, GlobalKey> _messageKeys = {};
+  String? _highlightId;
+  Timer? _highlightTimer;
+
   Message? _replyTo;
   Message? _editing;
   bool _sendingMedia = false;
@@ -78,6 +83,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _controller.removeListener(_onControllerChanged);
     _controller.closeActiveChat();
     _recordingTimer?.cancel();
+    _highlightTimer?.cancel();
     unawaited(_audioService.dispose());
     _messageController.dispose();
     _msgSearchController.dispose();
@@ -454,6 +460,59 @@ class _ChatScreenState extends State<ChatScreen> {
     return 'Сообщение';
   }
 
+  /// Тап по плашке-ответу: прокрутить ленту к оригинальному сообщению и кратко
+  /// подсветить его. Если оригинал вне экрана — сначала грубо доскроллим по
+  /// индексу, затем точно наводимся через ensureVisible.
+  void _jumpToMessage(String? id) {
+    if (id == null) return;
+    final messages = _controller.messages;
+    final idx = messages.indexWhere((m) => m.id == id);
+    if (idx < 0) return; // оригинал не загружен (старее текущей страницы)
+
+    void highlight() {
+      setState(() => _highlightId = id);
+      _highlightTimer?.cancel();
+      _highlightTimer = Timer(const Duration(milliseconds: 1600), () {
+        if (mounted) setState(() => _highlightId = null);
+      });
+    }
+
+    final ctx = _messageKeys[id]?.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+        alignment: 0.3,
+      );
+      highlight();
+      return;
+    }
+    // Оригинал не построен (вне области) — грубо доскроллим по доле индекса.
+    if (!_scrollController.hasClients) return;
+    final max = _scrollController.position.maxScrollExtent;
+    final target = messages.length <= 1 ? 0.0 : (idx / (messages.length - 1)) * max;
+    _scrollController
+        .animateTo(
+      target,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+    )
+        .then((_) {
+      if (!mounted) return;
+      final ctx2 = _messageKeys[id]?.currentContext;
+      if (ctx2 != null && ctx2.mounted) {
+        Scrollable.ensureVisible(
+          ctx2,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          alignment: 0.3,
+        );
+      }
+      highlight();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final chat = _controller.chatById(widget.chatId);
@@ -510,27 +569,33 @@ class _ChatScreenState extends State<ChatScreen> {
                               final message = messages[index];
                               final isOwn = message.senderId ==
                                   _controller.currentUser.id;
-                              return MessageBubble(
-                                message: message,
-                                serverUrl: _controller.serverUrl,
-                                own: isOwn,
-                                read: isOwn &&
-                                    _controller.isMessageRead(message),
-                                currentUserId: _controller.currentUser.id,
-                                senderName: _senderName(chat, message),
-                                replyPreview: _replyPreview(message),
-                                onReply: () => setState(() {
-                                  _editing = null;
-                                  _replyTo = message;
-                                }),
-                                onEdit: () => _startEdit(message),
-                                onDelete: () =>
-                                    _controller.deleteMessage(message.id),
-                                onPin: () =>
-                                    _controller.setPinnedMessage(message.id),
-                                onReaction: (emoji) =>
-                                    _controller.toggleReaction(message.id, emoji),
-                                onPlayVoice: _playVoice,
+                              return KeyedSubtree(
+                                key: _messageKeys[message.id] ??= GlobalKey(),
+                                child: MessageBubble(
+                                  message: message,
+                                  serverUrl: _controller.serverUrl,
+                                  own: isOwn,
+                                  read: isOwn &&
+                                      _controller.isMessageRead(message),
+                                  currentUserId: _controller.currentUser.id,
+                                  senderName: _senderName(chat, message),
+                                  replyPreview: _replyPreview(message),
+                                  highlighted: message.id == _highlightId,
+                                  onReplyTap: () =>
+                                      _jumpToMessage(message.replyToMessageId),
+                                  onReply: () => setState(() {
+                                    _editing = null;
+                                    _replyTo = message;
+                                  }),
+                                  onEdit: () => _startEdit(message),
+                                  onDelete: () =>
+                                      _controller.deleteMessage(message.id),
+                                  onPin: () =>
+                                      _controller.setPinnedMessage(message.id),
+                                  onReaction: (emoji) => _controller
+                                      .toggleReaction(message.id, emoji),
+                                  onPlayVoice: _playVoice,
+                                ),
                               );
                             },
                           ),

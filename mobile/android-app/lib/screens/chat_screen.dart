@@ -47,8 +47,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final _scrollController = ScrollController();
   final _audioService = AudioMessageService();
 
-  // Ключи сообщений по id — для перехода к оригиналу при тапе на ответ.
-  final Map<String, GlobalKey> _messageKeys = {};
+  // Для перехода к оригиналу по тапу на ответ: подсветка + ключ по объекту
+  // сообщения (GlobalObjectKey не сталкивается даже при дублирующихся id).
   String? _highlightId;
   Timer? _highlightTimer;
 
@@ -468,6 +468,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final messages = _controller.messages;
     final idx = messages.indexWhere((m) => m.id == id);
     if (idx < 0) return; // оригинал не загружен (старее текущей страницы)
+    final target = messages[idx];
 
     void highlight() {
       setState(() => _highlightId = id);
@@ -477,7 +478,7 @@ class _ChatScreenState extends State<ChatScreen> {
       });
     }
 
-    final ctx = _messageKeys[id]?.currentContext;
+    final ctx = GlobalObjectKey(target).currentContext;
     if (ctx != null) {
       Scrollable.ensureVisible(
         ctx,
@@ -491,16 +492,17 @@ class _ChatScreenState extends State<ChatScreen> {
     // Оригинал не построен (вне области) — грубо доскроллим по доле индекса.
     if (!_scrollController.hasClients) return;
     final max = _scrollController.position.maxScrollExtent;
-    final target = messages.length <= 1 ? 0.0 : (idx / (messages.length - 1)) * max;
+    final offset =
+        messages.length <= 1 ? 0.0 : (idx / (messages.length - 1)) * max;
     _scrollController
         .animateTo(
-      target,
+      offset,
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOutCubic,
     )
         .then((_) {
       if (!mounted) return;
-      final ctx2 = _messageKeys[id]?.currentContext;
+      final ctx2 = GlobalObjectKey(target).currentContext;
       if (ctx2 != null && ctx2.mounted) {
         Scrollable.ensureVisible(
           ctx2,
@@ -570,7 +572,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               final isOwn = message.senderId ==
                                   _controller.currentUser.id;
                               return KeyedSubtree(
-                                key: _messageKeys[message.id] ??= GlobalKey(),
+                                key: GlobalObjectKey(message),
                                 child: MessageBubble(
                                   message: message,
                                   serverUrl: _controller.serverUrl,

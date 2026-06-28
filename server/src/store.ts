@@ -717,6 +717,37 @@ export function updateChatProfile(
   return chat;
 }
 
+/** Может ли пользователь писать в чат. В канале — владелец или админ. */
+export function canWriteToChat(chat: Chat, userId: string): boolean {
+  if (chat.type !== 'channel') return true;
+  return (
+    chat.channelOwnerId === userId ||
+    (chat.channelAdminIds ?? []).includes(userId)
+  );
+}
+
+/** Назначить/снять администратора канала. Только владелец канала. */
+export function setChannelAdmin(
+  chatId: string,
+  requesterId: string,
+  targetUserId: string,
+  makeAdmin: boolean
+): Chat | undefined {
+  const chat = chats.get(chatId);
+  if (!chat || chat.type !== 'channel') return undefined;
+  if (chat.channelOwnerId !== requesterId) return undefined;
+  if (targetUserId === chat.channelOwnerId) return chat;
+  if (!chat.participantIds.includes(targetUserId)) return undefined;
+  const set = new Set(chat.channelAdminIds ?? []);
+  if (makeAdmin) {
+    set.add(targetUserId);
+  } else {
+    set.delete(targetUserId);
+  }
+  chat.channelAdminIds = [...set];
+  return chat;
+}
+
 export function addChatMembers(
   chatId: string,
   requesterId: string,
@@ -946,6 +977,7 @@ export function createChannelChat(
     name,
     participantIds,
     channelOwnerId: ownerId,
+    channelAdminIds: [],
     unread: {},
     lastReadAt: {},
   };

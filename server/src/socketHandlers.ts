@@ -300,10 +300,7 @@ export function registerSocketHandlers(io: IOServer): void {
       }) => {
         const chat = store.getChat(payload.chatId);
         if (!chat?.participantIds.includes(userId)) return;
-        if (
-          chat.type === 'channel' &&
-          chat.channelOwnerId !== userId
-        ) {
+        if (!store.canWriteToChat(chat, userId)) {
           return;
         }
 
@@ -409,10 +406,7 @@ export function registerSocketHandlers(io: IOServer): void {
         const text = String(payload?.text ?? '');
         const chat = store.getChat(chatId);
         if (!chat?.participantIds.includes(userId)) return;
-        if (
-          chat.type === 'channel' &&
-          chat.channelOwnerId !== userId
-        ) {
+        if (!store.canWriteToChat(chat, userId)) {
           return;
         }
         const encryptedText = payload.encryptedText;
@@ -478,7 +472,7 @@ export function registerSocketHandlers(io: IOServer): void {
         const targetChat = store.getChat(targetChatId);
         if (!sourceChat?.participantIds.includes(userId)) return;
         if (!targetChat?.participantIds.includes(userId)) return;
-        if (targetChat.type === 'channel' && targetChat.channelOwnerId !== userId) {
+        if (!store.canWriteToChat(targetChat, userId)) {
           return;
         }
         const ids = Array.isArray(payload?.messageIds)
@@ -537,10 +531,7 @@ export function registerSocketHandlers(io: IOServer): void {
       (payload: { chatId: string; isTyping: boolean }) => {
         const chat = store.getChat(payload.chatId);
         if (!chat?.participantIds.includes(userId)) return;
-        if (
-          chat.type === 'channel' &&
-          chat.channelOwnerId !== userId
-        ) {
+        if (!store.canWriteToChat(chat, userId)) {
           return;
         }
 

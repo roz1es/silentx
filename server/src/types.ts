@@ -76,6 +76,8 @@ export interface Chat {
   pinnedMessageId?: string | null;
   /** Канал: только этот пользователь может писать */
   channelOwnerId?: string;
+  /** Канал: дополнительные пользователи с правом писать (администраторы) */
+  channelAdminIds?: string[];
 }
 
 export interface Message {

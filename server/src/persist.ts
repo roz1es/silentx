@@ -82,6 +82,7 @@ async function ensureMysqlSchema(conn: mysql.Connection): Promise<void> {
       last_read_at JSON NULL,
       pinned_message_id VARCHAR(96) NULL,
       channel_owner_id VARCHAR(96) NULL,
+      channel_admin_ids JSON NULL,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `);
@@ -131,6 +132,20 @@ async function ensureMysqlSchema(conn: mysql.Connection): Promise<void> {
   if (encryptedTextColumns.length === 0) {
     await conn.execute(
       'ALTER TABLE messages ADD COLUMN encrypted_text JSON NULL AFTER text'
+    );
+  }
+  const [channelAdminColumns] = await conn.execute<mysql.RowDataPacket[]>(
+    `
+      SELECT COLUMN_NAME
+      FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'chats'
+        AND COLUMN_NAME = 'channel_admin_ids'
+    `
+  );
+  if (channelAdminColumns.length === 0) {
+    await conn.execute(
+      'ALTER TABLE chats ADD COLUMN channel_admin_ids JSON NULL AFTER channel_owner_id'
     );
   }
   await conn.execute(`
@@ -287,6 +302,7 @@ async function readStateFromNormalizedMysql(): Promise<PersistedStateV1 | null> 
           row.pinned_message_id == null ? undefined : String(row.pinned_message_id),
         channelOwnerId:
           row.channel_owner_id == null ? undefined : String(row.channel_owner_id),
+        channelAdminIds: parseJsonCell<string[]>(row.channel_admin_ids, []),
       })),
       messagesByChat: [...messagesByChatMap.entries()],
       muted: groupPairs(mutedRows),
@@ -360,9 +376,9 @@ async function flushToMysql(): Promise<void> {
           `
             INSERT INTO chats (
               id, type, name, avatar_url, last_message, unread,
-              last_read_at, pinned_message_id, channel_owner_id
+              last_read_at, pinned_message_id, channel_owner_id, channel_admin_ids
             )
-            VALUES (?, ?, ?, ?, CAST(? AS JSON), CAST(? AS JSON), CAST(? AS JSON), ?, ?)
+            VALUES (?, ?, ?, ?, CAST(? AS JSON), CAST(? AS JSON), CAST(? AS JSON), ?, ?, CAST(? AS JSON))
           `,
           [
             chat.id,
@@ -374,6 +390,7 @@ async function flushToMysql(): Promise<void> {
             JSON.stringify(chat.lastReadAt ?? null),
             chat.pinnedMessageId ?? null,
             chat.channelOwnerId ?? null,
+            JSON.stringify(chat.channelAdminIds ?? []),
           ]
         );
         for (const [position, userId] of chat.participantIds.entries()) {

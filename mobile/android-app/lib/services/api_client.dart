@@ -440,6 +440,26 @@ class ApiClient {
     return Chat.fromJson((json['chat'] as Map).cast<String, dynamic>());
   }
 
+  /// Изменить чат (название группы/канала). Доступно владельцу канала.
+  Future<Chat> updateChat(String chatId, {String? name}) async {
+    final body = <String, dynamic>{};
+    if (name != null) body['name'] = name;
+    final json = await _request('/api/chats/${Uri.encodeComponent(chatId)}',
+        method: 'PATCH', body: body);
+    return Chat.fromJson((json['chat'] as Map).cast<String, dynamic>());
+  }
+
+  /// Назначить/снять администратора канала (только владелец).
+  Future<Chat> setChannelAdmin(
+      String chatId, String userId, bool admin) async {
+    final json = await _request(
+      '/api/chats/${Uri.encodeComponent(chatId)}/admins',
+      method: 'POST',
+      body: {'userId': userId, 'admin': admin},
+    );
+    return Chat.fromJson((json['chat'] as Map).cast<String, dynamic>());
+  }
+
   Future<void> setPinnedMessage({
     required String chatId,
     required String? messageId,

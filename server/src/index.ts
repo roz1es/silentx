@@ -982,6 +982,23 @@ app.post('/api/chats/:chatId/members', requireAuth, (req, res) => {
   res.json({ chat: store.serializeChatForViewer(updated, userId) });
 });
 
+app.post('/api/chats/:chatId/admins', requireAuth, (req, res) => {
+  const userId = req.userId!;
+  const chatId = req.params.chatId;
+  const body = req.body ?? {};
+  const targetUserId = String(body.userId ?? '');
+  const admin = body.admin === true;
+  if (!targetUserId) {
+    return res.status(400).json({ error: 'Укажите пользователя' });
+  }
+  const updated = store.setChannelAdmin(chatId, userId, targetUserId, admin);
+  if (!updated) {
+    return res.status(403).json({ error: 'Нет прав или чат не найден' });
+  }
+  broadcastChatToParticipants(chatId);
+  res.json({ chat: store.serializeChatForViewer(updated, userId) });
+});
+
 app.delete('/api/chats/:chatId', requireAuth, (req, res) => {
   const userId = req.userId!;
   const chatId = req.params.chatId;

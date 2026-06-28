@@ -152,6 +152,7 @@ class Chat {
     this.pinnedToTop = false,
     this.verified = false,
     this.channelOwnerId,
+    this.channelAdminIds = const [],
   });
 
   final String id;
@@ -170,6 +171,7 @@ class Chat {
   final bool pinnedToTop;
   final bool verified;
   final String? channelOwnerId;
+  final List<String> channelAdminIds;
 
   String get title {
     final custom = displayName?.trim();
@@ -199,6 +201,7 @@ class Chat {
       pinnedToTop: pinnedToTop ?? this.pinnedToTop,
       verified: verified ?? this.verified,
       channelOwnerId: channelOwnerId,
+      channelAdminIds: channelAdminIds,
     );
   }
 
@@ -218,6 +221,7 @@ class Chat {
         'pinnedToTop': pinnedToTop,
         'verified': verified,
         'channelOwnerId': channelOwnerId,
+        'channelAdminIds': channelAdminIds,
       };
 
   factory Chat.fromJson(Map<String, dynamic> json) {
@@ -260,6 +264,11 @@ class Chat {
       pinnedToTop: json['pinnedToTop'] == true,
       verified: json['verified'] == true,
       channelOwnerId: json['channelOwnerId']?.toString(),
+      channelAdminIds: json['channelAdminIds'] is List
+          ? (json['channelAdminIds'] as List)
+              .map((e) => e.toString())
+              .toList(growable: false)
+          : const [],
     );
   }
 }

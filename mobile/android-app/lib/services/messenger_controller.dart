@@ -413,6 +413,21 @@ class MessengerController extends ChangeNotifier {
     unawaited(ChatCache.saveChats(_chats));
   }
 
+  Future<void> updateChatName(String chatId, String name) async {
+    final updated = await api.updateChat(chatId, name: name);
+    _upsertChat(updated);
+    notifyListeners();
+    unawaited(ChatCache.saveChats(_chats));
+  }
+
+  Future<void> setChannelAdmin(
+      String chatId, String userId, bool admin) async {
+    final updated = await api.setChannelAdmin(chatId, userId, admin);
+    _upsertChat(updated);
+    notifyListeners();
+    unawaited(ChatCache.saveChats(_chats));
+  }
+
   Future<void> clearChat(Chat chat) async {
     await api.clearChat(chat.id);
     if (chat.id == _activeChatId) {

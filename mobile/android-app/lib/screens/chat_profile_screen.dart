@@ -281,30 +281,33 @@ class _ChatProfileScreenState extends State<ChatProfileScreen> {
                             ),
                           ],
                         ),
-                      const SizedBox(height: 14),
-                      // Карточки информации.
-                      if (peer != null)
-                        _infoCard('Юзернейм', '@${peer.username}', textColor,
-                            mutedColor),
-                      if (phone != null && phone.isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        _infoCard('Телефон', phone, textColor, mutedColor),
-                      ],
-                      if (birth != null) ...[
-                        const SizedBox(height: 10),
-                        _infoCard(
-                            'Дата рождения', birth, textColor, mutedColor),
-                      ],
-                      const SizedBox(height: 14),
-                      Center(
-                        child: Text(
-                          bioText != null && bioText.isNotEmpty
-                              ? bioText
-                              : 'Нет описания',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: mutedColor, fontSize: 14),
+                      // Персональная информация — только для личных чатов;
+                      // в каналах/группах эти поля (владельца) не показываем.
+                      if (isDirect) ...[
+                        const SizedBox(height: 14),
+                        if (peer != null)
+                          _infoCard('Юзернейм', '@${peer.username}', textColor,
+                              mutedColor),
+                        if (phone != null && phone.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          _infoCard('Телефон', phone, textColor, mutedColor),
+                        ],
+                        if (birth != null) ...[
+                          const SizedBox(height: 10),
+                          _infoCard(
+                              'Дата рождения', birth, textColor, mutedColor),
+                        ],
+                        const SizedBox(height: 14),
+                        Center(
+                          child: Text(
+                            bioText != null && bioText.isNotEmpty
+                                ? bioText
+                                : 'Нет описания',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: mutedColor, fontSize: 14),
+                          ),
                         ),
-                      ),
+                      ],
                       const SizedBox(height: 16),
                       // Вкладки.
                       Row(

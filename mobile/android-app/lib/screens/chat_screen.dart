@@ -23,6 +23,7 @@ import '../widgets/glass.dart';
 import '../widgets/inline_video_recorder.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/message_composer.dart';
+import 'channel_settings_screen.dart';
 import 'chat_profile_screen.dart';
 
 const _maxMediaDataUrlLength = 14 * 1000 * 1000;
@@ -711,7 +712,8 @@ class _ChatScreenState extends State<ChatScreen> {
   /// владелец, в группах/личных — все.
   bool _canWrite(Chat chat) {
     if (chat.type == ChatType.channel) {
-      return chat.channelOwnerId == _controller.currentUser.id;
+      final me = _controller.currentUser.id;
+      return chat.channelOwnerId == me || chat.channelAdminIds.contains(me);
     }
     return true;
   }
@@ -884,6 +886,11 @@ class _ChatScreenState extends State<ChatScreen> {
           onSelected: (value) => _onMenu(value, chat),
           itemBuilder: (context) => [
             const PopupMenuItem(value: 'profile', child: Text('Профиль')),
+            if (chat.type == ChatType.channel &&
+                chat.channelOwnerId == _controller.currentUser.id)
+              const PopupMenuItem(
+                  value: 'channel_settings',
+                  child: Text('Настройки канала')),
             const PopupMenuItem(value: 'bg', child: Text('Изменить фон')),
             PopupMenuItem(
               value: 'mute',
@@ -921,6 +928,8 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       case 'profile':
         _openProfile(chat);
+      case 'channel_settings':
+        _openChannelSettings(chat);
       case 'bg':
         _pickBackground();
       case 'mute':
@@ -1056,6 +1065,16 @@ class _ChatScreenState extends State<ChatScreen> {
         canOnlySwipeFromEdge: false,
         builder: (_) =>
             ChatProfileScreen(controller: _controller, chatId: chat.id),
+      ),
+    );
+  }
+
+  void _openChannelSettings(Chat chat) {
+    Navigator.of(context).push(
+      SwipeablePageRoute(
+        canOnlySwipeFromEdge: false,
+        builder: (_) =>
+            ChannelSettingsScreen(controller: _controller, chatId: chat.id),
       ),
     );
   }

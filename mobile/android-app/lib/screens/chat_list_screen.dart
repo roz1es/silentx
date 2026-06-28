@@ -816,40 +816,38 @@ class _ChatListScreenState extends State<ChatListScreen>
 
   Widget _folderTabs(bool isLight) {
     final names = ['Все', ..._folders.map((f) => f.name)];
-    return SizedBox(
-      height: 46,
-      // Center центрирует вкладки, когда они умещаются; иначе включается скролл.
-      child: Center(
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    // Стеклянная панель-сегмент (как нижняя навигация): активная папка —
+    // матовая «пилюля», остальные прозрачны.
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: GlassPanel(
+          borderRadius: 22,
+          shadow: true,
+          padding: const EdgeInsets.all(5),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               for (var i = 0; i < names.length; i++)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: _folderTab(names[i], i, isLight),
-                ),
-              _TapBounce(
-                onTap: _openFolders,
-                child: Container(
-                  height: 34,
-                  width: 34,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: isLight ? 0.55 : 0.07),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: Colors.white
-                            .withValues(alpha: isLight ? 0.6 : 0.10)),
-                  ),
-                  child: Icon(Icons.tune_rounded,
-                      size: 18, color: isLight ? lightMuted : muted),
-                ),
-              ),
+                _folderTab(names[i], i, isLight),
+              _folderFilterButton(isLight),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _folderFilterButton(bool isLight) {
+    return GestureDetector(
+      onTap: _openFolders,
+      child: SizedBox(
+        height: 36,
+        width: 42,
+        child: Center(
+          child: Icon(Icons.tune_rounded,
+              size: 18, color: isLight ? lightMuted : muted),
         ),
       ),
     );
@@ -976,60 +974,56 @@ class _ChatListScreenState extends State<ChatListScreen>
   Widget _folderTab(String name, int index, bool isLight) {
     final selected = _activeFolder == index;
     final unread = _folderUnread(index);
+    final inner = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 15),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            name,
+            style: TextStyle(
+              color: selected ? accent : (isLight ? lightMuted : muted),
+              fontWeight: FontWeight.w800,
+              fontSize: 14,
+            ),
+          ),
+          if (unread > 0) ...[
+            const SizedBox(width: 7),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              constraints: const BoxConstraints(minWidth: 18),
+              decoration: BoxDecoration(
+                color: accent,
+                borderRadius: BorderRadius.circular(99),
+              ),
+              child: Text(
+                unread > 99 ? '99+' : '$unread',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFF08131A),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
     return GestureDetector(
       onTap: () => setState(() => _activeFolder = index),
       onLongPressStart: (d) => _folderMenu(index, d.globalPosition),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        height: 34,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected
-              ? accent.withValues(alpha: 0.12)
-              : Colors.white.withValues(alpha: isLight ? 0.45 : 0.05),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected
-                ? goldBorder
-                : Colors.white.withValues(alpha: isLight ? 0.5 : 0.08),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              name,
-              style: TextStyle(
-                color: selected ? accent : (isLight ? lightMuted : muted),
-                fontWeight: FontWeight.w800,
-                fontSize: 14,
-              ),
-            ),
-            if (unread > 0) ...[
-              const SizedBox(width: 7),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                constraints: const BoxConstraints(minWidth: 18),
-                decoration: BoxDecoration(
-                  color: accent,
-                  borderRadius: BorderRadius.circular(99),
-                ),
-                child: Text(
-                  unread > 99 ? '99+' : '$unread',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Color(0xFF08131A),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
+      child: SizedBox(
+        height: 36,
+        child: selected
+            ? GlassPanel(
+                borderRadius: 16,
+                blur: 14,
+                strength: 1.6,
+                shadow: true,
+                child: Center(child: inner),
+              )
+            : Center(child: inner),
       ),
     );
   }

@@ -119,6 +119,10 @@ class _VoicePreviewState extends State<VoicePreview> {
   Duration _dur = Duration.zero;
   String? _path;
   bool _preparing = false;
+  // Форма волны, вычисленная из самих байтов записи — у каждого голосового
+  // своя «дорожка» (а не одинаковая гребёнка у всех).
+  late final List<double> _wave =
+      waveformFromBytes(bytesFromDataUrl(widget.media.dataUrl));
 
   bool get _playing => _state == PlayerState.playing;
 
@@ -225,7 +229,7 @@ class _VoicePreviewState extends State<VoicePreview> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            _VoiceWave(progress: progress),
+            _VoiceWave(bars: _wave, progress: progress),
             const SizedBox(height: 5),
             Text(meta, style: const TextStyle(color: muted, fontSize: 11)),
           ],
@@ -242,30 +246,59 @@ String _formatSize(int bytes) {
   return '${(kb / 1024).toStringAsFixed(1)} MB';
 }
 
+/// Строит форму волны (высоты столбиков) из байтов аудиозаписи: разбивает их
+/// на [count] корзин и берёт среднее отклонение от середины — получается
+/// уникальный для каждой записи профиль громкости.
+List<double> waveformFromBytes(Uint8List? bytes, {int count = 28}) {
+  const minH = 3.0;
+  const maxH = 20.0;
+  if (bytes == null || bytes.length < count * 2) {
+    return List<double>.filled(count, (minH + maxH) / 3);
+  }
+  final step = bytes.length / count;
+  final raw = List<double>.filled(count, 0);
+  for (var i = 0; i < count; i++) {
+    final start = (i * step).floor();
+    final end = math.min(((i + 1) * step).floor(), bytes.length);
+    var sum = 0;
+    for (var j = start; j < end; j++) {
+      sum += (bytes[j] - 128).abs();
+    }
+    raw[i] = end > start ? sum / (end - start) : 0;
+  }
+  var lo = raw[0];
+  var hi = raw[0];
+  for (final v in raw) {
+    lo = math.min(lo, v);
+    hi = math.max(hi, v);
+  }
+  final range = (hi - lo) < 1e-6 ? 1.0 : (hi - lo);
+  return [
+    for (final v in raw) minH + ((v - lo) / range) * (maxH - minH),
+  ];
+}
+
 class _VoiceWave extends StatelessWidget {
-  const _VoiceWave({this.progress = 0});
+  const _VoiceWave({required this.bars, this.progress = 0});
+
+  final List<double> bars;
 
   /// 0..1 — доля проигранного (закрашивается ярким золотом).
   final double progress;
 
-  static const _bars = <double>[
-    5, 9, 14, 8, 12, 18, 13, 7, 11, 17, 10, 6, //
-    13, 8, 15, 10, 7, 12, 18, 9, 11, 7, 14, 9,
-  ];
-
   @override
   Widget build(BuildContext context) {
-    final active = (_bars.length * progress).round();
+    final active = (bars.length * progress).round();
     return SizedBox(
       height: 20,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          for (var i = 0; i < _bars.length; i++)
+          for (var i = 0; i < bars.length; i++)
             Container(
               width: 2.5,
-              height: _bars[i],
+              height: bars[i].clamp(3.0, 20.0),
               margin: const EdgeInsets.symmetric(horizontal: 1),
               decoration: BoxDecoration(
                 color: i < active ? accent : accent.withValues(alpha: 0.3),

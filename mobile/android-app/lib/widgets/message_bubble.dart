@@ -190,7 +190,7 @@ class MessageBubble extends StatelessWidget {
                 ),
                 child: IntrinsicWidth(
                   child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (!own && senderName != null && senderName!.isNotEmpty)

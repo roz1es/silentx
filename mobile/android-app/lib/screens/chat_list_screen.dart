@@ -6,7 +6,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:swipeable_page_route/swipeable_page_route.dart';
 
@@ -22,6 +21,7 @@ import '../widgets/glass.dart';
 import '../widgets/ios_context_menu.dart';
 import '../widgets/night_mode_switch.dart';
 import '../widgets/new_chat_sheet.dart';
+import '../widgets/styled_qr.dart';
 import 'chat_profile_screen.dart';
 import 'chat_screen.dart';
 import 'folders_screen.dart';
@@ -2142,26 +2142,12 @@ class _SettingsViewState extends State<_SettingsView> {
                       padding: const EdgeInsets.all(16),
                       child: Column(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: QrImageView(
-                              data: '${_ctrl.serverUrl}/u/${user.username}',
-                              version: QrVersions.auto,
-                              size: 184,
-                              backgroundColor: Colors.white,
-                              eyeStyle: const QrEyeStyle(
-                                eyeShape: QrEyeShape.square,
-                                color: Color(0xFF101317),
-                              ),
-                              dataModuleStyle: const QrDataModuleStyle(
-                                dataModuleShape: QrDataModuleShape.square,
-                                color: Color(0xFF101317),
-                              ),
-                            ),
+                          StyledQr(
+                            data: '${_ctrl.serverUrl}/u/${user.username}',
+                            username: user.username,
+                            avatarUrl: user.avatarUrl,
+                            serverUrl: _ctrl.serverUrl,
+                            size: 200,
                           ),
                           const SizedBox(height: 12),
                           Text(

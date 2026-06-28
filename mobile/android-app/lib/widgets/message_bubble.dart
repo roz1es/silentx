@@ -53,8 +53,8 @@ class MessageBubble extends StatelessWidget {
       child: _bubbleBody(context),
     );
     if (message.deleted) return body;
-    // Свайп для ответа: входящее — влево, своё — вправо.
-    return _SwipeToReply(own: own, onReply: onReply, child: body);
+    // Свайп влево по всей строке — ответ на сообщение.
+    return _SwipeToReply(onReply: onReply, child: body);
   }
 
   /// Тело пузыря без жестов — переиспользуется как «приподнятая» копия в меню.
@@ -657,19 +657,16 @@ class _ReplyChip extends StatelessWidget {
   }
 }
 
-/// Свайп-жест ответа: пузырь тянется в сторону, появляется иконка ответа, и при
-/// достижении порога вызывается [onReply]. Направление зависит от автора:
-/// входящее тянем влево, своё — вправо (как просил пользователь).
+/// Свайп-жест ответа: пузырь тянется влево, появляется иконка ответа, и при
+/// достижении порога вызывается [onReply]. Срабатывает по всей строке.
 class _SwipeToReply extends StatefulWidget {
   const _SwipeToReply({
     required this.child,
     required this.onReply,
-    required this.own,
   });
 
   final Widget child;
   final VoidCallback onReply;
-  final bool own;
 
   @override
   State<_SwipeToReply> createState() => _SwipeToReplyState();
@@ -697,10 +694,8 @@ class _SwipeToReplyState extends State<_SwipeToReply>
   void _onUpdate(DragUpdateDetails d) {
     if (_return.isAnimating) return;
     setState(() {
-      final next = _dx + d.delta.dx;
-      _dx = widget.own
-          ? next.clamp(0.0, _maxDrag)
-          : next.clamp(-_maxDrag, 0.0);
+      // Только влево (до 0) — тянем сообщение в сторону для ответа.
+      _dx = (_dx + d.delta.dx).clamp(-_maxDrag, 0.0);
     });
     final passed = _dx.abs() >= _trigger;
     if (passed && !_passed) HapticFeedback.mediumImpact();
@@ -725,15 +720,16 @@ class _SwipeToReplyState extends State<_SwipeToReply>
   Widget build(BuildContext context) {
     final progress = (_dx.abs() / _trigger).clamp(0.0, 1.0);
     return GestureDetector(
+      // opaque — чтобы свайп ловился по всей строке, а не только по пузырю.
+      behavior: HitTestBehavior.opaque,
       onHorizontalDragUpdate: _onUpdate,
       onHorizontalDragEnd: _onEnd,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Иконка ответа появляется со стороны, противоположной свайпу.
+          // Свайп всегда влево — иконка ответа появляется справа.
           Positioned(
-            left: widget.own ? 18 : null,
-            right: widget.own ? null : 18,
+            right: 18,
             child: Opacity(
               opacity: progress,
               child: Transform.scale(

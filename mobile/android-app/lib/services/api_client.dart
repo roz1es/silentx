@@ -319,6 +319,26 @@ class ApiClient {
     await _request('/api/me', method: 'PATCH', body: {'avatarUrl': null});
   }
 
+  Future<List<UserSession>> fetchSessions() async {
+    final json = await _request('/api/me/sessions');
+    final list = json['sessions'];
+    if (list is! List) return const [];
+    return list
+        .whereType<Map>()
+        .map((e) => UserSession.fromJson(e.cast<String, dynamic>()))
+        .toList(growable: false);
+  }
+
+  Future<void> revokeSession(String sessionId) async {
+    await _request('/api/me/sessions/${Uri.encodeComponent(sessionId)}',
+        method: 'DELETE');
+  }
+
+  Future<void> revokeOtherSessions() async {
+    await _request('/api/me/sessions/revoke-others',
+        method: 'POST', body: const {});
+  }
+
   // --- Чаты ---
 
   Future<List<Chat>> fetchChats() async {

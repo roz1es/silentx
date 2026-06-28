@@ -1408,6 +1408,9 @@ class _SettingsViewState extends State<_SettingsView> {
   late bool _allowCalls;
   late bool _showEmail;
 
+  List<UserSession>? _sessions;
+  bool _loadingSessions = false;
+
   MessengerController get _ctrl => widget.controller;
   bool get _isLight => widget.isLight;
 
@@ -1430,6 +1433,7 @@ class _SettingsViewState extends State<_SettingsView> {
     _allowCalls = u.allowCalls;
     _showEmail = u.showEmail;
     _loadAvatarHistory();
+    _loadSessions();
   }
 
   @override
@@ -1487,6 +1491,60 @@ class _SettingsViewState extends State<_SettingsView> {
       'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
     ];
     return '${d.day} ${months[d.month - 1]} ${d.year} г.';
+  }
+
+  Future<void> _loadSessions() async {
+    setState(() => _loadingSessions = true);
+    try {
+      final list = await _ctrl.api.fetchSessions();
+      if (mounted) setState(() => _sessions = list);
+    } on Object catch (e) {
+      if (mounted) showAppToast(context, 'Ошибка: $e', error: true);
+    } finally {
+      if (mounted) setState(() => _loadingSessions = false);
+    }
+  }
+
+  Future<void> _revokeSession(String id) async {
+    try {
+      await _ctrl.api.revokeSession(id);
+      if (mounted) {
+        setState(() => _sessions =
+            _sessions?.where((s) => s.id != id).toList(growable: false));
+        showAppToast(context, 'Сеанс завершён');
+      }
+    } on Object catch (e) {
+      if (mounted) showAppToast(context, 'Ошибка: $e', error: true);
+    }
+  }
+
+  Future<void> _revokeOthers() async {
+    try {
+      await _ctrl.api.revokeOtherSessions();
+      if (mounted) showAppToast(context, 'Остальные сеансы завершены');
+      await _loadSessions();
+    } on Object catch (e) {
+      if (mounted) showAppToast(context, 'Ошибка: $e', error: true);
+    }
+  }
+
+  String _fmtLogin(int ms) {
+    final d = DateTime.fromMillisecondsSinceEpoch(ms);
+    const m = [
+      'янв', 'фев', 'мар', 'апр', 'мая', 'июн', //
+      'июл', 'авг', 'сен', 'окт', 'ноя', 'дек',
+    ];
+    final hh = d.hour.toString().padLeft(2, '0');
+    final mm = d.minute.toString().padLeft(2, '0');
+    return '${d.day} ${m[d.month - 1]}, $hh:$mm';
+  }
+
+  String _fmtRemaining(int expiresMs) {
+    final ms = expiresMs - DateTime.now().millisecondsSinceEpoch;
+    if (ms <= 0) return 'истёк';
+    final days = (ms / 86400000).floor();
+    if (days >= 1) return 'осталось $days дн.';
+    return 'осталось ${(ms / 3600000).floor()} ч.';
   }
 
   Future<void> _loadAvatarHistory() async {
@@ -1999,6 +2057,43 @@ class _SettingsViewState extends State<_SettingsView> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(child: _sectionLabel('АКТИВНЫЕ СЕАНСЫ')),
+                        _smallChip('Обновить', _loadSessions),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (_sessions == null)
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Center(
+                          child: _loadingSessions
+                              ? const CircularProgressIndicator()
+                              : Text('Не удалось загрузить',
+                                  style: TextStyle(color: _mutedColor)),
+                        ),
+                      )
+                    else ...[
+                      for (final s in _sessions!) ...[
+                        _sessionCard(s),
+                        const SizedBox(height: 8),
+                      ],
+                      if (_sessions!.any((s) => !s.current))
+                        OutlinedButton(
+                          onPressed: _revokeOthers,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: danger,
+                            side: BorderSide(
+                                color: danger.withValues(alpha: 0.5)),
+                            minimumSize: const Size.fromHeight(48),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: const Text('Завершить все остальные'),
+                        ),
+                    ],
                     const SizedBox(height: 24),
                     OutlinedButton.icon(
                       onPressed: widget.onLogout,
@@ -2184,6 +2279,68 @@ class _SettingsViewState extends State<_SettingsView> {
                     fontSize: 14.5)),
           ),
           Switch(value: value, onChanged: onChanged, activeThumbColor: accent),
+        ],
+      ),
+    );
+  }
+
+  Widget _sessionCard(UserSession s) {
+    return GlassCard(
+      borderRadius: 18,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(s.current ? 'Это устройство' : 'Другое устройство',
+                    style: TextStyle(
+                        color: _textColor,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15)),
+                const SizedBox(height: 3),
+                Text('Вход: ${_fmtLogin(s.createdAt)}',
+                    style: TextStyle(color: _mutedColor, fontSize: 12.5)),
+                Text(
+                    '${_fmtRemaining(s.expiresAt)}'
+                    '${s.remembered ? ' · запомнено' : ''}',
+                    style: TextStyle(color: _mutedColor, fontSize: 12.5)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          if (s.current)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFF4AAE8A).withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(99),
+              ),
+              child: const Text('сейчас',
+                  style: TextStyle(
+                      color: Color(0xFF4AAE8A),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12)),
+            )
+          else
+            GestureDetector(
+              onTap: () => _revokeSession(s.id),
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: danger.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text('Завершить',
+                    style: TextStyle(
+                        color: danger,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13)),
+              ),
+            ),
         ],
       ),
     );

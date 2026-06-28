@@ -72,6 +72,34 @@ class User {
   }
 }
 
+/// Активный сеанс (вход на устройстве). Контракт: GET /api/me/sessions.
+class UserSession {
+  const UserSession({
+    required this.id,
+    required this.createdAt,
+    required this.expiresAt,
+    required this.current,
+    required this.remembered,
+  });
+
+  final String id;
+  final int createdAt;
+  final int expiresAt;
+  final bool current;
+  final bool remembered;
+
+  factory UserSession.fromJson(Map<String, dynamic> json) {
+    int toInt(dynamic v) => v is int ? v : int.tryParse('$v') ?? 0;
+    return UserSession(
+      id: json['id']?.toString() ?? '',
+      createdAt: toInt(json['createdAt']),
+      expiresAt: toInt(json['expiresAt']),
+      current: json['current'] == true,
+      remembered: json['remembered'] == true,
+    );
+  }
+}
+
 class ChatParticipant {
   const ChatParticipant({
     required this.id,

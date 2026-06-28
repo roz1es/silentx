@@ -49,7 +49,7 @@ class _NewChatSheet extends StatefulWidget {
 class _NewChatSheetState extends State<_NewChatSheet> {
   final _nameController = TextEditingController();
   final _searchController = TextEditingController();
-  ChatType _type = ChatType.direct;
+  ChatType _type = ChatType.group;
   Set<String> _selected = {};
 
   @override
@@ -79,8 +79,9 @@ class _NewChatSheetState extends State<_NewChatSheet> {
     );
   }
 
+  // «Личный» убран: личные чаты создаются через поиск пользователей в списке
+  // чатов. Здесь — только группы и каналы (приглашаем из контактов).
   static const _types = [
-    (ChatType.direct, 'Личный', Icons.person_rounded),
     (ChatType.group, 'Группа', Icons.groups_rounded),
     (ChatType.channel, 'Канал', Icons.campaign_rounded),
   ];

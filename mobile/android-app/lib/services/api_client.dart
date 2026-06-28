@@ -288,6 +288,30 @@ class ApiClient {
     return User.fromJson((json['user'] as Map).cast<String, dynamic>());
   }
 
+  /// Только контакты (пользователи, с кем есть чат) — для приглашения в
+  /// группы/каналы. Не весь каталог (его видят только админы).
+  Future<List<DirectoryUser>> fetchContacts() async {
+    final json = await _request('/api/users/contacts');
+    final users = json['users'];
+    if (users is! List) return const [];
+    return users
+        .whereType<Map>()
+        .map((e) => DirectoryUser.fromJson(e.cast<String, dynamic>()))
+        .toList(growable: false);
+  }
+
+  /// Поиск пользователей по юзернейму/имени (для создания личного чата).
+  Future<List<DirectoryUser>> searchUsers(String query) async {
+    final json =
+        await _request('/api/users/search?q=${Uri.encodeComponent(query)}');
+    final users = json['users'];
+    if (users is! List) return const [];
+    return users
+        .whereType<Map>()
+        .map((e) => DirectoryUser.fromJson(e.cast<String, dynamic>()))
+        .toList(growable: false);
+  }
+
   Future<User> updateProfile({
     String? displayName,
     String? avatarDataUrl,

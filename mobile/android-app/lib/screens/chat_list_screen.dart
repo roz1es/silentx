@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -57,6 +58,9 @@ class _ChatListScreenState extends State<ChatListScreen>
   int _tabIndex = 0; // 0 = Чаты, 1 = Настройки
   bool _editMode = false;
   bool _searchVisible = false;
+  // Поиск пользователей по юзернейму в строке поиска (для личных чатов).
+  List<DirectoryUser> _userResults = const [];
+  Timer? _userSearchDebounce;
   List<String> _manualOrder = const [];
   List<ChatFolder> _folders = const [];
   int _activeFolder = 0; // 0 = «Все»
@@ -122,9 +126,11 @@ class _ChatListScreenState extends State<ChatListScreen>
 
   void _closeSearch() {
     if (!_searchVisible) return;
+    _userSearchDebounce?.cancel();
     setState(() {
       _searchVisible = false;
       _searchController.clear();
+      _userResults = const [];
     });
     _searchReveal.reverse();
     _searchFocus.unfocus();
@@ -134,6 +140,42 @@ class _ChatListScreenState extends State<ChatListScreen>
   void _maybeCloseEmptySearch() {
     if (_searchVisible && _searchController.text.trim().isEmpty) {
       _closeSearch();
+    }
+  }
+
+  /// Реакция на ввод в поиск: помимо фильтра чатов — ищем пользователей по
+  /// юзернейму на сервере (с debounce), чтобы можно было начать личный чат.
+  void _onSearchChanged() {
+    setState(() {});
+    final q = _searchController.text.trim();
+    _userSearchDebounce?.cancel();
+    if (q.isEmpty) {
+      if (_userResults.isNotEmpty) setState(() => _userResults = const []);
+      return;
+    }
+    _userSearchDebounce = Timer(const Duration(milliseconds: 300), () async {
+      try {
+        final res = await _controller.api.searchUsers(q);
+        if (mounted && _searchController.text.trim() == q) {
+          setState(() => _userResults = res);
+        }
+      } on Object {
+        // тихо игнорируем ошибки поиска
+      }
+    });
+  }
+
+  Future<void> _openOrCreateDirect(DirectoryUser u) async {
+    _closeSearch();
+    try {
+      final chat = await _controller.createDirectChat(u.id);
+      if (mounted) _openChat(chat);
+    } on Object catch (err) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Не удалось открыть чат: $err')),
+        );
+      }
     }
   }
 
@@ -148,6 +190,7 @@ class _ChatListScreenState extends State<ChatListScreen>
   @override
   void dispose() {
     _controller.removeListener(_onChanged);
+    _userSearchDebounce?.cancel();
     _searchController.dispose();
     _searchFocus.dispose();
     _searchReveal.dispose();
@@ -223,7 +266,9 @@ class _ChatListScreenState extends State<ChatListScreen>
   Future<void> _newChat() async {
     _maybeCloseEmptySearch();
     try {
-      final users = await _controller.api.fetchUserDirectory();
+      // Для групп/каналов приглашаем только контактов (с кем есть чат),
+      // а не весь каталог.
+      final users = await _controller.api.fetchContacts();
       if (!mounted) return;
       final result = await showNewChatSheet(
         context,
@@ -1209,6 +1254,120 @@ class _ChatListScreenState extends State<ChatListScreen>
     return list.toList(growable: false);
   }
 
+  /// Результаты поиска: найденные пользователи (тап — открыть личный чат) +
+  /// совпавшие чаты.
+  Widget _searchResults(List<Chat> chats) {
+    final users = _userResults
+        .where((u) => u.id != _controller.currentUser.id)
+        .toList(growable: false);
+    final bottomInset = MediaQuery.of(context).padding.bottom + 80;
+    final pad = EdgeInsets.fromLTRB(10, _listTopInset + 8, 10, bottomInset);
+
+    if (users.isEmpty && chats.isEmpty) {
+      return ListView(
+        controller: _chatScroll,
+        padding: pad,
+        children: const [
+          SizedBox(height: 60),
+          EmptyState(
+            title: 'Ничего не найдено',
+            subtitle: 'Попробуйте другой запрос или @юзернейм.',
+          ),
+        ],
+      );
+    }
+    return ListView(
+      controller: _chatScroll,
+      padding: pad,
+      children: [
+        if (users.isNotEmpty) ...[
+          _searchSectionLabel('ПОЛЬЗОВАТЕЛИ'),
+          for (final u in users) _userTile(u),
+          const SizedBox(height: 10),
+        ],
+        if (chats.isNotEmpty) ...[
+          _searchSectionLabel('ЧАТЫ'),
+          for (final chat in chats)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 5),
+              child: GlassCard(
+                borderRadius: 18,
+                padding: EdgeInsets.zero,
+                child: ChatTile(
+                  chat: chat,
+                  avatarUrl: _controller.displayAvatar(chat),
+                  serverUrl: _controller.serverUrl,
+                  unread: _controller.unreadFor(chat),
+                  peerOnline: _controller.isPeerOnline(chat),
+                  onTap: () => _openChat(chat),
+                  onLongPress: (_) => _chatOptions(chat),
+                ),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+
+  Widget _userTile(DirectoryUser u) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _openOrCreateDirect(u),
+        child: GlassCard(
+          borderRadius: 18,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              BrenksAvatar(
+                title: u.title,
+                imageUrl: u.avatarUrl,
+                baseUrl: _controller.serverUrl,
+                size: 46,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(u.title,
+                        style: TextStyle(
+                            color: _isLightTheme ? lightText : text,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15.5)),
+                    Text('@${u.username}',
+                        style: TextStyle(
+                            color: _isLightTheme ? lightMuted : muted,
+                            fontSize: 13)),
+                  ],
+                ),
+              ),
+              Icon(Icons.chat_bubble_outline_rounded, color: accent, size: 22),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _searchSectionLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 6),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: _isLightTheme ? lightMuted : muted,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+
+  bool get _isLightTheme => Theme.of(context).brightness == Brightness.light;
+
   Widget _offlineBanner() {
     return AnimatedSize(
       duration: const Duration(milliseconds: 300),
@@ -1274,7 +1433,7 @@ class _ChatListScreenState extends State<ChatListScreen>
               child: TextField(
                 controller: _searchController,
                 focusNode: _searchFocus,
-                onChanged: (_) => setState(() {}),
+                onChanged: (_) => _onSearchChanged(),
                 textAlignVertical: TextAlignVertical.center,
                 style: const TextStyle(fontSize: 15),
                 cursorColor: accent,
@@ -1296,7 +1455,10 @@ class _ChatListScreenState extends State<ChatListScreen>
             ),
             if (_searchController.text.isNotEmpty)
               GestureDetector(
-                onTap: () => setState(() => _searchController.clear()),
+                onTap: () {
+                  _searchController.clear();
+                  _onSearchChanged();
+                },
                 child: Icon(Icons.close_rounded,
                     size: 18, color: isLight ? lightMuted : muted),
               ),
@@ -1329,6 +1491,9 @@ class _ChatListScreenState extends State<ChatListScreen>
           ),
         ],
       );
+    }
+    if (_searchController.text.trim().isNotEmpty) {
+      return _searchResults(chats);
     }
     if (chats.isEmpty) {
       return ListView(

@@ -66,32 +66,34 @@ class _FilePreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 240,
-      padding: const EdgeInsets.all(12),
+      width: 210,
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: const Color(0xFF242A33),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: border),
       ),
       child: Row(
         children: [
           Container(
-            width: 42,
-            height: 42,
+            width: 38,
+            height: 38,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: accent.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.insert_drive_file_rounded, color: accent),
+            child: const Icon(Icons.insert_drive_file_rounded,
+                color: accent, size: 22),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               media.fileName ?? 'Файл',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w700, color: text),
+              style: const TextStyle(
+                  fontWeight: FontWeight.w700, color: text, fontSize: 14),
             ),
           ),
         ],
@@ -205,8 +207,8 @@ class _VoicePreviewState extends State<VoicePreview> {
         GestureDetector(
           onTap: _toggle,
           child: Container(
-            width: 42,
-            height: 42,
+            width: 40,
+            height: 40,
             decoration: const BoxDecoration(
               shape: BoxShape.circle,
               color: accent,
@@ -214,18 +216,18 @@ class _VoicePreviewState extends State<VoicePreview> {
             child: Icon(
               _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
               color: const Color(0xFF08131A),
-              size: 26,
+              size: 24,
             ),
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
             _VoiceWave(progress: progress),
-            const SizedBox(height: 6),
-            Text(meta, style: const TextStyle(color: muted, fontSize: 11.5)),
+            const SizedBox(height: 5),
+            Text(meta, style: const TextStyle(color: muted, fontSize: 11)),
           ],
         ),
       ],
@@ -255,7 +257,7 @@ class _VoiceWave extends StatelessWidget {
   Widget build(BuildContext context) {
     final active = (_bars.length * progress).round();
     return SizedBox(
-      height: 22,
+      height: 20,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.center,

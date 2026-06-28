@@ -177,14 +177,14 @@ class MessageBubble extends StatelessWidget {
                 own ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+                padding: const EdgeInsets.fromLTRB(11, 6, 11, 6),
                 decoration: BoxDecoration(
                   color: own ? ownBg : otherBg,
                   borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(20),
-                    topRight: const Radius.circular(20),
-                    bottomLeft: Radius.circular(own ? 20 : 6),
-                    bottomRight: Radius.circular(own ? 6 : 20),
+                    topLeft: const Radius.circular(18),
+                    topRight: const Radius.circular(18),
+                    bottomLeft: Radius.circular(own ? 18 : 5),
+                    bottomRight: Radius.circular(own ? 5 : 18),
                   ),
                   border: Border.all(color: own ? ownBorder : otherBorder),
                 ),
@@ -207,38 +207,7 @@ class MessageBubble extends StatelessWidget {
                       ),
                     if (replyPreview != null && !message.deleted)
                       _ReplyChip(preview: replyPreview!, isLight: isLight),
-                    _content(msgTextColor, timeColor),
-                    const SizedBox(height: 4),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (message.editedAt != null && !message.deleted) ...[
-                            Text('изм.',
-                                style:
-                                    TextStyle(color: timeColor, fontSize: 11)),
-                            const SizedBox(width: 6),
-                          ],
-                          Text(
-                            formatTime(message.createdAt),
-                            style: TextStyle(color: timeColor, fontSize: 11),
-                          ),
-                          if (own && !message.deleted) ...[
-                            const SizedBox(width: 3),
-                            Icon(
-                              read
-                                  ? Icons.done_all_rounded
-                                  : Icons.done_rounded,
-                              size: 15,
-                              color: read
-                                  ? (isLight ? lightAccent : softGold)
-                                  : timeColor,
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
+                    ..._bubbleInner(msgTextColor, timeColor, isLight),
                   ],
                 ),
                 ),
@@ -250,30 +219,94 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _content(Color textColor, Color mutedColor) {
+  /// Содержимое пузыря. Для чистого текста время «втекает» в строку (инлайн
+  /// справа внизу) — компактнее. Для медиа с подписью время идёт отдельной
+  /// строкой под контентом.
+  List<Widget> _bubbleInner(Color textColor, Color timeColor, bool isLight) {
     if (message.deleted) {
-      return Text(
-        'Сообщение удалено',
-        style: TextStyle(color: mutedColor, fontSize: 15, fontStyle: FontStyle.italic),
-      );
+      return [_inlineText('Сообщение удалено', textColor, timeColor, isLight)];
     }
 
     final media = message.media;
     final body = message.text.trim();
     final hasMedia = media != null || (message.imageUrl?.isNotEmpty == true);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+
+    if (!hasMedia) {
+      return [
+        _inlineText(
+            body.isEmpty ? 'Сообщение' : body, textColor, timeColor, isLight),
+      ];
+    }
+
+    return [
+      if (media != null)
+        MediaPreview(
+            media: media, serverUrl: serverUrl, onPlayVoice: onPlayVoice),
+      if (message.imageUrl?.isNotEmpty == true)
+        ImagePreview(source: message.imageUrl!, serverUrl: serverUrl),
+      if (body.isNotEmpty) ...[
+        const SizedBox(height: 6),
+        Text(body, style: TextStyle(color: textColor, fontSize: 15)),
+      ],
+      const SizedBox(height: 3),
+      Align(alignment: Alignment.centerRight, child: _meta(timeColor, isLight)),
+    ];
+  }
+
+  /// Текст с временем, наложенным в правый нижний угол. В конце текста —
+  /// невидимый «резерв» шириной под метку времени, поэтому последняя строка
+  /// оставляет ей место (как в Telegram).
+  Widget _inlineText(
+      String body, Color textColor, Color timeColor, bool isLight) {
+    final hasEdited = message.editedAt != null && !message.deleted;
+    final reserve = (own && !message.deleted ? 54.0 : 38.0) +
+        (hasEdited ? 30.0 : 0.0);
+    return Stack(
       children: [
-        if (media != null)
-          MediaPreview(media: media, serverUrl: serverUrl, onPlayVoice: onPlayVoice),
-        if (message.imageUrl?.isNotEmpty == true)
-          ImagePreview(source: message.imageUrl!, serverUrl: serverUrl),
-        if (body.isNotEmpty) ...[
-          if (hasMedia) const SizedBox(height: 8),
-          Text(body, style: TextStyle(color: textColor, fontSize: 16.5)),
+        Text.rich(
+          TextSpan(
+            text: body,
+            children: [
+              WidgetSpan(child: SizedBox(width: reserve, height: 1)),
+            ],
+          ),
+          style: TextStyle(
+            color: textColor,
+            fontSize: 15,
+            fontStyle:
+                message.deleted ? FontStyle.italic : FontStyle.normal,
+          ),
+        ),
+        Positioned(
+          right: 0,
+          bottom: 0,
+          child: _meta(timeColor, isLight),
+        ),
+      ],
+    );
+  }
+
+  /// Компактная метка времени: «изм.» + время + галочки прочтения.
+  Widget _meta(Color timeColor, bool isLight) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (message.editedAt != null && !message.deleted) ...[
+          Text('изм.', style: TextStyle(color: timeColor, fontSize: 10.5)),
+          const SizedBox(width: 5),
         ],
-        if (!hasMedia && body.isEmpty)
-          Text('Сообщение', style: TextStyle(color: textColor, fontSize: 16.5)),
+        Text(
+          formatTime(message.createdAt),
+          style: TextStyle(color: timeColor, fontSize: 10.5),
+        ),
+        if (own && !message.deleted) ...[
+          const SizedBox(width: 3),
+          Icon(
+            read ? Icons.done_all_rounded : Icons.done_rounded,
+            size: 13,
+            color: read ? (isLight ? lightAccent : softGold) : timeColor,
+          ),
+        ],
       ],
     );
   }

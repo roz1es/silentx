@@ -700,11 +700,20 @@ class _SwipeToReplyState extends State<_SwipeToReply>
 
   double _dx = 0; // визуальный сдвиг пузыря (только влево — для ответа)
   bool _passed = false;
-  late final AnimationController _return = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 200),
-  );
+  // Создаём в initState (не лениво): иначе при dispose без единого свайпа
+  // ленивая инициализация AnimationController ищет Ticker у уже деактивиро-
+  // ванного элемента → исключение и красный экран при прокрутке/входе.
+  late final AnimationController _return;
   Animation<double>? _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _return = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+  }
 
   @override
   void dispose() {

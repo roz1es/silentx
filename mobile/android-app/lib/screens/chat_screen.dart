@@ -52,6 +52,9 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _highlightId;
   Timer? _highlightTimer;
 
+  // Кнопка «вниз»: показывается, когда лента прокручена вверх от конца.
+  bool _showScrollDown = false;
+
   Message? _replyTo;
   Message? _editing;
   bool _sendingMedia = false;
@@ -70,6 +73,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _controller.addListener(_onControllerChanged);
+    _scrollController.addListener(_onScroll);
     // Открываем чат после первого кадра, чтобы синхронный notifyListeners
     // внутри openChat не вызвал setState во время инициализации.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -111,6 +115,32 @@ class _ChatScreenState extends State<ChatScreen> {
       _scrollToBottom();
     }
     setState(() {});
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+    final show = (pos.maxScrollExtent - pos.pixels) > 300;
+    if (show != _showScrollDown) setState(() => _showScrollDown = show);
+  }
+
+  Widget _scrollDownButton() {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    return Material(
+      color: isLight ? Colors.white : panelStrong,
+      shape: const CircleBorder(),
+      elevation: 4,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: () => _scrollToBottom(),
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child: Icon(Icons.keyboard_arrow_down_rounded,
+              color: isLight ? lightText : text, size: 26),
+        ),
+      ),
+    );
   }
 
   void _scrollToBottom({bool instant = false}) {
@@ -293,6 +323,7 @@ class _ChatScreenState extends State<ChatScreen> {
         replyToMessageId: _replyTo?.id,
       );
       setState(() => _replyTo = null);
+      _scrollToBottom();
     } on Object catch (err) {
       _showSnack('Не удалось отправить фото: $err');
     } finally {
@@ -331,6 +362,7 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       setState(() => _replyTo = null);
       _messageController.clear();
+      _scrollToBottom();
     } on Object catch (err) {
       _showSnack('Не удалось отправить файл: $err');
     } finally {
@@ -375,6 +407,7 @@ class _ChatScreenState extends State<ChatScreen> {
         return;
       }
       _controller.sendMessage(media: recording.media);
+      _scrollToBottom();
     } on Object catch (err) {
       _showSnack('Не удалось отправить голосовое: $err');
     }
@@ -630,6 +663,24 @@ class _ChatScreenState extends State<ChatScreen> {
                         },
                       ),
                     ],
+                  ),
+                ),
+                // Кнопка прокрутки в конец чата (видна при прокрутке вверх).
+                Positioned(
+                  right: 14,
+                  bottom: MediaQuery.of(context).padding.bottom + 78,
+                  child: IgnorePointer(
+                    ignoring: !_showScrollDown,
+                    child: AnimatedOpacity(
+                      opacity: _showScrollDown ? 1 : 0,
+                      duration: const Duration(milliseconds: 180),
+                      child: AnimatedScale(
+                        scale: _showScrollDown ? 1 : 0.6,
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOutCubic,
+                        child: _scrollDownButton(),
+                      ),
+                    ),
                   ),
                 ),
                 // Инлайн-запись видеокружка поверх всего чата.

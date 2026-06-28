@@ -134,14 +134,29 @@ class _ChatProfileScreenState extends State<ChatProfileScreen> {
         body: SafeArea(
           child: Column(
             children: [
-              // Шапка: заголовок + крестик.
+              // Шапка: кнопка «назад» слева, заголовок по центру.
               Padding(
-                padding: const EdgeInsets.fromLTRB(18, 12, 12, 6),
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
                 child: Row(
                   children: [
+                    Material(
+                      color:
+                          Colors.white.withValues(alpha: isLight ? 0.5 : 0.08),
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () => Navigator.of(context).maybePop(),
+                        child: SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: Icon(Icons.arrow_back_ios_new_rounded,
+                              color: textColor, size: 20),
+                        ),
+                      ),
+                    ),
                     Expanded(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Text('Профиль',
                               style: TextStyle(
@@ -154,21 +169,8 @@ class _ChatProfileScreenState extends State<ChatProfileScreen> {
                         ],
                       ),
                     ),
-                    Material(
-                      color:
-                          Colors.white.withValues(alpha: isLight ? 0.5 : 0.08),
-                      shape: const CircleBorder(),
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: () => Navigator.of(context).maybePop(),
-                        child: SizedBox(
-                          width: 40,
-                          height: 40,
-                          child: Icon(Icons.close_rounded,
-                              color: textColor, size: 22),
-                        ),
-                      ),
-                    ),
+                    // Симметричный отступ справа — чтобы заголовок был по центру.
+                    const SizedBox(width: 40),
                   ],
                 ),
               ),

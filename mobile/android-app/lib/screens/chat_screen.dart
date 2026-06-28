@@ -5,10 +5,10 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:mime/mime.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:swipeable_page_route/swipeable_page_route.dart';
 
 import '../format.dart';
 import '../models.dart';
@@ -995,7 +995,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _openProfile(Chat chat) {
     Navigator.of(context).push(
-      CupertinoPageRoute(
+      // Полноэкранный свайп-вправо назад в чат (как в самом чате).
+      SwipeablePageRoute(
+        canOnlySwipeFromEdge: false,
         builder: (_) =>
             ChatProfileScreen(controller: _controller, chatId: chat.id),
       ),

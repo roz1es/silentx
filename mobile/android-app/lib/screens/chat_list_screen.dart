@@ -305,7 +305,8 @@ class _ChatListScreenState extends State<ChatListScreen>
   void _openProfileFromMenu(Chat chat) {
     Navigator.of(context, rootNavigator: true).pop();
     Navigator.of(context).push(
-      CupertinoPageRoute(
+      SwipeablePageRoute(
+        canOnlySwipeFromEdge: false,
         builder: (_) =>
             ChatProfileScreen(controller: _controller, chatId: chat.id),
       ),

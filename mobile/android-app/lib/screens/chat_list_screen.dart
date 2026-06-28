@@ -50,7 +50,7 @@ class _ChatListScreenState extends State<ChatListScreen>
   late final AnimationController _searchReveal = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 360),
-  );
+  )..addListener(_measureHeader);
   bool _showOffline = false;
   DateTime? _disconnectedAt;
   int _tabIndex = 0; // 0 = Чаты, 1 = Настройки
@@ -67,6 +67,11 @@ class _ChatListScreenState extends State<ChatListScreen>
   double _indLeft = 0;
   double _indWidth = 0;
   bool _indReady = false;
+
+  // Плавающая шапка над списком: ключ для измерения её высоты и верхний
+  // отступ списка (чтобы первый чат был ровно под вкладками).
+  final GlobalKey _headerKey = GlobalKey();
+  double _listTopInset = 0;
 
   MessengerController get _controller => widget.controller;
 
@@ -672,6 +677,18 @@ class _ChatListScreenState extends State<ChatListScreen>
     );
   }
 
+  /// Меряет высоту плавающей шапки и задаёт списку верхний отступ
+  /// (= низ AppBar + высота шапки). setState — только при реальном изменении.
+  void _measureHeader() {
+    final ctx = _headerKey.currentContext;
+    if (ctx == null || !mounted) return;
+    final box = ctx.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final inset = MediaQuery.of(context).padding.top + 56 + box.size.height;
+    if ((inset - _listTopInset).abs() < 0.5) return;
+    setState(() => _listTopInset = inset);
+  }
+
   Widget _settingsTab(bool isLight) {
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -699,8 +716,13 @@ class _ChatListScreenState extends State<ChatListScreen>
 
   Widget _chatTab(bool isLight) {
     final chats = _filteredChats();
+    // После кадра меряем высоту плавающей шапки (баннер + поиск + вкладки),
+    // чтобы дать списку верхний отступ ровно под неё.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureHeader());
     return Scaffold(
       backgroundColor: Colors.transparent,
+      // Список уходит под плавающий заголовок и вкладки (как в Telegram).
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         toolbarHeight: 56,
@@ -739,82 +761,92 @@ class _ChatListScreenState extends State<ChatListScreen>
           const SizedBox(width: 12),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          _offlineBanner(),
-          if (!_editMode)
-            SizeTransition(
-              alignment: Alignment.topCenter,
-              sizeFactor: CurvedAnimation(
-                parent: _searchReveal,
-                curve: Curves.easeOutCubic,
-                reverseCurve: Curves.easeInCubic,
-              ),
-              child: FadeTransition(
-                opacity: CurvedAnimation(
-                  parent: _searchReveal,
-                  curve: const Interval(0.2, 1, curve: Curves.easeOut),
-                ),
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0, -0.35),
-                    end: Offset.zero,
-                  ).animate(CurvedAnimation(
-                    parent: _searchReveal,
-                    curve: Curves.easeOutCubic,
-                  )),
-                  child: ScaleTransition(
-                    scale: Tween<double>(begin: 0.94, end: 1.0).animate(
-                      CurvedAnimation(
-                          parent: _searchReveal, curve: Curves.easeOutCubic),
-                    ),
-                    alignment: Alignment.topCenter,
-                    child: _searchBar(isLight),
-                  ),
-                ),
-              ),
-            ),
-          Expanded(
+          // Список на всю высоту — скроллится под плавающим заголовком/вкладками.
+          Positioned.fill(
             child: Listener(
               behavior: HitTestBehavior.translucent,
-              // Если строка поиска пустая — любое касание (чат, кнопка, пустое
-              // место) закрывает поиск. Событие не поглощается, так что чат/
-              // кнопка всё равно срабатывают.
+              // Пустой поиск закрывается касанием по списку (чат всё равно
+              // открывается — событие не поглощается).
               onPointerDown: (_) => _maybeCloseEmptySearch(),
-              child: Column(
-                children: [
-                  if (!_editMode && _folders.isNotEmpty) _folderTabs(isLight),
-                  Expanded(
-                    child: _editMode
-                        ? _buildEditList()
-                        : GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            // Тап по пустому месту закрывает поиск (при любом
-                            // тексте); по плитке чата — открывает чат.
-                            onTap: () {
-                              if (_searchVisible) _closeSearch();
+              child: _editMode
+                  ? _buildEditList()
+                  : GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      // Тап по пустому месту закрывает поиск; по плитке — чат.
+                      onTap: () {
+                        if (_searchVisible) _closeSearch();
+                      },
+                      // Свайп влево/вправо переключает папки.
+                      onHorizontalDragEnd: _folders.isEmpty
+                          ? null
+                          : (details) {
+                              final v = details.primaryVelocity ?? 0;
+                              if (v < -250) {
+                                setState(() => _activeFolder =
+                                    (_activeFolder + 1)
+                                        .clamp(0, _folders.length));
+                              } else if (v > 250) {
+                                setState(() => _activeFolder =
+                                    (_activeFolder - 1)
+                                        .clamp(0, _folders.length));
+                              }
                             },
-                            // Свайп влево/вправо переключает папки.
-                            onHorizontalDragEnd: _folders.isEmpty
-                                ? null
-                                : (details) {
-                                    final v = details.primaryVelocity ?? 0;
-                                    if (v < -250) {
-                                      setState(() => _activeFolder =
-                                          (_activeFolder + 1)
-                                              .clamp(0, _folders.length));
-                                    } else if (v > 250) {
-                                      setState(() => _activeFolder =
-                                          (_activeFolder - 1)
-                                              .clamp(0, _folders.length));
-                                    }
-                                  },
-                            child: RefreshIndicator(
-                              onRefresh: _controller.loadChats,
-                              child: _buildBody(chats),
+                      child: RefreshIndicator(
+                        edgeOffset: _listTopInset,
+                        onRefresh: _controller.loadChats,
+                        child: _buildBody(chats),
+                      ),
+                    ),
+            ),
+          ),
+          // Плавающая шапка под AppBar: оффлайн-баннер + поиск + вкладки.
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 56,
+            left: 0,
+            right: 0,
+            child: Container(
+              key: _headerKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _offlineBanner(),
+                  if (!_editMode)
+                    SizeTransition(
+                      alignment: Alignment.topCenter,
+                      sizeFactor: CurvedAnimation(
+                        parent: _searchReveal,
+                        curve: Curves.easeOutCubic,
+                        reverseCurve: Curves.easeInCubic,
+                      ),
+                      child: FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: _searchReveal,
+                          curve: const Interval(0.2, 1, curve: Curves.easeOut),
+                        ),
+                        child: SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0, -0.35),
+                            end: Offset.zero,
+                          ).animate(CurvedAnimation(
+                            parent: _searchReveal,
+                            curve: Curves.easeOutCubic,
+                          )),
+                          child: ScaleTransition(
+                            scale:
+                                Tween<double>(begin: 0.94, end: 1.0).animate(
+                              CurvedAnimation(
+                                  parent: _searchReveal,
+                                  curve: Curves.easeOutCubic),
                             ),
+                            alignment: Alignment.topCenter,
+                            child: _searchBar(isLight),
                           ),
-                  ),
+                        ),
+                      ),
+                    ),
+                  if (!_editMode && _folders.isNotEmpty) _folderTabs(isLight),
                 ],
               ),
             ),
@@ -1096,7 +1128,7 @@ class _ChatListScreenState extends State<ChatListScreen>
     }
     return ReorderableListView.builder(
       padding: EdgeInsets.fromLTRB(
-          10, 8, 10, MediaQuery.of(context).padding.bottom + 80),
+          10, _listTopInset + 8, 10, MediaQuery.of(context).padding.bottom + 80),
       itemCount: chats.length,
       // ignore: deprecated_member_use
       onReorder: (oldIndex, newIndex) => _onReorder(chats, oldIndex, newIndex),
@@ -1265,6 +1297,7 @@ class _ChatListScreenState extends State<ChatListScreen>
     }
     if (_controller.chatsError != null && _controller.chats.isEmpty) {
       return ListView(
+        padding: EdgeInsets.only(top: _listTopInset),
         children: [
           const SizedBox(height: 80),
           EmptyState(
@@ -1284,6 +1317,7 @@ class _ChatListScreenState extends State<ChatListScreen>
     }
     if (chats.isEmpty) {
       return ListView(
+        padding: EdgeInsets.only(top: _listTopInset),
         children: const [
           SizedBox(height: 100),
           EmptyState(
@@ -1297,7 +1331,7 @@ class _ChatListScreenState extends State<ChatListScreen>
     // последние чаты можно было выкрутить из-под кнопок.
     final bottomInset = MediaQuery.of(context).padding.bottom + 80;
     return ListView.builder(
-      padding: EdgeInsets.fromLTRB(10, 8, 10, bottomInset),
+      padding: EdgeInsets.fromLTRB(10, _listTopInset + 8, 10, bottomInset),
       itemCount: chats.length,
       itemBuilder: (context, index) {
         final chat = chats[index];

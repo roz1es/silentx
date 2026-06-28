@@ -23,6 +23,9 @@ class User {
     this.phone,
     this.bio,
     this.birthDate,
+    this.showOnline = true,
+    this.allowCalls = true,
+    this.showEmail = false,
   });
 
   final String id;
@@ -35,6 +38,9 @@ class User {
   final String? phone;
   final String? bio;
   final String? birthDate;
+  final bool showOnline;
+  final bool allowCalls;
+  final bool showEmail;
 
   String get title {
     final name = displayName?.trim();
@@ -53,6 +59,15 @@ class User {
       phone: json['phone']?.toString(),
       bio: json['bio']?.toString(),
       birthDate: json['birthDate']?.toString(),
+      showOnline: json['privacy'] is Map
+          ? (json['privacy'] as Map)['showOnline'] != false
+          : true,
+      allowCalls: json['privacy'] is Map
+          ? (json['privacy'] as Map)['allowCalls'] != false
+          : true,
+      showEmail: json['privacy'] is Map
+          ? (json['privacy'] as Map)['showEmail'] == true
+          : false,
     );
   }
 }

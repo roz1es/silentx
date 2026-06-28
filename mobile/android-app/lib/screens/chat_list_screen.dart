@@ -1397,7 +1397,16 @@ class _SettingsView extends StatefulWidget {
 
 class _SettingsViewState extends State<_SettingsView> {
   bool _uploadingPhoto = false;
+  bool _savingProfile = false;
   List<String> _avatarHistory = const [];
+
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _bioCtrl;
+  late final TextEditingController _phoneCtrl;
+  DateTime? _birth;
+  late bool _showOnline;
+  late bool _allowCalls;
+  late bool _showEmail;
 
   MessengerController get _ctrl => widget.controller;
   bool get _isLight => widget.isLight;
@@ -1410,7 +1419,74 @@ class _SettingsViewState extends State<_SettingsView> {
   @override
   void initState() {
     super.initState();
+    final u = _ctrl.currentUser;
+    _nameCtrl = TextEditingController(text: u.displayName ?? '');
+    _bioCtrl = TextEditingController(text: u.bio ?? '');
+    _phoneCtrl = TextEditingController(text: u.phone ?? '');
+    _birth = (u.birthDate != null && u.birthDate!.isNotEmpty)
+        ? DateTime.tryParse(u.birthDate!)
+        : null;
+    _showOnline = u.showOnline;
+    _allowCalls = u.allowCalls;
+    _showEmail = u.showEmail;
     _loadAvatarHistory();
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _bioCtrl.dispose();
+    _phoneCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveProfile() async {
+    setState(() => _savingProfile = true);
+    try {
+      final updated = await _ctrl.api.updateProfile(
+        displayName: _nameCtrl.text.trim(),
+        bio: _bioCtrl.text.trim(),
+        phone: _phoneCtrl.text.trim(),
+        birthDate: _birth == null
+            ? ''
+            : '${_birth!.year.toString().padLeft(4, '0')}-'
+                '${_birth!.month.toString().padLeft(2, '0')}-'
+                '${_birth!.day.toString().padLeft(2, '0')}',
+        showOnline: _showOnline,
+        allowCalls: _allowCalls,
+        showEmail: _showEmail,
+      );
+      _ctrl.applyProfile(updated);
+      if (mounted) showAppToast(context, 'Профиль сохранён');
+    } on Object catch (e) {
+      if (mounted) showAppToast(context, 'Ошибка: $e', error: true);
+    } finally {
+      if (mounted) setState(() => _savingProfile = false);
+    }
+  }
+
+  Future<void> _pickBirth() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _birth ?? DateTime(now.year - 18, now.month, now.day),
+      firstDate: DateTime(1920),
+      lastDate: now,
+    );
+    if (picked != null) setState(() => _birth = picked);
+  }
+
+  void _copyId() {
+    Clipboard.setData(ClipboardData(text: _ctrl.currentUser.id));
+    showAppToast(context, 'ID скопирован');
+  }
+
+  String _formatBirthDate(DateTime d) {
+    const months = [
+      'января', 'февраля', 'марта', 'апреля', 'мая', 'июня', //
+      'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
+    ];
+    return '${d.day} ${months[d.month - 1]} ${d.year} г.';
   }
 
   Future<void> _loadAvatarHistory() async {
@@ -1441,7 +1517,8 @@ class _SettingsViewState extends State<_SettingsView> {
       if (bytes == null || bytes.isEmpty) return;
       final mime = file.extension?.toLowerCase() == 'png' ? 'image/png' : 'image/jpeg';
       final dataUrl = 'data:$mime;base64,${base64Encode(bytes)}';
-      await _ctrl.api.updateProfile(avatarDataUrl: dataUrl);
+      final updated = await _ctrl.api.updateProfile(avatarDataUrl: dataUrl);
+      _ctrl.applyProfile(updated);
       await _pushAvatarHistory(dataUrl);
       if (mounted) showAppToast(context, 'Аватар обновлён');
     } on Object catch (e) {
@@ -1454,7 +1531,8 @@ class _SettingsViewState extends State<_SettingsView> {
   Future<void> _applyHistoryAvatar(String dataUrl) async {
     Navigator.of(context).pop();
     try {
-      await _ctrl.api.updateProfile(avatarDataUrl: dataUrl);
+      final updated = await _ctrl.api.updateProfile(avatarDataUrl: dataUrl);
+      _ctrl.applyProfile(updated);
       await _pushAvatarHistory(dataUrl);
       if (mounted) showAppToast(context, 'Аватар обновлён');
     } on Object catch (e) {
@@ -1654,6 +1732,122 @@ class _SettingsViewState extends State<_SettingsView> {
                           onTap: _copyUsername,
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 20),
+                    _sectionLabel('ВАШ ID'),
+                    const SizedBox(height: 8),
+                    GlassCard(
+                      borderRadius: 18,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(user.id,
+                                style: TextStyle(
+                                    color: _textColor,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14)),
+                          ),
+                          const SizedBox(width: 10),
+                          _smallChip('Копир.', _copyId),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    _sectionLabel('ПРОФИЛЬ'),
+                    const SizedBox(height: 8),
+                    GlassCard(
+                      borderRadius: 18,
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _fieldLabel('Отображаемое имя'),
+                          _profileField(_nameCtrl, hint: 'Имя'),
+                          const SizedBox(height: 14),
+                          _fieldLabel('О себе'),
+                          _profileField(_bioCtrl,
+                              hint: 'Несколько слов о себе', maxLines: 3),
+                          const SizedBox(height: 14),
+                          _fieldLabel('Телефон'),
+                          _profileField(_phoneCtrl,
+                              hint: '+7...', keyboard: TextInputType.phone),
+                          const SizedBox(height: 14),
+                          _fieldLabel('Дата рождения'),
+                          GestureDetector(
+                            onTap: _pickBirth,
+                            behavior: HitTestBehavior.opaque,
+                            child: Container(
+                              height: 50,
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 14),
+                              alignment: Alignment.centerLeft,
+                              decoration: BoxDecoration(
+                                color: _isLight
+                                    ? const Color(0xFFF1F3F6)
+                                    : Colors.black.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: border),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.cake_rounded,
+                                      size: 18, color: _mutedColor),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    _birth == null
+                                        ? 'Не указана'
+                                        : _formatBirthDate(_birth!),
+                                    style: TextStyle(
+                                        color: _birth == null
+                                            ? _mutedColor
+                                            : _textColor,
+                                        fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    _sectionLabel('ПРИВАТНОСТЬ'),
+                    const SizedBox(height: 8),
+                    GlassCard(
+                      borderRadius: 18,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 4),
+                      child: Column(
+                        children: [
+                          _toggleRow('Показывать онлайн', _showOnline,
+                              (v) => setState(() => _showOnline = v)),
+                          _toggleRow('Разрешить звонки', _allowCalls,
+                              (v) => setState(() => _allowCalls = v)),
+                          _toggleRow('Показывать почту в профиле', _showEmail,
+                              (v) => setState(() => _showEmail = v)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: _savingProfile ? null : _saveProfile,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: accent,
+                        foregroundColor: const Color(0xFF08131A),
+                        minimumSize: const Size.fromHeight(50),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
+                      ),
+                      child: _savingProfile
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Color(0xFF08131A)))
+                          : const Text('Сохранить профиль',
+                              style: TextStyle(fontWeight: FontWeight.w800)),
                     ),
                     if (user.email?.isNotEmpty == true) ...[
                       const SizedBox(height: 20),
@@ -1918,6 +2112,79 @@ class _SettingsViewState extends State<_SettingsView> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _smallChip(String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(label,
+            style: const TextStyle(
+                color: accent, fontWeight: FontWeight.w800, fontSize: 13)),
+      ),
+    );
+  }
+
+  Widget _fieldLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6, left: 2),
+      child: Text(label,
+          style: TextStyle(
+              color: _mutedColor, fontSize: 12, fontWeight: FontWeight.w700)),
+    );
+  }
+
+  Widget _profileField(TextEditingController c,
+      {String? hint, int maxLines = 1, TextInputType? keyboard}) {
+    return TextField(
+      controller: c,
+      maxLines: maxLines,
+      keyboardType: keyboard,
+      style: TextStyle(color: _textColor, fontSize: 15),
+      decoration: InputDecoration(
+        hintText: hint,
+        isDense: true,
+        filled: true,
+        fillColor: _isLight
+            ? const Color(0xFFF1F3F6)
+            : Colors.black.withValues(alpha: 0.2),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: border)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: border)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: accent)),
+      ),
+    );
+  }
+
+  Widget _toggleRow(String label, bool value, ValueChanged<bool> onChanged) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(label,
+                style: TextStyle(
+                    color: _textColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14.5)),
+          ),
+          Switch(value: value, onChanged: onChanged, activeThumbColor: accent),
+        ],
       ),
     );
   }

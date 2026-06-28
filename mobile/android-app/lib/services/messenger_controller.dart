@@ -28,7 +28,7 @@ class MessengerController extends ChangeNotifier {
   }
 
   final ApiClient api;
-  final User currentUser;
+  User currentUser;
   final String serverUrl;
   final String token;
 
@@ -50,6 +50,12 @@ class MessengerController extends ChangeNotifier {
   /// Увеличивается каждый раз, когда в активный чат приходит новое сообщение —
   /// экран переписки использует это, чтобы прокрутиться вниз.
   int _incomingMessageTick = 0;
+
+  /// Обновляет текущего пользователя (после сохранения профиля) и оповещает UI.
+  void applyProfile(User user) {
+    currentUser = user;
+    notifyListeners();
+  }
 
   // --- Геттеры ---
 

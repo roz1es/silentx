@@ -288,10 +288,29 @@ class ApiClient {
     return User.fromJson((json['user'] as Map).cast<String, dynamic>());
   }
 
-  Future<User> updateProfile({String? displayName, String? avatarDataUrl}) async {
+  Future<User> updateProfile({
+    String? displayName,
+    String? avatarDataUrl,
+    String? bio,
+    String? phone,
+    String? birthDate,
+    bool? showOnline,
+    bool? allowCalls,
+    bool? showEmail,
+  }) async {
     final body = <String, dynamic>{};
     if (displayName != null) body['displayName'] = displayName;
     if (avatarDataUrl != null) body['avatarUrl'] = avatarDataUrl;
+    if (bio != null) body['bio'] = bio;
+    if (phone != null) body['phone'] = phone;
+    if (birthDate != null) body['birthDate'] = birthDate;
+    if (showOnline != null && allowCalls != null && showEmail != null) {
+      body['privacy'] = {
+        'showOnline': showOnline,
+        'allowCalls': allowCalls,
+        'showEmail': showEmail,
+      };
+    }
     final json = await _request('/api/me', method: 'PATCH', body: body);
     return User.fromJson((json['user'] as Map).cast<String, dynamic>());
   }

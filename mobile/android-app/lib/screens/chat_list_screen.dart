@@ -210,8 +210,10 @@ class _ChatListScreenState extends State<ChatListScreen>
   void _openChat(Chat chat) {
     _maybeCloseEmptySearch();
     Navigator.of(context).push(
-      // Cupertino-роут даёт свайп-назад (edge swipe) и на Android.
-      CupertinoPageRoute(
+      // Material-роут: без iOS-свайпа-назад от левого края. Иначе правый свайп
+      // по входящему сообщению (у левого края) выкидывал из чата. Назад —
+      // кнопкой в шапке.
+      MaterialPageRoute(
         builder: (_) => ChatScreen(controller: _controller, chatId: chat.id),
       ),
     );

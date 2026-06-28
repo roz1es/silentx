@@ -556,6 +556,8 @@ class _ChatListScreenState extends State<ChatListScreen>
       child: GlassBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        // Контент уходит под плавающую стеклянную навигацию (как в Telegram).
+        extendBody: true,
         body: IndexedStack(
           index: _tabIndex,
           children: [
@@ -1093,7 +1095,8 @@ class _ChatListScreenState extends State<ChatListScreen>
       );
     }
     return ReorderableListView.builder(
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
+      padding: EdgeInsets.fromLTRB(
+          10, 8, 10, MediaQuery.of(context).padding.bottom + 80),
       itemCount: chats.length,
       // ignore: deprecated_member_use
       onReorder: (oldIndex, newIndex) => _onReorder(chats, oldIndex, newIndex),
@@ -1290,8 +1293,11 @@ class _ChatListScreenState extends State<ChatListScreen>
         ],
       );
     }
+    // Запас снизу = высота плавающей навигации + системный inset, чтобы
+    // последние чаты можно было выкрутить из-под кнопок.
+    final bottomInset = MediaQuery.of(context).padding.bottom + 80;
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
+      padding: EdgeInsets.fromLTRB(10, 8, 10, bottomInset),
       itemCount: chats.length,
       itemBuilder: (context, index) {
         final chat = chats[index];
@@ -1487,7 +1493,8 @@ class _SettingsViewState extends State<_SettingsView> {
   Widget build(BuildContext context) {
     final user = _ctrl.currentUser;
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
+      padding: EdgeInsets.fromLTRB(
+          18, 12, 18, 28 + MediaQuery.of(context).padding.bottom + 70),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

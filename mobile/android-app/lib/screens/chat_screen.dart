@@ -17,6 +17,7 @@ import '../services/messenger_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/attach_sheet.dart';
 import '../widgets/brenks_avatar.dart';
+import '../widgets/camera_capture_screen.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/glass.dart';
 import '../widgets/inline_video_recorder.dart';
@@ -161,6 +162,17 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!mounted || result == null) return;
     if (result.isFile) {
       await _attach();
+    } else if (result.isCamera) {
+      // Экран съёмки открываем уже ПОСЛЕ закрытия листа (его pop вернул
+      // результат), иначе словим краш _dependents.isEmpty.
+      final bytes = await Navigator.of(context).push<Uint8List>(
+        MaterialPageRoute(
+          fullscreenDialog: true,
+          builder: (_) => const CameraCaptureScreen(),
+        ),
+      );
+      if (!mounted || bytes == null) return;
+      await _previewAndSendImage(bytes, 'camera.jpg');
     } else if (result.bytes != null) {
       await _previewAndSendImage(result.bytes!, result.name ?? 'photo.jpg');
     }

@@ -3,8 +3,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import 'brenks_avatar.dart';
 
-/// Стилизованный QR-код в стиле Telegram: градиентные круглые модули на белой
-/// карточке, аватар в центре и @юзернейм снизу.
+/// Стилизованный QR-код в фирменной палитре BrenksChat: золотые круглые модули
+/// на графитовой карточке, аватар в центре и @юзернейм снизу.
 class StyledQr extends StatelessWidget {
   const StyledQr({
     super.key,
@@ -21,11 +21,16 @@ class StyledQr extends StatelessWidget {
   final String serverUrl;
   final double size;
 
-  static const _gradient = LinearGradient(
+  // Золотой градиент модулей.
+  static const _gold = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF4F8BF0), Color(0xFF8B6FE0), Color(0xFFE070C8)],
+    colors: [Color(0xFFEAD392), Color(0xFFD8B76C), Color(0xFF9C7C3C)],
   );
+
+  // Графит карточки и «дырки» под аватаром.
+  static const _cardTop = Color(0xFF26282E);
+  static const _cardBottom = Color(0xFF15171B);
 
   @override
   Widget build(BuildContext context) {
@@ -33,17 +38,22 @@ class StyledQr extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: Colors.white,
             borderRadius: BorderRadius.circular(24),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [_cardTop, _cardBottom],
+            ),
+            border: Border.all(color: const Color(0x33D8B76C)),
           ),
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // Градиент накладываем на сами модули (срез по непрозрачным).
+              // Золото накладываем на сами модули (срез по непрозрачным).
               ShaderMask(
-                shaderCallback: (rect) => _gradient.createShader(rect),
+                shaderCallback: (rect) => _gold.createShader(rect),
                 blendMode: BlendMode.srcIn,
                 child: QrImageView(
                   data: data,
@@ -66,7 +76,7 @@ class StyledQr extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(5),
                 decoration: const BoxDecoration(
-                  color: Colors.white,
+                  color: _cardBottom,
                   shape: BoxShape.circle,
                 ),
                 child: BrenksAvatar(
@@ -81,7 +91,7 @@ class StyledQr extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         ShaderMask(
-          shaderCallback: (rect) => _gradient.createShader(rect),
+          shaderCallback: (rect) => _gold.createShader(rect),
           blendMode: BlendMode.srcIn,
           child: Text(
             '@$username',

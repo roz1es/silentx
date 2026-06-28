@@ -36,7 +36,13 @@ class MediaPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     switch (media.kind) {
       case 'image':
-        return ImagePreview(source: media.dataUrl, serverUrl: serverUrl);
+        return ImagePreview(
+          source: media.dataUrl,
+          serverUrl: serverUrl,
+          timeLabel: timeLabel,
+          read: read,
+          own: own,
+        );
       case 'voice':
         return VoicePreview(media: media);
       case 'video_note':
@@ -513,10 +519,21 @@ class _OverlayPill extends StatelessWidget {
 }
 
 class ImagePreview extends StatefulWidget {
-  const ImagePreview({super.key, required this.source, required this.serverUrl});
+  const ImagePreview({
+    super.key,
+    required this.source,
+    required this.serverUrl,
+    this.timeLabel,
+    this.read = false,
+    this.own = false,
+  });
 
   final String source;
   final String serverUrl;
+  // Для «голого» фото без пузыря — наложить время/галочки прямо на снимок.
+  final String? timeLabel;
+  final bool read;
+  final bool own;
 
   @override
   State<ImagePreview> createState() => _ImagePreviewState();
@@ -561,19 +578,50 @@ class _ImagePreviewState extends State<ImagePreview> {
       onTap: () => _openViewer(context, bytes, url),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 320, maxWidth: 320),
-          child: bytes != null
-              ? Image.memory(bytes, fit: BoxFit.cover, gaplessPlayback: true)
-              : Image.network(
-                  url!,
-                  fit: BoxFit.cover,
-                  gaplessPlayback: true,
-                  errorBuilder: (_, __, ___) => const Text(
-                    'Фото не удалось загрузить',
-                    style: TextStyle(color: muted),
+        child: Stack(
+          children: [
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 320, maxWidth: 320),
+              child: bytes != null
+                  ? Image.memory(bytes,
+                      fit: BoxFit.cover, gaplessPlayback: true)
+                  : Image.network(
+                      url!,
+                      fit: BoxFit.cover,
+                      gaplessPlayback: true,
+                      errorBuilder: (_, __, ___) => const Text(
+                        'Фото не удалось загрузить',
+                        style: TextStyle(color: muted),
+                      ),
+                    ),
+            ),
+            // Время + галочки поверх снимка (когда фото без пузыря).
+            if (widget.timeLabel != null)
+              Positioned(
+                right: 8,
+                bottom: 8,
+                child: _OverlayPill(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(widget.timeLabel!,
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 12)),
+                      if (widget.own) ...[
+                        const SizedBox(width: 3),
+                        Icon(
+                          widget.read
+                              ? Icons.done_all_rounded
+                              : Icons.done_rounded,
+                          size: 14,
+                          color: widget.read ? softGold : Colors.white,
+                        ),
+                      ],
+                    ],
                   ),
                 ),
+              ),
+          ],
         ),
       ),
     );

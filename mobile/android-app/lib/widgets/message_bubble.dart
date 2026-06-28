@@ -109,6 +109,62 @@ class MessageBubble extends StatelessWidget {
       );
     }
 
+    // Чистое фото без подписи и без ответа — без прямоугольного пузыря
+    // (как в Telegram): «голый» снимок со временем/галочками поверх.
+    final isPhotoOnly = !message.deleted &&
+        message.text.trim().isEmpty &&
+        replyPreview == null &&
+        ((m != null && m.kind == 'image') ||
+            (message.imageUrl?.isNotEmpty ?? false));
+    if (isPhotoOnly) {
+      return Align(
+        alignment: own ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.82,
+          ),
+          margin: const EdgeInsets.only(bottom: 10),
+          child: Column(
+            crossAxisAlignment:
+                own ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!own && senderName != null && senderName!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4, left: 4),
+                  child: Text(
+                    senderName!,
+                    style: const TextStyle(
+                      color: accent,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              if (m != null)
+                MediaPreview(
+                  media: m,
+                  serverUrl: serverUrl,
+                  onPlayVoice: onPlayVoice,
+                  timeLabel: formatTime(message.createdAt),
+                  read: read,
+                  own: own,
+                )
+              else
+                ImagePreview(
+                  source: message.imageUrl!,
+                  serverUrl: serverUrl,
+                  timeLabel: formatTime(message.createdAt),
+                  read: read,
+                  own: own,
+                ),
+              if (message.reactions.isNotEmpty) _reactions(isLight),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Align(
         alignment: own ? Alignment.centerRight : Alignment.centerLeft,
         child: Container(

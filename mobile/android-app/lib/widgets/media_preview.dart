@@ -575,10 +575,16 @@ class ImagePreview extends StatefulWidget {
 }
 
 class _ImagePreviewState extends State<ImagePreview> {
+  // Соотношение сторон по источнику кешируем глобально: при прокрутке/рециклинге
+  // высота картинки известна сразу с первого кадра — лента не «прыгает» при
+  // (пере)декодировании.
+  static final Map<String, double> _aspectCache = {};
+
   // Декодируем один раз и держим стабильные байты — иначе Image.memory
   // перезагружается на каждый rebuild и лента «прыгает».
   Uint8List? _bytes;
   String? _url;
+  double? _aspect;
 
   @override
   void initState() {
@@ -599,6 +605,29 @@ class _ImagePreviewState extends State<ImagePreview> {
     final b = bytesFromDataUrl(widget.source);
     _bytes = b;
     _url = b == null ? resolveMediaUrl(widget.source, widget.serverUrl) : null;
+    final cached = _aspectCache[widget.source];
+    if (cached != null) {
+      _aspect = cached;
+      return;
+    }
+    final ImageProvider? provider = b != null
+        ? MemoryImage(b)
+        : (_url != null && _url!.isNotEmpty ? NetworkImage(_url!) : null);
+    if (provider != null) _resolveAspect(provider, widget.source);
+  }
+
+  // Получаем реальные размеры картинки (для memory и network) и кешируем аспект.
+  void _resolveAspect(ImageProvider provider, String key) {
+    final stream = provider.resolve(ImageConfiguration.empty);
+    late final ImageStreamListener listener;
+    listener = ImageStreamListener((info, _) {
+      final hh = info.image.height;
+      final a = hh == 0 ? 1.0 : info.image.width / hh;
+      _aspectCache[key] = a;
+      if (mounted) setState(() => _aspect = a);
+      stream.removeListener(listener);
+    }, onError: (_, __) => stream.removeListener(listener));
+    stream.addListener(listener);
   }
 
   @override
@@ -609,14 +638,25 @@ class _ImagePreviewState extends State<ImagePreview> {
       return const Text('Фото не удалось открыть',
           style: TextStyle(color: muted));
     }
+    // Фикс-размер по аспекту — стабильная высота, лента не прыгает при декоде.
+    final aspect = _aspect ?? 1.0;
+    const maxW = 250.0;
+    const maxH = 320.0;
+    double w = maxW;
+    double h = maxW / aspect;
+    if (h > maxH) {
+      h = maxH;
+      w = maxH * aspect;
+    }
     return GestureDetector(
       onTap: () => _openViewer(context, bytes, url),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Stack(
           children: [
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 320, maxWidth: 320),
+            SizedBox(
+              width: w,
+              height: h,
               child: bytes != null
                   ? Image.memory(bytes,
                       fit: BoxFit.cover, gaplessPlayback: true)

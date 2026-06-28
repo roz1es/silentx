@@ -60,6 +60,14 @@ class _ChatListScreenState extends State<ChatListScreen>
   List<ChatFolder> _folders = const [];
   int _activeFolder = 0; // 0 = «Все»
 
+  // Скользящий индикатор активной папки: ключи сегментов + измеренные позиция
+  // и ширина (в координатах панели вкладок).
+  final GlobalKey _folderStackKey = GlobalKey();
+  final Map<int, GlobalKey> _folderKeys = {};
+  double _indLeft = 0;
+  double _indWidth = 0;
+  bool _indReady = false;
+
   MessengerController get _controller => widget.controller;
 
   Future<void> _loadFolders() async {
@@ -816,8 +824,10 @@ class _ChatListScreenState extends State<ChatListScreen>
 
   Widget _folderTabs(bool isLight) {
     final names = ['Все', ..._folders.map((f) => f.name)];
-    // Стеклянная панель-сегмент (как нижняя навигация): активная папка —
-    // матовая «пилюля», остальные прозрачны.
+    // Измеряем положение активного сегмента после кадра — стеклянная «пилюля»
+    // плавно переезжает к нему (AnimatedPositioned).
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _measureFolderIndicator());
     return Padding(
       padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
       child: SingleChildScrollView(
@@ -826,17 +836,67 @@ class _ChatListScreenState extends State<ChatListScreen>
           borderRadius: 22,
           shadow: true,
           padding: const EdgeInsets.all(5),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+          child: Stack(
+            key: _folderStackKey,
             children: [
-              for (var i = 0; i < names.length; i++)
-                _folderTab(names[i], i, isLight),
-              _folderFilterButton(isLight),
+              // Скользящая матовая «пилюля» под активной папкой.
+              if (_indReady)
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.easeOutCubic,
+                  left: _indLeft,
+                  top: 0,
+                  bottom: 0,
+                  width: _indWidth,
+                  child: const GlassPanel(
+                    borderRadius: 16,
+                    blur: 14,
+                    strength: 1.6,
+                    shadow: true,
+                    child: SizedBox.expand(),
+                  ),
+                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < names.length; i++)
+                    KeyedSubtree(
+                      key: _folderKeys[i] ??= GlobalKey(),
+                      child: _folderTab(names[i], i, isLight),
+                    ),
+                  _folderFilterButton(isLight),
+                ],
+              ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  /// Меряет положение/ширину активного сегмента относительно панели и двигает
+  /// туда скользящий индикатор. Вызывается после кадра; setState — только при
+  /// реальном изменении, чтобы не зациклиться.
+  void _measureFolderIndicator() {
+    final segCtx = _folderKeys[_activeFolder]?.currentContext;
+    final stackCtx = _folderStackKey.currentContext;
+    if (segCtx == null || stackCtx == null) return;
+    final seg = segCtx.findRenderObject() as RenderBox?;
+    final stack = stackCtx.findRenderObject() as RenderBox?;
+    if (seg == null || stack == null || !seg.hasSize || !stack.hasSize) return;
+    final left = seg.localToGlobal(Offset.zero, ancestor: stack).dx;
+    final width = seg.size.width;
+    if (_indReady &&
+        (left - _indLeft).abs() < 0.5 &&
+        (width - _indWidth).abs() < 0.5) {
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _indLeft = left;
+      _indWidth = width;
+      _indReady = true;
+    });
   }
 
   Widget _folderFilterButton(bool isLight) {
@@ -1015,15 +1075,7 @@ class _ChatListScreenState extends State<ChatListScreen>
       onLongPressStart: (d) => _folderMenu(index, d.globalPosition),
       child: SizedBox(
         height: 36,
-        child: selected
-            ? GlassPanel(
-                borderRadius: 16,
-                blur: 14,
-                strength: 1.6,
-                shadow: true,
-                child: Center(child: inner),
-              )
-            : Center(child: inner),
+        child: Center(child: inner),
       ),
     );
   }

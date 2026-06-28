@@ -440,10 +440,12 @@ class ApiClient {
     return Chat.fromJson((json['chat'] as Map).cast<String, dynamic>());
   }
 
-  /// Изменить чат (название группы/канала). Доступно владельцу канала.
-  Future<Chat> updateChat(String chatId, {String? name}) async {
+  /// Изменить чат (название/аватар группы/канала). Доступно владельцу канала.
+  /// Пустая строка в [avatarUrl] убирает аватар.
+  Future<Chat> updateChat(String chatId, {String? name, String? avatarUrl}) async {
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
+    if (avatarUrl != null) body['avatarUrl'] = avatarUrl;
     final json = await _request('/api/chats/${Uri.encodeComponent(chatId)}',
         method: 'PATCH', body: body);
     return Chat.fromJson((json['chat'] as Map).cast<String, dynamic>());

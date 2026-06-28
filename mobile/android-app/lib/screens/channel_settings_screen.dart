@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../models.dart';
@@ -25,6 +28,7 @@ class ChannelSettingsScreen extends StatefulWidget {
 class _ChannelSettingsScreenState extends State<ChannelSettingsScreen> {
   late final TextEditingController _nameCtrl;
   bool _savingName = false;
+  bool _changingAvatar = false;
   final Set<String> _busyUsers = {};
 
   MessengerController get _ctrl => widget.controller;
@@ -56,6 +60,35 @@ class _ChannelSettingsScreenState extends State<ChannelSettingsScreen> {
       if (mounted) showAppToast(context, 'Ошибка: $e', error: true);
     } finally {
       if (mounted) setState(() => _savingName = false);
+    }
+  }
+
+  Future<void> _changeAvatar() async {
+    setState(() => _changingAvatar = true);
+    try {
+      final res =
+          await FilePicker.pickFiles(type: FileType.image, withData: true);
+      final file = res?.files.single;
+      final bytes = file?.bytes;
+      if (bytes == null || bytes.isEmpty) return;
+      final mime =
+          file!.extension?.toLowerCase() == 'png' ? 'image/png' : 'image/jpeg';
+      final dataUrl = 'data:$mime;base64,${base64Encode(bytes)}';
+      await _ctrl.updateChatAvatar(widget.chatId, dataUrl);
+      if (mounted) showAppToast(context, 'Аватар обновлён');
+    } on Object catch (e) {
+      if (mounted) showAppToast(context, 'Ошибка: $e', error: true);
+    } finally {
+      if (mounted) setState(() => _changingAvatar = false);
+    }
+  }
+
+  Future<void> _removeAvatar() async {
+    try {
+      await _ctrl.updateChatAvatar(widget.chatId, '');
+      if (mounted) showAppToast(context, 'Аватар убран');
+    } on Object catch (e) {
+      if (mounted) showAppToast(context, 'Ошибка: $e', error: true);
     }
   }
 
@@ -103,6 +136,50 @@ class _ChannelSettingsScreenState extends State<ChannelSettingsScreen> {
             return ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
               children: [
+                Center(
+                  child: BrenksAvatar(
+                    title: chat.title,
+                    imageUrl: chat.avatarUrl,
+                    baseUrl: _ctrl.serverUrl,
+                    size: 92,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.tonalIcon(
+                        onPressed: _changingAvatar ? null : _changeAvatar,
+                        icon: _changingAvatar
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.add_a_photo_rounded, size: 18),
+                        label: const Text('Сменить фото'),
+                      ),
+                    ),
+                    if (chat.avatarUrl != null &&
+                        chat.avatarUrl!.isNotEmpty) ...[
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _removeAvatar,
+                          icon: const Icon(Icons.delete_outline_rounded,
+                              size: 18, color: danger),
+                          label: const Text('Убрать',
+                              style: TextStyle(color: danger)),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                                color: danger.withValues(alpha: 0.5)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 22),
                 _label('НАЗВАНИЕ', mutedColor),
                 const SizedBox(height: 8),
                 TextField(

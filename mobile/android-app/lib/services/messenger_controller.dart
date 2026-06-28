@@ -420,6 +420,14 @@ class MessengerController extends ChangeNotifier {
     unawaited(ChatCache.saveChats(_chats));
   }
 
+  /// Сменить аватар чата. Пустая строка [dataUrl] убирает аватар.
+  Future<void> updateChatAvatar(String chatId, String dataUrl) async {
+    final updated = await api.updateChat(chatId, avatarUrl: dataUrl);
+    _upsertChat(updated);
+    notifyListeners();
+    unawaited(ChatCache.saveChats(_chats));
+  }
+
   Future<void> setChannelAdmin(
       String chatId, String userId, bool admin) async {
     final updated = await api.setChannelAdmin(chatId, userId, admin);

@@ -262,6 +262,24 @@ class ApiClient {
     );
   }
 
+  /// Запросить смену почты для входа — код придёт на новую почту.
+  Future<({String ticket, String emailMasked})> requestEmailChange(
+      String email) async {
+    final json = await _request('/api/me/email/request',
+        method: 'POST', body: {'email': email});
+    return (
+      ticket: json['ticket']?.toString() ?? '',
+      emailMasked: json['emailMasked']?.toString() ?? '',
+    );
+  }
+
+  /// Подтвердить смену почты кодом. Возвращает обновлённого пользователя.
+  Future<User> confirmEmailChange(String ticket, String code) async {
+    final json = await _request('/api/me/email/confirm',
+        method: 'POST', body: {'ticket': ticket, 'code': code});
+    return User.fromJson((json['user'] as Map).cast<String, dynamic>());
+  }
+
   Future<void> logout() async {
     await _request('/api/logout', method: 'POST', body: const {});
   }

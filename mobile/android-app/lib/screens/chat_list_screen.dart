@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:swipeable_page_route/swipeable_page_route.dart';
 
@@ -1659,6 +1660,158 @@ class _SettingsViewState extends State<_SettingsView> {
     return '${d.day} ${months[d.month - 1]} ${d.year} г.';
   }
 
+  Future<String?> _prompt(String title,
+      {String? subtitle,
+      String hint = '',
+      bool obscure = false,
+      TextInputType? keyboard}) {
+    final ctrl = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _isLight ? Colors.white : panel,
+        title: Text(title,
+            style: TextStyle(
+                color: _textColor,
+                fontSize: 17,
+                fontWeight: FontWeight.w800)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (subtitle != null) ...[
+              Text(subtitle,
+                  style: TextStyle(color: _mutedColor, fontSize: 13)),
+              const SizedBox(height: 10),
+            ],
+            TextField(
+              controller: ctrl,
+              obscureText: obscure,
+              keyboardType: keyboard,
+              autofocus: true,
+              decoration: InputDecoration(hintText: hint),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Отмена')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            style: FilledButton.styleFrom(
+                backgroundColor: accent,
+                foregroundColor: const Color(0xFF08131A)),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _changeEmail() async {
+    final email = await _prompt('Сменить почту',
+        subtitle: 'Введите новую почту — на неё придёт код.',
+        hint: 'you@example.com',
+        keyboard: TextInputType.emailAddress);
+    if (email == null || email.isEmpty) return;
+    try {
+      final res = await _ctrl.api.requestEmailChange(email);
+      if (!mounted) return;
+      final code = await _prompt('Код подтверждения',
+          subtitle: 'Код отправлен на ${res.emailMasked}.',
+          hint: 'Код из письма',
+          keyboard: TextInputType.number);
+      if (code == null || code.isEmpty) return;
+      final updated = await _ctrl.api.confirmEmailChange(res.ticket, code);
+      _ctrl.applyProfile(updated);
+      if (mounted) showAppToast(context, 'Почта изменена');
+    } on Object catch (e) {
+      if (mounted) showAppToast(context, 'Ошибка: $e', error: true);
+    }
+  }
+
+  Future<void> _changePassword() async {
+    try {
+      final res =
+          await _ctrl.api.requestPasswordReset(_ctrl.currentUser.username);
+      if (!res.codeSent) {
+        if (mounted) {
+          showAppToast(context, res.message ?? 'Не удалось отправить код',
+              error: true);
+        }
+        return;
+      }
+      if (!mounted) return;
+      final code = await _prompt('Код из письма',
+          subtitle: 'Код отправлен на ${res.emailMasked ?? 'вашу почту'}.',
+          hint: 'Код',
+          keyboard: TextInputType.number);
+      if (code == null || code.isEmpty) return;
+      if (!mounted) return;
+      final pass = await _prompt('Новый пароль',
+          hint: 'Минимум 6 символов', obscure: true);
+      if (pass == null) return;
+      if (pass.length < 6) {
+        if (mounted) showAppToast(context, 'Пароль слишком короткий', error: true);
+        return;
+      }
+      await _ctrl.api
+          .confirmPasswordReset(ticket: res.ticket!, code: code, password: pass);
+      if (mounted) showAppToast(context, 'Пароль изменён');
+    } on Object catch (e) {
+      if (mounted) showAppToast(context, 'Ошибка: $e', error: true);
+    }
+  }
+
+  Future<void> _clearCache() async {
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
+    try {
+      final dir = await getTemporaryDirectory();
+      if (dir.existsSync()) {
+        for (final f in dir.listSync()) {
+          try {
+            f.deleteSync(recursive: true);
+          } on Object {
+            // файл занят — пропускаем
+          }
+        }
+      }
+    } on Object {
+      // нет доступа к временной папке — игнорируем
+    }
+    if (mounted) showAppToast(context, 'Кеш очищен');
+  }
+
+  void _shareApp() {
+    Clipboard.setData(
+        const ClipboardData(text: 'BrenksChat — https://brenkschat.ru'));
+    showAppToast(context, 'Ссылка скопирована');
+  }
+
+  Widget _settingsRow(IconData icon, String label, VoidCallback onTap) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: GlassCard(
+        borderRadius: 18,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        child: Row(
+          children: [
+            _miniIcon(icon),
+            const SizedBox(width: 12),
+            Expanded(
+                child: Text(label,
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700, color: _textColor))),
+            Icon(Icons.chevron_right_rounded, color: _mutedColor),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _loadSessions() async {
     setState(() => _loadingSessions = true);
     try {
@@ -2209,6 +2362,50 @@ class _SettingsViewState extends State<_SettingsView> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 20),
+                    _sectionLabel('АККАУНТ'),
+                    const SizedBox(height: 8),
+                    _settingsRow(Icons.alternate_email_rounded, 'Сменить почту',
+                        _changeEmail),
+                    const SizedBox(height: 8),
+                    _settingsRow(Icons.lock_reset_rounded, 'Сменить пароль',
+                        _changePassword),
+                    const SizedBox(height: 20),
+                    _sectionLabel('ХРАНИЛИЩЕ'),
+                    const SizedBox(height: 8),
+                    _settingsRow(Icons.cleaning_services_rounded,
+                        'Очистить кеш', _clearCache),
+                    const SizedBox(height: 20),
+                    _sectionLabel('О ПРИЛОЖЕНИИ'),
+                    const SizedBox(height: 8),
+                    GlassCard(
+                      borderRadius: 18,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 14),
+                      child: Row(
+                        children: [
+                          _miniIcon(Icons.info_outline_rounded),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('BrenksChat',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: _textColor)),
+                                Text('Версия $appVersion',
+                                    style: TextStyle(
+                                        color: _mutedColor, fontSize: 12.5)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _settingsRow(Icons.ios_share_rounded,
+                        'Поделиться приложением', _shareApp),
                     const SizedBox(height: 20),
                     Row(
                       children: [

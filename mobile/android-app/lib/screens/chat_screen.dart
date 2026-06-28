@@ -642,7 +642,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (!_recordingCircle)
+                      if (!_canWrite(chat))
+                        _muteBar(chat)
+                      else if (!_recordingCircle)
                         MessageComposer(
                         controller: _messageController,
                         replyTo: _replyTo,
@@ -701,6 +703,60 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ],
       ),
+      ),
+    );
+  }
+
+  /// Может ли текущий пользователь писать в чат. В канале писать может только
+  /// владелец, в группах/личных — все.
+  bool _canWrite(Chat chat) {
+    if (chat.type == ChatType.channel) {
+      return chat.channelOwnerId == _controller.currentUser.id;
+    }
+    return true;
+  }
+
+  /// Вместо строки ввода (когда писать нельзя) — кнопка вкл/выкл звука канала.
+  Widget _muteBar(Chat chat) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => _controller.toggleMute(chat),
+          child: Container(
+            height: 52,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: isLight ? Colors.white : panelStrong,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: border),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  chat.muted
+                      ? Icons.notifications_active_rounded
+                      : Icons.notifications_off_rounded,
+                  size: 20,
+                  color: accent,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  chat.muted ? 'Включить звук' : 'Убрать звук',
+                  style: TextStyle(
+                    color: isLight ? lightText : text,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

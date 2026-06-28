@@ -72,7 +72,7 @@ class _FoldersScreenState extends State<FoldersScreen> {
     final existing = _folders.map((f) => f.filterType).toSet();
     final all = [
       (name: 'Личные', filter: FolderFilter.direct),
-      (name: 'Группы, беседы и боты', filter: FolderFilter.groups),
+      (name: 'Группы', filter: FolderFilter.groups),
     ];
     return all.where((p) => !existing.contains(p.filter)).toList();
   }
@@ -97,7 +97,7 @@ class _FoldersScreenState extends State<FoldersScreen> {
       case FolderFilter.direct:
         return 'Все личные чаты';
       case FolderFilter.groups:
-        return 'Все группы, беседы и боты';
+        return 'Все группы';
       default:
         return '${f.chatIds.length} чатов';
     }

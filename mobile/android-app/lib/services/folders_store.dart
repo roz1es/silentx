@@ -54,10 +54,15 @@ class FoldersStore {
     if (raw == null || raw.isEmpty) return [];
     try {
       final list = jsonDecode(raw) as List;
-      return list
+      final folders = list
           .whereType<Map>()
           .map((m) => ChatFolder.fromJson(m.cast<String, dynamic>()))
           .toList();
+      // Миграция: старое название папки → короткое «Группы».
+      for (final f in folders) {
+        if (f.name == 'Группы, беседы и боты') f.name = 'Группы';
+      }
+      return folders;
     } on Object {
       return [];
     }

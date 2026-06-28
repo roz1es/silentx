@@ -677,7 +677,8 @@ class _SwipeToReplyState extends State<_SwipeToReply>
   static const _maxDrag = 78.0;
   static const _trigger = 52.0;
 
-  double _dx = 0;
+  double _dx = 0; // визуальный сдвиг пузыря (только влево — для ответа)
+  double _raw = 0; // суммарный горизонтальный сдвиг (обе стороны)
   bool _passed = false;
   late final AnimationController _return = AnimationController(
     vsync: this,
@@ -693,19 +694,26 @@ class _SwipeToReplyState extends State<_SwipeToReply>
 
   void _onUpdate(DragUpdateDetails d) {
     if (_return.isAnimating) return;
+    _raw += d.delta.dx;
     setState(() {
-      // Только влево (до 0) — тянем сообщение в сторону для ответа.
-      _dx = (_dx + d.delta.dx).clamp(-_maxDrag, 0.0);
+      // Пузырь визуально едет только влево (ответ); вправо — это выход.
+      _dx = _raw.clamp(-_maxDrag, 0.0);
     });
-    final passed = _dx.abs() >= _trigger;
+    final passed = _dx <= -_trigger;
     if (passed && !_passed) HapticFeedback.mediumImpact();
     _passed = passed;
   }
 
   void _onEnd(DragEndDetails d) {
-    final fire = _dx.abs() >= _trigger;
     _passed = false;
-    if (fire) widget.onReply();
+    final raw = _raw;
+    _raw = 0;
+    if (raw <= -_trigger) {
+      widget.onReply(); // свайп влево — ответ
+    } else if (raw >= _trigger) {
+      Navigator.of(context).maybePop(); // свайп вправо — выход из чата
+      return;
+    }
     final from = _dx;
     if (from == 0) return;
     _anim = Tween<double>(begin: from, end: 0).animate(

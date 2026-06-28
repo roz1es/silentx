@@ -474,14 +474,7 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Scaffold(
       backgroundColor: Colors.transparent,
       appBar: _appBar(chat),
-      // Свайп вправо в любом месте экрана — выход из чата (на сообщениях это
-      // же делает свайп-ответ: влево — ответ, вправо — выход).
-      body: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onHorizontalDragEnd: (d) {
-          if ((d.primaryVelocity ?? 0) > 320) Navigator.of(context).maybePop();
-        },
-        child: Column(
+      body: Column(
         children: [
           if (pinned != null) _pinnedBanner(pinned),
           if (_controller.messagesError != null)
@@ -589,7 +582,6 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
         ],
-      ),
       ),
       ),
     );

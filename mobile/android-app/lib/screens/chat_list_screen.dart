@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:swipeable_page_route/swipeable_page_route.dart';
 
 import '../format.dart';
 import '../models.dart';
@@ -210,9 +211,10 @@ class _ChatListScreenState extends State<ChatListScreen>
   void _openChat(Chat chat) {
     _maybeCloseEmptySearch();
     Navigator.of(context).push(
-      // Cupertino-роут даёт свайп-назад (свайп вправо от левого края) и на
-      // Android. Свайп-ответ по сообщению — влево, так что не конфликтует.
-      CupertinoPageRoute(
+      // Полноэкранный свайп-назад (follow-finger) по всему экрану — едет за
+      // пальцем. Свайп-ответ по сообщению — только влево, не конфликтует.
+      SwipeablePageRoute(
+        canOnlySwipeFromEdge: false,
         builder: (_) => ChatScreen(controller: _controller, chatId: chat.id),
       ),
     );

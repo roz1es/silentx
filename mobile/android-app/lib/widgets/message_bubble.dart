@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -678,7 +679,6 @@ class _SwipeToReplyState extends State<_SwipeToReply>
   static const _trigger = 52.0;
 
   double _dx = 0; // визуальный сдвиг пузыря (только влево — для ответа)
-  double _raw = 0; // суммарный горизонтальный сдвиг (обе стороны)
   bool _passed = false;
   late final AnimationController _return = AnimationController(
     vsync: this,
@@ -694,10 +694,8 @@ class _SwipeToReplyState extends State<_SwipeToReply>
 
   void _onUpdate(DragUpdateDetails d) {
     if (_return.isAnimating) return;
-    _raw += d.delta.dx;
     setState(() {
-      // Пузырь визуально едет только влево (ответ); вправо — это выход.
-      _dx = _raw.clamp(-_maxDrag, 0.0);
+      _dx = (_dx + d.delta.dx).clamp(-_maxDrag, 0.0);
     });
     final passed = _dx <= -_trigger;
     if (passed && !_passed) HapticFeedback.mediumImpact();
@@ -706,14 +704,7 @@ class _SwipeToReplyState extends State<_SwipeToReply>
 
   void _onEnd(DragEndDetails d) {
     _passed = false;
-    final raw = _raw;
-    _raw = 0;
-    if (raw <= -_trigger) {
-      widget.onReply(); // свайп влево — ответ
-    } else if (raw >= _trigger) {
-      Navigator.of(context).maybePop(); // свайп вправо — выход из чата
-      return;
-    }
+    if (_dx <= -_trigger) widget.onReply(); // свайп влево — ответ
     final from = _dx;
     if (from == 0) return;
     _anim = Tween<double>(begin: from, end: 0).animate(
@@ -727,11 +718,19 @@ class _SwipeToReplyState extends State<_SwipeToReply>
   @override
   Widget build(BuildContext context) {
     final progress = (_dx.abs() / _trigger).clamp(0.0, 1.0);
-    return GestureDetector(
-      // opaque — чтобы свайп ловился по всей строке, а не только по пузырю.
+    return RawGestureDetector(
+      // Только свайп ВЛЕВО (ответ); свайп вправо отдаём странице — там
+      // полноэкранный свайп-назад. opaque — чтобы ловить по всей строке.
       behavior: HitTestBehavior.opaque,
-      onHorizontalDragUpdate: _onUpdate,
-      onHorizontalDragEnd: _onEnd,
+      gestures: <Type, GestureRecognizerFactory>{
+        _LeftDragGestureRecognizer:
+            GestureRecognizerFactoryWithHandlers<_LeftDragGestureRecognizer>(
+          () => _LeftDragGestureRecognizer(),
+          (r) => r
+            ..onUpdate = _onUpdate
+            ..onEnd = _onEnd,
+        ),
+      },
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -762,5 +761,32 @@ class _SwipeToReplyState extends State<_SwipeToReply>
         ],
       ),
     );
+  }
+}
+
+/// Горизонтальный drag только ВЛЕВО (свайп-ответ). При движении вправо отдаёт
+/// жест (rejected), чтобы сработал полноэкранный свайп-назад страницы.
+class _LeftDragGestureRecognizer extends HorizontalDragGestureRecognizer {
+  Offset _down = Offset.zero;
+  bool _rejected = false;
+
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    _down = event.position;
+    _rejected = false;
+    super.addAllowedPointer(event);
+  }
+
+  @override
+  void handleEvent(PointerEvent event) {
+    if (!_rejected && event is PointerMoveEvent) {
+      if (event.position.dx - _down.dx > kTouchSlop) {
+        _rejected = true;
+        resolve(GestureDisposition.rejected);
+        return;
+      }
+    }
+    if (_rejected) return;
+    super.handleEvent(event);
   }
 }

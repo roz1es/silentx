@@ -7,6 +7,7 @@ import '../services/messenger_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/brenks_avatar.dart';
 import '../widgets/glass.dart';
+import 'channel_settings_screen.dart';
 
 /// Профиль собеседника: инфо (ID / телефон / дата рождения / описание),
 /// кнопки действий и общие медиа (Фото / ГС / Кружки / Файлы).
@@ -281,6 +282,25 @@ class _ChatProfileScreenState extends State<ChatProfileScreen> {
                             ),
                           ],
                         ),
+                      // Настройки канала — кнопка для владельца.
+                      if (chat.type == ChatType.channel &&
+                          chat.channelOwnerId == _ctrl.currentUser.id) ...[
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: _actionBtn(
+                            Icons.settings_rounded,
+                            'Настройки канала',
+                            () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => ChannelSettingsScreen(
+                                    controller: _ctrl, chatId: chat.id),
+                              ),
+                            ),
+                            isLight,
+                          ),
+                        ),
+                      ],
                       // Персональная информация — только для личных чатов;
                       // в каналах/группах эти поля (владельца) не показываем.
                       if (isDirect) ...[

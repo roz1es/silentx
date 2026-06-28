@@ -12,6 +12,21 @@ const appVersion = String.fromEnvironment(
   defaultValue: '0.1.0',
 );
 
+/// Публичная ссылка на профиль (для QR и «Поделиться»). Ведёт на веб-клиент
+/// (brenkschat.ru), а НЕ на API-домен (api.brenkschat.ru) — там пути /u/ нет.
+String profileLink(String serverUrl, String username) {
+  final uri = Uri.tryParse(serverUrl);
+  if (uri == null || uri.host.isEmpty) {
+    return '$serverUrl/u/$username';
+  }
+  var host = uri.host;
+  if (host.startsWith('api.')) host = host.substring(4);
+  final scheme = uri.scheme.isEmpty ? 'https' : uri.scheme;
+  final portPart =
+      (uri.hasPort && uri.port != 80 && uri.port != 443) ? ':${uri.port}' : '';
+  return '$scheme://$host$portPart/u/$username';
+}
+
 /// Нормализует адрес сервера: убирает завершающий слэш и добавляет схему.
 String normalizeServerUrl(String value) {
   final trimmed = value.trim();

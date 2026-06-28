@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:swipeable_page_route/swipeable_page_route.dart';
 
+import '../config.dart';
 import '../format.dart';
 import '../models.dart';
 import '../services/folders_store.dart';
@@ -1835,7 +1836,7 @@ class _SettingsViewState extends State<_SettingsView> {
   }
 
   void _copyProfileLink() {
-    final link = '${_ctrl.serverUrl}/u/${_ctrl.currentUser.username}';
+    final link = profileLink(_ctrl.serverUrl, _ctrl.currentUser.username);
     Clipboard.setData(ClipboardData(text: link));
     showAppToast(context, 'Ссылка скопирована');
   }
@@ -2143,7 +2144,7 @@ class _SettingsViewState extends State<_SettingsView> {
                       child: Column(
                         children: [
                           StyledQr(
-                            data: '${_ctrl.serverUrl}/u/${user.username}',
+                            data: profileLink(_ctrl.serverUrl, user.username),
                             username: user.username,
                             avatarUrl: user.avatarUrl,
                             serverUrl: _ctrl.serverUrl,

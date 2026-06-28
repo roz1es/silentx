@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../config.dart';
 import '../format.dart';
 import '../models.dart';
 import '../services/messenger_controller.dart';
@@ -275,7 +276,7 @@ class _ChatProfileScreenState extends State<ChatProfileScreen> {
                               child: _actionBtn(
                                   Icons.ios_share_rounded, 'Поделиться', () {
                                 final link =
-                                    '${_ctrl.serverUrl}/u/${peer.username}';
+                                    profileLink(_ctrl.serverUrl, peer.username);
                                 Clipboard.setData(ClipboardData(text: link));
                                 showAppToast(context, 'Ссылка скопирована');
                               }, isLight),

@@ -12,6 +12,7 @@ import 'package:swipeable_page_route/swipeable_page_route.dart';
 
 import '../format.dart';
 import '../models.dart';
+import '../services/app_settings.dart';
 import '../services/audio_message_service.dart';
 import '../services/messenger_controller.dart';
 import '../theme/app_theme.dart';
@@ -75,6 +76,7 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _controller.addListener(_onControllerChanged);
     _scrollController.addListener(_onScroll);
+    AppSettings.instance.addListener(_onAppSettings);
     // Открываем чат после первого кадра, чтобы синхронный notifyListeners
     // внутри openChat не вызвал setState во время инициализации.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -86,6 +88,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _controller.removeListener(_onControllerChanged);
+    AppSettings.instance.removeListener(_onAppSettings);
     _controller.closeActiveChat();
     _recordingTimer?.cancel();
     _highlightTimer?.cancel();
@@ -95,6 +98,10 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollController.dispose();
     _recordingMs.dispose();
     super.dispose();
+  }
+
+  void _onAppSettings() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadBg() async {
@@ -631,6 +638,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   onReaction: (emoji) => _controller
                                       .toggleReaction(message.id, emoji),
                                   onPlayVoice: _playVoice,
+                                  fontScale: AppSettings.instance.msgFontScale,
                                 ),
                               );
                             },

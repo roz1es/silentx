@@ -13,6 +13,7 @@ import 'package:swipeable_page_route/swipeable_page_route.dart';
 import '../config.dart';
 import '../format.dart';
 import '../models.dart';
+import '../services/app_settings.dart';
 import '../services/folders_store.dart';
 import '../services/messenger_controller.dart';
 import '../theme/app_theme.dart';
@@ -185,6 +186,7 @@ class _ChatListScreenState extends State<ChatListScreen>
   void initState() {
     super.initState();
     _controller.addListener(_onChanged);
+    AppSettings.instance.addListener(_onChanged);
     _loadOrder();
     _loadFolders();
   }
@@ -192,6 +194,7 @@ class _ChatListScreenState extends State<ChatListScreen>
   @override
   void dispose() {
     _controller.removeListener(_onChanged);
+    AppSettings.instance.removeListener(_onChanged);
     _userSearchDebounce?.cancel();
     _searchController.dispose();
     _searchFocus.dispose();
@@ -1213,6 +1216,7 @@ class _ChatListScreenState extends State<ChatListScreen>
                     peerOnline: _controller.isPeerOnline(chat),
                     onTap: () {},
                     onLongPress: (_) {},
+                    compact: AppSettings.instance.compactList,
                   ),
                 ),
                 ReorderableDragStartListener(
@@ -1303,6 +1307,7 @@ class _ChatListScreenState extends State<ChatListScreen>
                   peerOnline: _controller.isPeerOnline(chat),
                   onTap: () => _openChat(chat),
                   onLongPress: (_) => _chatOptions(chat),
+                  compact: AppSettings.instance.compactList,
                 ),
               ),
             ),
@@ -1531,6 +1536,7 @@ class _ChatListScreenState extends State<ChatListScreen>
               peerOnline: _controller.isPeerOnline(chat),
               onTap: () => _openChat(chat),
               onLongPress: (_) => _chatOptions(chat),
+              compact: AppSettings.instance.compactList,
             ),
           ),
         );
@@ -1788,6 +1794,38 @@ class _SettingsViewState extends State<_SettingsView> {
     Clipboard.setData(
         const ClipboardData(text: 'BrenksChat — https://brenkschat.ru'));
     showAppToast(context, 'Ссылка скопирована');
+  }
+
+  Widget _fontChip(String label, double scale) {
+    final selected =
+        (AppSettings.instance.msgFontScale - scale).abs() < 0.001;
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          AppSettings.instance.setMsgFontScale(scale);
+          setState(() {});
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: selected
+                ? accent.withValues(alpha: 0.18)
+                : (_isLight
+                    ? const Color(0xFFF1F3F6)
+                    : Colors.black.withValues(alpha: 0.2)),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: selected ? accent : border),
+          ),
+          child: Text(label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: selected ? accent : _textColor,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13)),
+        ),
+      ),
+    );
   }
 
   Widget _settingsRow(IconData icon, String label, VoidCallback onTap) {
@@ -2360,6 +2398,44 @@ class _SettingsViewState extends State<_SettingsView> {
                             onChanged: widget.onThemeModeChanged,
                           ),
                         ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    GlassCard(
+                      borderRadius: 18,
+                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Размер шрифта сообщений',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: _textColor)),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              _fontChip('Мелкий', 0.9),
+                              const SizedBox(width: 8),
+                              _fontChip('Обычный', 1.0),
+                              const SizedBox(width: 8),
+                              _fontChip('Крупный', 1.15),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    GlassCard(
+                      borderRadius: 18,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 2),
+                      child: _toggleRow(
+                        'Компактный список чатов',
+                        AppSettings.instance.compactList,
+                        (v) {
+                          AppSettings.instance.setCompactList(v);
+                          setState(() {});
+                        },
                       ),
                     ),
                     const SizedBox(height: 20),

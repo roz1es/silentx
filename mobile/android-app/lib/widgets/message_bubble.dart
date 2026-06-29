@@ -31,6 +31,7 @@ class MessageBubble extends StatelessWidget {
     this.onReplyTap,
     this.read = false,
     this.highlighted = false,
+    this.fontScale = 1.0,
   });
 
   final Message message;
@@ -48,6 +49,7 @@ class MessageBubble extends StatelessWidget {
   final String? replyPreview;
   final VoidCallback? onReplyTap;
   final bool highlighted;
+  final double fontScale;
 
   @override
   Widget build(BuildContext context) {
@@ -266,7 +268,8 @@ class MessageBubble extends StatelessWidget {
         ImagePreview(source: message.imageUrl!, serverUrl: serverUrl),
       if (body.isNotEmpty) ...[
         const SizedBox(height: 6),
-        Text(body, style: TextStyle(color: textColor, fontSize: 15)),
+        Text(body,
+            style: TextStyle(color: textColor, fontSize: 15 * fontScale)),
       ],
       const SizedBox(height: 3),
       Align(alignment: Alignment.centerRight, child: _meta(timeColor, isLight)),
@@ -292,7 +295,7 @@ class MessageBubble extends StatelessWidget {
           ),
           style: TextStyle(
             color: textColor,
-            fontSize: 15,
+            fontSize: 15 * fontScale,
             fontStyle:
                 message.deleted ? FontStyle.italic : FontStyle.normal,
           ),

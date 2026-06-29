@@ -7,13 +7,15 @@ import 'models.dart';
 import 'screens/chat_list_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/api_client.dart';
+import 'services/app_settings.dart';
 import 'services/auth_store.dart';
 import 'services/messenger_controller.dart';
 import 'theme/app_theme.dart';
 import 'widgets/call_overlay.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppSettings.instance.load();
   runApp(const BrenksChatApp());
 }
 

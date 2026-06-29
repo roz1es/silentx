@@ -16,6 +16,7 @@ class ChatTile extends StatelessWidget {
     required this.onTap,
     required this.onLongPress,
     this.avatarUrl,
+    this.compact = false,
   });
 
   final Chat chat;
@@ -27,11 +28,17 @@ class ChatTile extends StatelessWidget {
 
   /// Долгое нажатие с позицией касания (для привязки контекстного меню).
   final void Function(Offset globalPosition) onLongPress;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
     final mutedColor = isLight ? lightMuted : muted;
+    final vPad = compact ? 4.0 : 7.0;
+    final avatarSize = compact ? 42.0 : 50.0;
+    final titleSize = compact ? 15.0 : 16.0;
+    final subSize = compact ? 13.0 : 14.0;
+    final gap = compact ? 2.0 : 4.0;
     return GestureDetector(
       onLongPressStart: (d) => onLongPress(d.globalPosition),
       child: Material(
@@ -40,7 +47,7 @@ class ChatTile extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(18),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          padding: EdgeInsets.symmetric(horizontal: 10, vertical: vPad),
           child: Row(
             children: [
               Stack(
@@ -49,7 +56,7 @@ class ChatTile extends StatelessWidget {
                     title: chat.title,
                     imageUrl: avatarUrl ?? chat.avatarUrl,
                     baseUrl: serverUrl,
-                    size: 50,
+                    size: avatarSize,
                   ),
                   if (peerOnline)
                     Positioned(
@@ -90,8 +97,8 @@ class ChatTile extends StatelessWidget {
                                   chat.title,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 16,
+                                  style: TextStyle(
+                                    fontSize: titleSize,
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
@@ -112,7 +119,7 @@ class ChatTile extends StatelessWidget {
                           ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: gap),
                     Row(
                       children: [
                         if (chat.muted) ...[
@@ -125,7 +132,7 @@ class ChatTile extends StatelessWidget {
                             lastMessageLabel(chat.lastMessage?.text),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: mutedColor, fontSize: 14),
+                            style: TextStyle(color: mutedColor, fontSize: subSize),
                           ),
                         ),
                         if (unread > 0) ...[

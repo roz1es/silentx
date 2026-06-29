@@ -374,7 +374,7 @@ class _VideoNotePreviewState extends State<_VideoNotePreview> {
       barrierColor: Colors.transparent,
       barrierDismissible: true,
       barrierLabel: 'note',
-      transitionDuration: const Duration(milliseconds: 200),
+      transitionDuration: const Duration(milliseconds: 260),
       pageBuilder: (_, __, ___) => _VideoNoteViewer(
         media: widget.media,
         timeLabel: widget.timeLabel,
@@ -383,8 +383,9 @@ class _VideoNotePreviewState extends State<_VideoNotePreview> {
         final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
         return FadeTransition(
           opacity: curved,
+          // Кружок «вырастает» из маленького в крупный круг (как в Telegram).
           child: ScaleTransition(
-            scale: Tween<double>(begin: 0.85, end: 1).animate(curved),
+            scale: Tween<double>(begin: 0.3, end: 1).animate(curved),
             child: child,
           ),
         );

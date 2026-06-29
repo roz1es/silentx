@@ -89,11 +89,12 @@ class MessageBubble extends StatelessWidget {
 
     // Видеокружок (без текста) — отдельно, без прямоугольного пузыря.
     final m = message.media;
+    // Видеокружок без текста — всегда круг (даже если пришёл постер imageUrl):
+    // открывается круглым просмотрщиком, а не как фото.
     final isCircleNote = !message.deleted &&
         m != null &&
         m.kind == 'video_note' &&
-        message.text.trim().isEmpty &&
-        (message.imageUrl?.isEmpty ?? true);
+        message.text.trim().isEmpty;
     if (isCircleNote) {
       return Align(
         alignment: own ? Alignment.centerRight : Alignment.centerLeft,
@@ -267,7 +268,7 @@ class MessageBubble extends StatelessWidget {
       if (media != null)
         MediaPreview(
             media: media, serverUrl: serverUrl, onPlayVoice: onPlayVoice),
-      if (message.imageUrl?.isNotEmpty == true)
+      if (message.imageUrl?.isNotEmpty == true && media?.kind != 'video_note')
         ImagePreview(source: message.imageUrl!, serverUrl: serverUrl),
       if (body.isNotEmpty) ...[
         const SizedBox(height: 6),

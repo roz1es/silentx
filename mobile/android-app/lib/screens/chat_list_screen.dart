@@ -1569,7 +1569,8 @@ class _SettingsView extends StatefulWidget {
   State<_SettingsView> createState() => _SettingsViewState();
 }
 
-class _SettingsViewState extends State<_SettingsView> {
+class _SettingsViewState extends State<_SettingsView>
+    with SingleTickerProviderStateMixin {
   bool _uploadingPhoto = false;
   bool _savingProfile = false;
   List<String> _avatarHistory = const [];
@@ -1578,9 +1579,9 @@ class _SettingsViewState extends State<_SettingsView> {
   /// 'appearance' / 'security'.
   String? _openSection;
 
-  /// Накопленный горизонтальный сдвиг свайпа в открытом разделе (свайп вправо
-  /// = возврат к списку разделов).
-  double _sectionDragDx = 0;
+  /// Слайд открытого раздела: 0 — раздел на месте, 1 — увезён вправо за экран.
+  /// Палец тянет панель напрямую, на отпускании она доезжает.
+  late final AnimationController _secCtrl;
 
   late final TextEditingController _nameCtrl;
   late final TextEditingController _bioCtrl;
@@ -1604,6 +1605,16 @@ class _SettingsViewState extends State<_SettingsView> {
   @override
   void initState() {
     super.initState();
+    _secCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 260),
+    )..addStatusListener((s) {
+        // Доехал до края (увезён вправо) — закрываем раздел и сбрасываем слайд.
+        if (s == AnimationStatus.completed) {
+          setState(() => _openSection = null);
+          _secCtrl.value = 0;
+        }
+      });
     final u = _ctrl.currentUser;
     _nameCtrl = TextEditingController(text: u.displayName ?? '');
     _bioCtrl = TextEditingController(text: u.bio ?? '');
@@ -1620,10 +1631,23 @@ class _SettingsViewState extends State<_SettingsView> {
 
   @override
   void dispose() {
+    _secCtrl.dispose();
     _nameCtrl.dispose();
     _bioCtrl.dispose();
     _phoneCtrl.dispose();
     super.dispose();
+  }
+
+  /// Открыть раздел: ставим панель за правым краем и доезжаем на место.
+  void _openSettingsSection(String id) {
+    setState(() => _openSection = id);
+    _secCtrl.value = 1;
+    _secCtrl.animateBack(0, curve: Curves.easeOutCubic);
+  }
+
+  /// Закрыть раздел: увозим панель вправо (статус-листенер сбросит _openSection).
+  void _closeSettingsSection() {
+    _secCtrl.animateTo(1, curve: Curves.easeInCubic);
   }
 
   Future<void> _saveProfile() async {
@@ -2675,18 +2699,32 @@ class _SettingsViewState extends State<_SettingsView> {
       ),
     );
     if (_openSection == null) return body;
-    // В открытом разделе свайп вправо возвращает к списку разделов
-    // (как свайп-выход из чата в остальном приложении).
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onHorizontalDragStart: (_) => _sectionDragDx = 0,
-      onHorizontalDragUpdate: (d) => _sectionDragDx += d.delta.dx,
-      onHorizontalDragEnd: (d) {
-        if (_sectionDragDx > 80 || (d.primaryVelocity ?? 0) > 300) {
-          setState(() => _openSection = null);
-        }
-      },
+    // Открытый раздел тянется свайпом вправо: панель следует за пальцем, на
+    // отпускании доезжает и возвращает к списку (как выход из чата).
+    return AnimatedBuilder(
+      animation: _secCtrl,
       child: body,
+      builder: (context, child) {
+        final w = MediaQuery.of(context).size.width;
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onHorizontalDragUpdate: (d) {
+            _secCtrl.value = (_secCtrl.value + d.delta.dx / w).clamp(0.0, 1.0);
+          },
+          onHorizontalDragEnd: (d) {
+            final v = d.primaryVelocity ?? 0;
+            if (_secCtrl.value > 0.32 || v > 700) {
+              _secCtrl.animateTo(1, curve: Curves.easeOutCubic);
+            } else {
+              _secCtrl.animateBack(0, curve: Curves.easeOutCubic);
+            }
+          },
+          child: Transform.translate(
+            offset: Offset(_secCtrl.value * w, 0),
+            child: child,
+          ),
+        );
+      },
     );
   }
 
@@ -2696,14 +2734,14 @@ class _SettingsViewState extends State<_SettingsView> {
     return Column(
       children: [
         _menuRow(Icons.person_rounded, 'Профиль', 'Имя, фото, приватность, QR',
-            () => setState(() => _openSection = 'profile')),
+            () => _openSettingsSection('profile')),
         const SizedBox(height: 8),
         _menuRow(Icons.palette_rounded, 'Оформление', 'Тема, акцент, шрифт, папки',
-            () => setState(() => _openSection = 'appearance')),
+            () => _openSettingsSection('appearance')),
         const SizedBox(height: 8),
         _menuRow(Icons.shield_rounded, 'Безопасность',
             'Почта, пароль, сеансы, выход',
-            () => setState(() => _openSection = 'security')),
+            () => _openSettingsSection('security')),
       ],
     );
   }
@@ -2750,7 +2788,7 @@ class _SettingsViewState extends State<_SettingsView> {
         children: [
           GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => setState(() => _openSection = null),
+            onTap: _closeSettingsSection,
             child: Container(
               width: 40,
               height: 40,

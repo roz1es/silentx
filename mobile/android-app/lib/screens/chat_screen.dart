@@ -1050,11 +1050,16 @@ class _ChatScreenState extends State<ChatScreen> {
             Color.alphaBlend(accent.withValues(alpha: 0.03), deepBg),
           ],
         );
-      case 1: // Тёплый графит
-        return const LinearGradient(
+      case 1: // Тёплый — тёплый оттенок акцента
+        return LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF26231D), Color(0xFF141209)],
+          colors: [
+            Color.alphaBlend(
+                accent.withValues(alpha: 0.18), const Color(0xFF231C14)),
+            Color.alphaBlend(
+                accent.withValues(alpha: 0.07), const Color(0xFF130F0A)),
+          ],
         );
       case 2: // Холодный графит
         return const LinearGradient(
@@ -1062,11 +1067,16 @@ class _ChatScreenState extends State<ChatScreen> {
           end: Alignment.bottomRight,
           colors: [Color(0xFF1C1F24), Color(0xFF111215)],
         );
-      case 3: // Сепия
-        return const LinearGradient(
+      case 3: // Сепия — сепия-оттенок акцента
+        return LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF2B261C), Color(0xFF161106)],
+          colors: [
+            Color.alphaBlend(
+                accent.withValues(alpha: 0.16), const Color(0xFF241B0E)),
+            Color.alphaBlend(
+                accent.withValues(alpha: 0.06), const Color(0xFF140E05)),
+          ],
         );
       case 4: // Уголь
         return const LinearGradient(

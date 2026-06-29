@@ -472,7 +472,7 @@ class _MessageComposerState extends State<MessageComposer> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: accent,
                     fontWeight: FontWeight.w800,
                     fontSize: 13,

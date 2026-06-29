@@ -192,7 +192,7 @@ class _AttachSheetState extends State<AttachSheet> {
   Widget _body(
       ScrollController scrollController, Color titleColor, Color mutedColor) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: accent));
+      return Center(child: CircularProgressIndicator(color: accent));
     }
     if (_denied) {
       return _deniedView(titleColor, mutedColor);
@@ -219,9 +219,9 @@ class _AttachSheetState extends State<AttachSheet> {
           },
         ),
         if (_picking)
-          const Positioned.fill(
+          Positioned.fill(
             child: ColoredBox(
-              color: Color(0x66000000),
+              color: const Color(0x66000000),
               child: Center(child: CircularProgressIndicator(color: accent)),
             ),
           ),

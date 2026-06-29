@@ -190,7 +190,7 @@ class _ChatProfileScreenState extends State<ChatProfileScreen> {
                               children: [
                                 Container(
                                   padding: const EdgeInsets.all(3),
-                                  decoration: const BoxDecoration(
+                                  decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     gradient: LinearGradient(
                                       begin: Alignment.topLeft,
@@ -579,7 +579,7 @@ class _MediaTile extends StatelessWidget {
             border: Border.all(color: accent.withValues(alpha: 0.55), width: 2),
           ),
           alignment: Alignment.center,
-          child: const Icon(Icons.videocam_rounded, color: accent, size: 30),
+          child: Icon(Icons.videocam_rounded, color: accent, size: 30),
         ),
       );
     }

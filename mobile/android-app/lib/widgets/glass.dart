@@ -2,6 +2,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 /// Аккуратный всплывающий тост с иконкой (стиль берётся из SnackBarTheme).
 void showAppToast(BuildContext context, String message, {bool error = false}) {
   final messenger = ScaffoldMessenger.of(context);
@@ -200,14 +202,25 @@ class GlassCard extends StatelessWidget {
     final isLight = Theme.of(context).brightness == Brightness.light;
     final baseAlpha = isLight ? 0.55 : 0.07;
     final selAlpha = isLight ? 0.85 : 0.16;
+    // Выделенная карточка получает мягкий акцентный отлив и акцентную рамку —
+    // тонко, «стеклянно», без резкого цвета.
+    final fill = selected
+        ? Color.alphaBlend(
+            accent.withValues(alpha: isLight ? 0.16 : 0.13),
+            Colors.white.withValues(alpha: selAlpha),
+          )
+        : Colors.white.withValues(alpha: baseAlpha);
+    final borderColor = selected
+        ? accent.withValues(alpha: isLight ? 0.55 : 0.42)
+        : Colors.white.withValues(alpha: isLight ? 0.6 : 0.12);
     return Container(
       padding: padding,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(borderRadius),
-        color: Colors.white.withValues(alpha: selected ? selAlpha : baseAlpha),
+        color: fill,
         border: Border.all(
-          color: Colors.white.withValues(alpha: isLight ? 0.6 : 0.12),
-          width: 1,
+          color: borderColor,
+          width: selected ? 1.4 : 1,
         ),
       ),
       child: child,

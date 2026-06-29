@@ -126,23 +126,28 @@ class _BrenksChatAppState extends State<BrenksChatApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'БренксЧат',
-      debugShowCheckedModeBanner: false,
-      theme: buildBrenksLightTheme(),
-      darkTheme: buildBrenksTheme(),
-      themeMode: _themeMode,
-      themeAnimationDuration: const Duration(milliseconds: 220),
-      builder: (context, child) {
-        final controller = _controller;
-        return Stack(
-          children: [
-            child ?? const SizedBox.shrink(),
-            if (controller != null) CallOverlay(controller: controller),
-          ],
-        );
-      },
-      home: _buildHome(),
+    // Слушаем визуальные настройки (акцентный цвет): при смене акцента
+    // пересобираем всё приложение, чтобы темы и геттеры accent обновились.
+    return ListenableBuilder(
+      listenable: AppSettings.instance,
+      builder: (context, _) => MaterialApp(
+        title: 'БренксЧат',
+        debugShowCheckedModeBanner: false,
+        theme: buildBrenksLightTheme(),
+        darkTheme: buildBrenksTheme(),
+        themeMode: _themeMode,
+        themeAnimationDuration: const Duration(milliseconds: 220),
+        builder: (context, child) {
+          final controller = _controller;
+          return Stack(
+            children: [
+              child ?? const SizedBox.shrink(),
+              if (controller != null) CallOverlay(controller: controller),
+            ],
+          );
+        },
+        home: _buildHome(),
+      ),
     );
   }
 

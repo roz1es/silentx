@@ -840,7 +840,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       if (chat.type == ChatType.channel && chat.verified) ...[
                         const SizedBox(width: 4),
-                        const Icon(Icons.verified_rounded,
+                        Icon(Icons.verified_rounded,
                             size: 17, color: accent),
                       ],
                     ],
@@ -1110,7 +1110,7 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.push_pin_rounded, color: accent, size: 18),
+          Icon(Icons.push_pin_rounded, color: accent, size: 18),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -1162,7 +1162,7 @@ class _TypingIndicatorState extends State<_TypingIndicator>
       children: [
         Text(
           widget.label,
-          style: const TextStyle(
+          style: TextStyle(
               color: accent, fontSize: 12, fontWeight: FontWeight.w600),
         ),
         const SizedBox(width: 5),
@@ -1183,7 +1183,7 @@ class _TypingIndicatorState extends State<_TypingIndicator>
                       child: Container(
                         width: 4,
                         height: 4,
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           color: accent,
                           shape: BoxShape.circle,
                         ),

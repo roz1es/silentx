@@ -83,7 +83,7 @@ class _FilePreview extends StatelessWidget {
               color: accent.withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.insert_drive_file_rounded,
+            child: Icon(Icons.insert_drive_file_rounded,
                 color: accent, size: 22),
           ),
           const SizedBox(width: 10),
@@ -213,7 +213,7 @@ class _VoicePreviewState extends State<VoicePreview> {
           child: Container(
             width: 40,
             height: 40,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: accent,
             ),

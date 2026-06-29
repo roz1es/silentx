@@ -106,7 +106,7 @@ class MessageBubble extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 4, left: 4),
                   child: Text(
                     senderName!,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: accent,
                       fontWeight: FontWeight.w800,
                       fontSize: 13,
@@ -152,7 +152,7 @@ class MessageBubble extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 4, left: 4),
                   child: Text(
                     senderName!,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: accent,
                       fontWeight: FontWeight.w800,
                       fontSize: 13,
@@ -216,7 +216,7 @@ class MessageBubble extends StatelessWidget {
                         padding: const EdgeInsets.only(bottom: 4),
                         child: Text(
                           senderName!,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: accent,
                             fontWeight: FontWeight.w800,
                             fontSize: 13,
@@ -780,7 +780,7 @@ class _SwipeToReplyState extends State<_SwipeToReply>
                     color: accent.withValues(alpha: 0.18),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.reply_rounded,
+                  child: Icon(Icons.reply_rounded,
                       size: 18, color: accent),
                 ),
               ),

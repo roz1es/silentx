@@ -17,6 +17,7 @@ import '../services/app_settings.dart';
 import '../services/folders_store.dart';
 import '../services/messenger_controller.dart';
 import '../theme/app_theme.dart';
+import '../widgets/accent_picker.dart';
 import '../widgets/brenks_avatar.dart';
 import '../widgets/chat_tile.dart';
 import '../widgets/empty_state.dart';
@@ -1828,6 +1829,103 @@ class _SettingsViewState extends State<_SettingsView> {
     );
   }
 
+  /// Кружок-пресет акцента с подписью.
+  Widget _accentDot(AccentPreset preset) {
+    final selected = AppSettings.instance.accentId == preset.id;
+    return _accentDotRaw(
+      color: preset.color,
+      label: preset.label,
+      selected: selected,
+      onTap: () {
+        AppSettings.instance.setAccent(id: preset.id, color: preset.color);
+        setState(() {});
+      },
+    );
+  }
+
+  /// Кружок «Свой цвет» — радужный, либо текущий пользовательский акцент.
+  Widget _customAccentDot() {
+    final selected = AppSettings.instance.accentId == 'custom';
+    return _accentDotRaw(
+      color: selected ? AppSettings.instance.accentColor : null,
+      rainbow: !selected,
+      icon: selected ? Icons.check_rounded : Icons.add_rounded,
+      label: 'Свой',
+      selected: selected,
+      onTap: _pickCustomAccent,
+    );
+  }
+
+  Widget _accentDotRaw({
+    Color? color,
+    bool rainbow = false,
+    IconData? icon,
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: color,
+              gradient: rainbow
+                  ? const SweepGradient(colors: [
+                      Color(0xFFFF0000),
+                      Color(0xFFFFFF00),
+                      Color(0xFF00FF00),
+                      Color(0xFF00FFFF),
+                      Color(0xFF0000FF),
+                      Color(0xFFFF00FF),
+                      Color(0xFFFF0000),
+                    ])
+                  : null,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: selected
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: 0.2),
+                width: selected ? 3 : 1,
+              ),
+              boxShadow: selected && color != null
+                  ? [BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 10)]
+                  : null,
+            ),
+            child: icon != null
+                ? Icon(icon,
+                    size: 20,
+                    color: rainbow ? Colors.white : const Color(0xFF08131A))
+                : (selected
+                    ? const Icon(Icons.check_rounded,
+                        size: 20, color: Color(0xFF08131A))
+                    : null),
+          ),
+          const SizedBox(height: 6),
+          Text(label,
+              style: TextStyle(
+                  color: _mutedColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickCustomAccent() async {
+    final picked =
+        await showAccentColorPicker(context, AppSettings.instance.accentColor);
+    if (picked == null || !mounted) return;
+    await AppSettings.instance.setAccent(id: 'custom', color: picked);
+    if (mounted) setState(() {});
+  }
+
   Widget _settingsRow(IconData icon, String label, VoidCallback onTap) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -2051,7 +2149,7 @@ class _SettingsViewState extends State<_SettingsView> {
                             onTap: _openAvatarGallery,
                             child: Container(
                             padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
+                            decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               gradient: LinearGradient(
                                 begin: Alignment.topLeft,
@@ -2403,6 +2501,28 @@ class _SettingsViewState extends State<_SettingsView> {
                     const SizedBox(height: 10),
                     GlassCard(
                       borderRadius: 18,
+                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Акцентный цвет',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: _textColor)),
+                          const SizedBox(height: 14),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              for (final p in kAccentPresets) _accentDot(p),
+                              _customAccentDot(),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    GlassCard(
+                      borderRadius: 18,
                       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2647,7 +2767,7 @@ class _SettingsViewState extends State<_SettingsView> {
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(label,
-            style: const TextStyle(
+            style: TextStyle(
                 color: accent, fontWeight: FontWeight.w800, fontSize: 13)),
       ),
     );
@@ -2686,7 +2806,7 @@ class _SettingsViewState extends State<_SettingsView> {
             borderSide: BorderSide(color: border)),
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: accent)),
+            borderSide: BorderSide(color: accent)),
       ),
     );
   }

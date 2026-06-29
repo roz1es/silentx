@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
-// ─── Палитра BrenksChat: тёмный графит + умеренное золото-акцент ───────────
+import '../services/app_settings.dart';
+
+// ─── Палитра BrenksChat: тёмный графит + настраиваемый акцент ───────────────
 
 // Фон
 const bg = Color(0xFF17191D);
@@ -19,29 +21,77 @@ const text = Color(0xFFF6F4EF);
 const muted = Color(0xFFB9B5AC);
 const hint = Color(0xFF858A92);
 
-// Границы (по умолчанию — мягкая белая, фокус — золотая)
+// Граница по умолчанию — мягкая белая (фокус — акцентная, см. goldBorder).
 const border = Color(0x1FFFFFFF); // white ~12%
-const goldBorder = Color(0x4DD8B76C); // gold ~30% (focus/важное)
-
-// Золото — только тонкий акцент
-const accent = Color(0xFFD8B76C);
-const softGold = Color(0xFFE0C783);
-const goldDark = Color(0xFF5D4A28);
 
 const danger = Color(0xFFFF7474);
 
-// Светлая тема (вторична; золото-акцент сохраняется)
+// Светлая тема (вторична; акцент сохраняется)
 const lightBg = Color(0xFFF3F1EC);
 const lightPanel = Color(0xFFFFFFFF);
 const lightText = Color(0xFF1B1A17);
 const lightMuted = Color(0xFF6B675F);
-const lightAccent = Color(0xFFB5933F);
+
+// ─── Акцент (настраиваемый). Имена сохранены ради совместимости со всем
+// кодом, который импортирует `accent`/`softGold`/`goldDark`/`goldBorder`/
+// `lightAccent` — теперь это геттеры из AppSettings, а не const. Все спутники
+// выводятся из базового акцента, поэтому работают и с пресетами, и со «своим
+// цветом». ─────────────────────────────────────────────────────────────────
+
+/// Базовый акцентный цвет (по умолчанию золото).
+Color get accent => AppSettings.instance.accentColor;
+
+/// Светлее акцента — для вторичных бликов/градиентов.
+Color get softGold => _shiftLightness(accent, 0.08);
+
+/// Тёмная, приглушённая версия акцента — для тёмных подложек/иконок.
+Color get goldDark => _shiftLightness(_desaturate(accent, 0.18), -0.38);
+
+/// Акцент ~30% — для фокус-рамок и важных контуров.
+Color get goldBorder => accent.withValues(alpha: 0.30);
+
+/// Версия акцента для светлой темы — темнее и чуть насыщеннее, чтобы читалась
+/// на белом фоне.
+Color get lightAccent {
+  final hsl = HSLColor.fromColor(accent);
+  return hsl
+      .withLightness((hsl.lightness - 0.16).clamp(0.0, 1.0))
+      .withSaturation((hsl.saturation + 0.06).clamp(0.0, 1.0))
+      .toColor();
+}
+
+/// Пресеты акцента для экрана настроек (id, подпись, цвет).
+class AccentPreset {
+  const AccentPreset(this.id, this.label, this.color);
+  final String id;
+  final String label;
+  final Color color;
+}
+
+const kAccentPresets = <AccentPreset>[
+  AccentPreset('gold', 'Золото', Color(0xFFD8B76C)),
+  AccentPreset('ruby', 'Рубин', Color(0xFFCB5F6E)),
+  AccentPreset('graphite', 'Графит', Color(0xFF9BA7B3)),
+  AccentPreset('diamond', 'Алмаз', Color(0xFF7EC6DD)),
+];
+
+Color _shiftLightness(Color c, double delta) {
+  final hsl = HSLColor.fromColor(c);
+  return hsl.withLightness((hsl.lightness + delta).clamp(0.0, 1.0)).toColor();
+}
+
+Color _desaturate(Color c, double amount) {
+  final hsl = HSLColor.fromColor(c);
+  return hsl
+      .withSaturation((hsl.saturation - amount).clamp(0.0, 1.0))
+      .toColor();
+}
 
 ThemeData buildBrenksTheme() {
   final base = ThemeData.dark(useMaterial3: true);
   return base.copyWith(
     scaffoldBackgroundColor: bg,
-    colorScheme: const ColorScheme.dark(
+    colorScheme: ColorScheme.dark(
       primary: accent,
       secondary: softGold,
       surface: panel,
@@ -84,11 +134,11 @@ ThemeData buildBrenksLightTheme() {
   final base = ThemeData.light(useMaterial3: true);
   return base.copyWith(
     scaffoldBackgroundColor: lightBg,
-    colorScheme: const ColorScheme.light(
+    colorScheme: ColorScheme.light(
       primary: lightAccent,
-      secondary: Color(0xFF8A6E22),
+      secondary: const Color(0xFF8A6E22),
       surface: lightPanel,
-      error: Color(0xFFD84B4B),
+      error: const Color(0xFFD84B4B),
     ),
     textTheme: base.textTheme.apply(
       bodyColor: lightText,

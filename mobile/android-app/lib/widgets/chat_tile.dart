@@ -106,7 +106,7 @@ class ChatTile extends StatelessWidget {
                               if (chat.type == ChatType.channel &&
                                   chat.verified) ...[
                                 const SizedBox(width: 4),
-                                const Icon(Icons.verified_rounded,
+                                Icon(Icons.verified_rounded,
                                     size: 16, color: accent),
                               ],
                             ],

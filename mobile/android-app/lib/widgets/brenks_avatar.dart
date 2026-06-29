@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../format.dart';
+import '../theme/app_theme.dart';
 
 /// Круглый аватар с поддержкой сетевых картинок, data-url и буквы-заглушки.
 /// Байты data-url декодируются один раз и кешируются — иначе при каждом
@@ -26,20 +27,6 @@ class BrenksAvatar extends StatefulWidget {
 }
 
 class _BrenksAvatarState extends State<BrenksAvatar> {
-  // Приглушённая палитра — не «кричит» и не бросается в глаза.
-  static const _palette = [
-    Color(0xFF5B7C99),
-    Color(0xFF5E927A),
-    Color(0xFFBE9266),
-    Color(0xFFA9707F),
-    Color(0xFF836F9E),
-    Color(0xFFA87A66),
-    Color(0xFF5E97A0),
-    Color(0xFF6D77A1),
-    Color(0xFF629285),
-    Color(0xFF7E9468),
-  ];
-
   Uint8List? _bytes;
   String? _resolvedUrl;
 
@@ -69,10 +56,18 @@ class _BrenksAvatarState extends State<BrenksAvatar> {
     }
   }
 
+  // Заглушка строится из акцентного цвета: семейство приглушённых оттенков
+  // вокруг акцента — буква даёт небольшой сдвиг тона и яркости, чтобы аватары
+  // были в одной гамме с темой, но различались между собой.
   Color _avatarColor() {
+    final base = HSVColor.fromColor(accent);
     final t = widget.title.trim();
-    if (t.isEmpty) return _palette[0];
-    return _palette[t.codeUnitAt(0) % _palette.length];
+    final code = t.isEmpty ? 0 : t.codeUnitAt(0);
+    final hue = (base.hue + ((code % 5) - 2) * 16) % 360;
+    final sat = (base.saturation * 0.62).clamp(0.18, 0.62);
+    final val =
+        (base.value * (0.74 + ((code ~/ 5) % 3) * 0.05)).clamp(0.40, 0.82);
+    return HSVColor.fromAHSV(1, hue.toDouble(), sat, val).toColor();
   }
 
   @override

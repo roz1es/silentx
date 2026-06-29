@@ -4,6 +4,7 @@ class AuthStore {
   static const _tokenKey = 'brenkschat.token';
   static const _serverKey = 'brenkschat.server';
   static const _themeKey = 'brenkschat.theme';
+  static const _accentKey = 'brenkschat.accent';
   static const _uiScaleKey = 'brenkschat.uiScale';
 
   Future<String?> loadToken() async {
@@ -39,6 +40,16 @@ class AuthStore {
   Future<void> saveTheme(String theme) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_themeKey, theme);
+  }
+
+  Future<String?> loadAccent() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_accentKey);
+  }
+
+  Future<void> saveAccent(String accent) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_accentKey, accent);
   }
 
   Future<double?> loadUiScale() async {

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
 import 'brenks_cached_image.dart';
 
 class BrenksAvatar extends StatelessWidget {
@@ -37,13 +38,13 @@ class BrenksAvatar extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              const Color(0xFFE0C783).withValues(alpha: 0.82),
-              const Color(0xFF4A4030).withValues(alpha: 0.84),
-              const Color(0xFF24272D).withValues(alpha: 0.9),
+              accentSecondary.withValues(alpha: 0.86),
+              accent.withValues(alpha: 0.42),
+              panelStrong.withValues(alpha: 0.95),
             ],
           ),
           border: Border.all(
-            color: const Color(0xFFFFE6A8).withValues(alpha: 0.22),
+            color: accentSecondary.withValues(alpha: 0.24),
           ),
           boxShadow: [
             BoxShadow(
@@ -52,7 +53,7 @@ class BrenksAvatar extends StatelessWidget {
               offset: const Offset(0, 8),
             ),
             BoxShadow(
-              color: const Color(0xFFFFE6A8).withValues(alpha: 0.1),
+              color: accentSecondary.withValues(alpha: 0.12),
               blurRadius: 0,
               offset: const Offset(0, 1),
             ),

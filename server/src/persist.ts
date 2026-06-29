@@ -6,6 +6,7 @@ import type { PersistedStateV1, PushSubscriptionData } from './store.js';
 import type {
   EncryptedTextEnvelope,
   MessageMediaKind,
+  UserReportStatus
 } from './types.js';
 import * as store from './store.js';
 
@@ -19,7 +20,12 @@ function shouldUseMysql(): boolean {
 
 function isPersistedState(data: unknown): data is PersistedStateV1 {
   const state = data as Partial<PersistedStateV1> | null;
-  return !!state && state.v === 1 && Array.isArray(state.users) && Array.isArray(state.chats);
+  return (
+    !!state &&
+    state.v === 1 &&
+    Array.isArray(state.users) &&
+    Array.isArray(state.chats)
+  );
 }
 
 function readStateFromDisk(): PersistedStateV1 | null {
@@ -29,13 +35,15 @@ function readStateFromDisk(): PersistedStateV1 | null {
   return raw;
 }
 
-async function withMysql<T>(fn: (conn: mysql.Connection) => Promise<T>): Promise<T> {
+async function withMysql<T>(
+  fn: (conn: mysql.Connection) => Promise<T>
+): Promise<T> {
   if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL не задан');
   }
   const conn = await mysql.createConnection({
     uri: process.env.DATABASE_URL,
-    dateStrings: true,
+    dateStrings: true
   });
   try {
     await ensureMysqlSchema(conn);
@@ -88,10 +96,12 @@ async function ensureMysqlSchema(conn: mysql.Connection): Promise<void> {
       birth_date VARCHAR(10) NULL,
       is_admin TINYINT(1) NOT NULL DEFAULT 0,
       banned TINYINT(1) NOT NULL DEFAULT 0,
+      blocked_user_ids JSON NULL,
       privacy JSON NULL,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `);
+  await ensureColumn(conn, 'users', 'blocked_user_ids', 'JSON NULL');
   await conn.execute(`
     CREATE TABLE IF NOT EXISTS chats (
       id VARCHAR(96) PRIMARY KEY,
@@ -103,10 +113,12 @@ async function ensureMysqlSchema(conn: mysql.Connection): Promise<void> {
       last_read_at JSON NULL,
       pinned_message_id VARCHAR(96) NULL,
       channel_owner_id VARCHAR(96) NULL,
+      channel_admin_ids JSON NULL,
       verified TINYINT(1) NOT NULL DEFAULT 0,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `);
+  await ensureColumn(conn, 'chats', 'channel_admin_ids', 'JSON NULL');
   await ensureColumn(
     conn,
     'chats',
@@ -183,6 +195,22 @@ async function ensureMysqlSchema(conn: mysql.Connection): Promise<void> {
       PRIMARY KEY (user_id, endpoint(191))
     )
   `);
+  await conn.execute(`
+    CREATE TABLE IF NOT EXISTS user_reports (
+      id VARCHAR(96) PRIMARY KEY,
+      reporter_id VARCHAR(96) NOT NULL,
+      target_user_id VARCHAR(96) NOT NULL,
+      chat_id VARCHAR(96) NULL,
+      message_id VARCHAR(96) NULL,
+      reason VARCHAR(160) NOT NULL,
+      comment TEXT NULL,
+      status VARCHAR(24) NOT NULL,
+      created_at BIGINT NOT NULL,
+      updated_at BIGINT NOT NULL,
+      closed_by VARCHAR(96) NULL,
+      INDEX idx_user_reports_status_created (status, created_at)
+    )
+  `);
 }
 
 function parseJsonCell<T>(value: unknown, fallback: T): T {
@@ -199,8 +227,12 @@ function parseJsonCell<T>(value: unknown, fallback: T): T {
 
 async function readStateFromNormalizedMysql(): Promise<PersistedStateV1 | null> {
   const state = await withMysql(async (conn) => {
-    const [userRows] = await conn.execute<mysql.RowDataPacket[]>('SELECT * FROM users');
-    const [chatRows] = await conn.execute<mysql.RowDataPacket[]>('SELECT * FROM chats');
+    const [userRows] = await conn.execute<mysql.RowDataPacket[]>(
+      'SELECT * FROM users'
+    );
+    const [chatRows] = await conn.execute<mysql.RowDataPacket[]>(
+      'SELECT * FROM chats'
+    );
     if (userRows.length === 0 && chatRows.length === 0) return null;
 
     const [participantRows] = await conn.execute<mysql.RowDataPacket[]>(
@@ -218,6 +250,9 @@ async function readStateFromNormalizedMysql(): Promise<PersistedStateV1 | null> 
     const [pushRows] = await conn.execute<mysql.RowDataPacket[]>(
       'SELECT user_id, data FROM push_subscriptions'
     );
+    const [reportRows] = await conn.execute<mysql.RowDataPacket[]>(
+      'SELECT * FROM user_reports ORDER BY created_at DESC'
+    );
 
     const participantsByChat = new Map<string, string[]>();
     for (const row of participantRows) {
@@ -227,7 +262,10 @@ async function readStateFromNormalizedMysql(): Promise<PersistedStateV1 | null> 
       participantsByChat.set(chatId, arr);
     }
 
-    const messagesByChatMap = new Map<string, PersistedStateV1['messagesByChat'][number][1]>();
+    const messagesByChatMap = new Map<
+      string,
+      PersistedStateV1['messagesByChat'][number][1]
+    >();
     for (const row of messageRows) {
       const chatId = String(row.chat_id);
       const mediaKind = row.media_kind ? String(row.media_kind) : undefined;
@@ -245,18 +283,28 @@ async function readStateFromNormalizedMysql(): Promise<PersistedStateV1 | null> 
           ? {
               kind: mediaKind as MessageMediaKind,
               dataUrl: String(row.media_data_url ?? ''),
-              fileName: row.media_file_name == null ? undefined : String(row.media_file_name),
-              mimeType: row.media_mime_type == null ? undefined : String(row.media_mime_type),
+              fileName:
+                row.media_file_name == null
+                  ? undefined
+                  : String(row.media_file_name),
+              mimeType:
+                row.media_mime_type == null
+                  ? undefined
+                  : String(row.media_mime_type),
               durationMs:
-                row.media_duration_ms == null ? undefined : Number(row.media_duration_ms),
+                row.media_duration_ms == null
+                  ? undefined
+                  : Number(row.media_duration_ms)
             }
           : undefined,
         createdAt: Number(row.created_at),
         deleted: !!row.deleted,
         editedAt: row.edited_at == null ? undefined : Number(row.edited_at),
         replyToMessageId:
-          row.reply_to_message_id == null ? undefined : String(row.reply_to_message_id),
-        reactions: parseJsonCell(row.reactions, undefined),
+          row.reply_to_message_id == null
+            ? undefined
+            : String(row.reply_to_message_id),
+        reactions: parseJsonCell(row.reactions, undefined)
       };
       const arr = messagesByChatMap.get(chatId) ?? [];
       arr.push(msg);
@@ -278,11 +326,16 @@ async function readStateFromNormalizedMysql(): Promise<PersistedStateV1 | null> 
     for (const row of pushRows) {
       const userId = String(row.user_id);
       const arr = pushMap.get(userId) ?? [];
-      arr.push(parseJsonCell<PushSubscriptionData>(row.data, {
-        endpoint: '',
-        keys: { p256dh: '', auth: '' },
-      }));
-      pushMap.set(userId, arr.filter((sub) => sub.endpoint));
+      arr.push(
+        parseJsonCell<PushSubscriptionData>(row.data, {
+          endpoint: '',
+          keys: { p256dh: '', auth: '' }
+        })
+      );
+      pushMap.set(
+        userId,
+        arr.filter((sub) => sub.endpoint)
+      );
     }
 
     return {
@@ -294,13 +347,15 @@ async function readStateFromNormalizedMysql(): Promise<PersistedStateV1 | null> 
         email: row.email == null ? undefined : String(row.email),
         emailVerified: !!row.email_verified,
         avatarUrl: row.avatar_url == null ? undefined : String(row.avatar_url),
-        displayName: row.display_name == null ? undefined : String(row.display_name),
+        displayName:
+          row.display_name == null ? undefined : String(row.display_name),
         bio: row.bio == null ? undefined : String(row.bio),
         phone: row.phone == null ? undefined : String(row.phone),
         birthDate: row.birth_date == null ? undefined : String(row.birth_date),
         isAdmin: !!row.is_admin,
         banned: !!row.banned,
-        privacy: parseJsonCell(row.privacy, undefined),
+        blockedUserIds: parseJsonCell<string[]>(row.blocked_user_ids, []),
+        privacy: parseJsonCell(row.privacy, undefined)
       })),
       chats: chatRows.map((row) => ({
         id: String(row.id),
@@ -312,15 +367,33 @@ async function readStateFromNormalizedMysql(): Promise<PersistedStateV1 | null> 
         unread: parseJsonCell<Record<string, number>>(row.unread, {}),
         lastReadAt: parseJsonCell(row.last_read_at, undefined),
         pinnedMessageId:
-          row.pinned_message_id == null ? undefined : String(row.pinned_message_id),
+          row.pinned_message_id == null
+            ? undefined
+            : String(row.pinned_message_id),
         channelOwnerId:
-          row.channel_owner_id == null ? undefined : String(row.channel_owner_id),
-        verified: !!row.verified,
+          row.channel_owner_id == null
+            ? undefined
+            : String(row.channel_owner_id),
+        channelAdminIds: parseJsonCell<string[]>(row.channel_admin_ids, []),
+        verified: !!row.verified
       })),
       messagesByChat: [...messagesByChatMap.entries()],
+      reports: reportRows.map((row) => ({
+        id: String(row.id),
+        reporterId: String(row.reporter_id),
+        targetUserId: String(row.target_user_id),
+        chatId: row.chat_id == null ? undefined : String(row.chat_id),
+        messageId: row.message_id == null ? undefined : String(row.message_id),
+        reason: String(row.reason),
+        comment: row.comment == null ? undefined : String(row.comment),
+        status: String(row.status) as UserReportStatus,
+        createdAt: Number(row.created_at),
+        updatedAt: Number(row.updated_at),
+        closedBy: row.closed_by == null ? undefined : String(row.closed_by)
+      })),
       muted: groupPairs(mutedRows),
       pinned: groupPairs(pinnedRows),
-      pushSubscriptions: [...pushMap.entries()],
+      pushSubscriptions: [...pushMap.entries()]
     } satisfies PersistedStateV1;
   });
   return state;
@@ -341,7 +414,9 @@ async function readStateFromLegacyMysql(): Promise<PersistedStateV1 | null> {
 }
 
 async function readStateFromMysql(): Promise<PersistedStateV1 | null> {
-  return (await readStateFromNormalizedMysql()) ?? (await readStateFromLegacyMysql());
+  return (
+    (await readStateFromNormalizedMysql()) ?? (await readStateFromLegacyMysql())
+  );
 }
 
 async function flushToMysql(): Promise<void> {
@@ -350,6 +425,7 @@ async function flushToMysql(): Promise<void> {
     await conn.beginTransaction();
     try {
       await conn.execute('DELETE FROM push_subscriptions');
+      await conn.execute('DELETE FROM user_reports');
       await conn.execute('DELETE FROM user_chat_pinned');
       await conn.execute('DELETE FROM user_chat_muted');
       await conn.execute('DELETE FROM messages');
@@ -362,9 +438,10 @@ async function flushToMysql(): Promise<void> {
           `
             INSERT INTO users (
               id, username, password, email, email_verified, avatar_url,
-              display_name, bio, phone, birth_date, is_admin, banned, privacy
+              display_name, bio, phone, birth_date, is_admin, banned,
+              blocked_user_ids, privacy
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON))
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON), CAST(? AS JSON))
           `,
           [
             user.id,
@@ -379,7 +456,8 @@ async function flushToMysql(): Promise<void> {
             user.birthDate ?? null,
             user.isAdmin ? 1 : 0,
             user.banned ? 1 : 0,
-            JSON.stringify(user.privacy ?? null),
+            JSON.stringify(user.blockedUserIds ?? []),
+            JSON.stringify(user.privacy ?? null)
           ]
         );
       }
@@ -389,9 +467,9 @@ async function flushToMysql(): Promise<void> {
           `
             INSERT INTO chats (
               id, type, name, avatar_url, last_message, unread,
-              last_read_at, pinned_message_id, channel_owner_id, verified
+              last_read_at, pinned_message_id, channel_owner_id, channel_admin_ids, verified
             )
-            VALUES (?, ?, ?, ?, CAST(? AS JSON), CAST(? AS JSON), CAST(? AS JSON), ?, ?, ?)
+            VALUES (?, ?, ?, ?, CAST(? AS JSON), CAST(? AS JSON), CAST(? AS JSON), ?, ?, CAST(? AS JSON), ?)
           `,
           [
             chat.id,
@@ -403,7 +481,8 @@ async function flushToMysql(): Promise<void> {
             JSON.stringify(chat.lastReadAt ?? null),
             chat.pinnedMessageId ?? null,
             chat.channelOwnerId ?? null,
-            chat.verified ? 1 : 0,
+            JSON.stringify(chat.channelAdminIds ?? []),
+            chat.verified ? 1 : 0
           ]
         );
         for (const [position, userId] of chat.participantIds.entries()) {
@@ -441,10 +520,35 @@ async function flushToMysql(): Promise<void> {
               message.deleted ? 1 : 0,
               message.editedAt ?? null,
               message.replyToMessageId ?? null,
-              JSON.stringify(message.reactions ?? null),
+              JSON.stringify(message.reactions ?? null)
             ]
           );
         }
+      }
+
+      for (const report of state.reports ?? []) {
+        await conn.execute(
+          `
+            INSERT INTO user_reports (
+              id, reporter_id, target_user_id, chat_id, message_id, reason,
+              comment, status, created_at, updated_at, closed_by
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `,
+          [
+            report.id,
+            report.reporterId,
+            report.targetUserId,
+            report.chatId ?? null,
+            report.messageId ?? null,
+            report.reason,
+            report.comment ?? null,
+            report.status,
+            report.createdAt,
+            report.updatedAt,
+            report.closedBy ?? null
+          ]
+        );
       }
 
       for (const [userId, chatIds] of state.muted) {
@@ -531,7 +635,10 @@ export async function bootstrapPersistence(): Promise<void> {
       return;
     }
   } catch (e) {
-    console.warn('[persist] не удалось загрузить файл, старт с демо-данными:', e);
+    console.warn(
+      '[persist] не удалось загрузить файл, старт с демо-данными:',
+      e
+    );
   }
   store.seedDatabase();
 }

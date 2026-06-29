@@ -21,11 +21,15 @@ class BrenksSocket {
     required void Function(String chatId) onChatDeleted,
     required void Function(String chatId) onMessagesCleared,
     required void Function(List<String> userIds) onPresence,
+    required void Function(Map<String, dynamic> signal) onCallSignal,
+    void Function(UserReport report)? onAdminReportCreated,
+    void Function(UserReport report)? onAdminReportUpdated,
     required void Function(String message) onSocketError,
     required void Function({
       required String chatId,
       required String userId,
       required String username,
+      required String activity,
       required bool isTyping,
     }) onTyping,
   }) {
@@ -103,7 +107,27 @@ class BrenksSocket {
         chatId: payload['chatId']?.toString() ?? '',
         userId: payload['userId']?.toString() ?? '',
         username: payload['username']?.toString() ?? '...',
+        activity: payload['activity']?.toString() ?? 'text',
         isTyping: payload['isTyping'] == true,
+      );
+    });
+
+    socket.on('call_signal', (payload) {
+      if (payload is! Map) return;
+      onCallSignal(payload.cast<String, dynamic>());
+    });
+
+    socket.on('admin_report_created', (payload) {
+      if (payload is! Map || payload['report'] is! Map) return;
+      onAdminReportCreated?.call(
+        UserReport.fromJson((payload['report'] as Map).cast<String, dynamic>()),
+      );
+    });
+
+    socket.on('admin_report_updated', (payload) {
+      if (payload is! Map || payload['report'] is! Map) return;
+      onAdminReportUpdated?.call(
+        UserReport.fromJson((payload['report'] as Map).cast<String, dynamic>()),
       );
     });
 
@@ -160,6 +184,18 @@ class BrenksSocket {
     });
   }
 
+  void forwardMessages({
+    required String sourceChatId,
+    required String targetChatId,
+    required List<String> messageIds,
+  }) {
+    _socket?.emit('forward_messages', {
+      'sourceChatId': sourceChatId,
+      'targetChatId': targetChatId,
+      'messageIds': messageIds,
+    });
+  }
+
   void toggleReaction({
     required String chatId,
     required String messageId,
@@ -175,15 +211,35 @@ class BrenksSocket {
   void typing({
     required String chatId,
     required bool isTyping,
+    String activity = 'text',
   }) {
     _socket?.emit('typing', {
       'chatId': chatId,
       'isTyping': isTyping,
+      'activity': activity,
     });
   }
 
   void markRead(String chatId) {
     _socket?.emit('mark_read', chatId);
+  }
+
+  void sendCallSignal({
+    required String toUserId,
+    required String kind,
+    String? callId,
+    String? callType,
+    String? sdp,
+    Map<String, dynamic>? candidate,
+  }) {
+    _socket?.emit('call_signal', {
+      'toUserId': toUserId,
+      'kind': kind,
+      if (callId != null) 'callId': callId,
+      if (callType != null) 'callType': callType,
+      if (sdp != null) 'sdp': sdp,
+      if (candidate != null) 'candidate': candidate,
+    });
   }
 
   void dispose() {

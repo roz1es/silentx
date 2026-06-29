@@ -497,7 +497,7 @@ class _LoginHeader extends StatelessWidget {
               ),
             ],
           ),
-          child: const Center(
+          child: Center(
             child: Text(
               'B',
               style: TextStyle(
@@ -513,7 +513,7 @@ class _LoginHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'БренксЧат',
                 style: TextStyle(
                   fontSize: 28,
@@ -524,7 +524,7 @@ class _LoginHeader extends StatelessWidget {
               const SizedBox(height: 3),
               Text(
                 subtitle,
-                style: const TextStyle(color: muted, fontSize: 14.5),
+                style: TextStyle(color: muted, fontSize: 14.5),
               ),
             ],
           ),
@@ -673,8 +673,8 @@ class _LoginFields extends StatelessWidget {
           alignment: Alignment.centerRight,
           child: TextButton.icon(
             onPressed: loading ? null : onForgotPassword,
-            icon: const Icon(Icons.help_outline_rounded, size: 18),
-            label: const Text('Забыл пароль'),
+            icon: Icon(Icons.help_outline_rounded, size: 18),
+            label: Text('Забыл пароль'),
             style: TextButton.styleFrom(
               foregroundColor: accent,
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -719,10 +719,10 @@ class _ResetRequestFields extends StatelessWidget {
             borderRadius: BorderRadius.circular(22),
             border: Border.all(color: accent.withValues(alpha: 0.14)),
           ),
-          child: const Row(
+          child: Row(
             children: [
               Icon(Icons.lock_reset_rounded, color: accent, size: 28),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   'Введите @username или почту. Если аккаунт найден, мы отправим код восстановления.',
@@ -869,7 +869,7 @@ class _CodeFields extends StatelessWidget {
                   color: accent.withValues(alpha: 0.13),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.mark_email_read_rounded, color: accent),
+                child: Icon(Icons.mark_email_read_rounded, color: accent),
               ),
               const SizedBox(width: 13),
               Expanded(
@@ -878,7 +878,7 @@ class _CodeFields extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 15.5,
                       ),
@@ -886,7 +886,7 @@ class _CodeFields extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       'Код отправлен на $emailMasked',
-                      style: const TextStyle(color: muted, fontSize: 13.5),
+                      style: TextStyle(color: muted, fontSize: 13.5),
                     ),
                   ],
                 ),
@@ -997,12 +997,12 @@ class _ErrorBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline_rounded, color: danger, size: 19),
+          Icon(Icons.error_outline_rounded, color: danger, size: 19),
           const SizedBox(width: 9),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(color: danger, fontSize: 13.5),
+              style: TextStyle(color: danger, fontSize: 13.5),
             ),
           ),
         ],
@@ -1027,13 +1027,12 @@ class _InfoBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.check_circle_outline_rounded,
-              color: accent, size: 19),
+          Icon(Icons.check_circle_outline_rounded, color: accent, size: 19),
           const SizedBox(width: 9),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(color: text, fontSize: 13.5),
+              style: TextStyle(color: text, fontSize: 13.5),
             ),
           ),
         ],
@@ -1063,7 +1062,7 @@ class _SecondaryButton extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: const TextStyle(fontWeight: FontWeight.w800),
+        style: TextStyle(fontWeight: FontWeight.w800),
       ),
     );
   }
@@ -1107,7 +1106,7 @@ class _PrimaryButton extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
+                  style: TextStyle(fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(width: 8),
                 Icon(icon, size: 19),

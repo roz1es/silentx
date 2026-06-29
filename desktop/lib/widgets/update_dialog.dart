@@ -170,7 +170,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
                       const SizedBox(height: 8),
                       Text(
                         'Текущая версия: $appVersion\nНовая версия: ${widget.update.version}',
-                        style: const TextStyle(color: muted, height: 1.35),
+                        style: TextStyle(color: muted, height: 1.35),
                       ),
                       if ((widget.update.notes ?? '').trim().isNotEmpty) ...[
                         const SizedBox(height: 14),
@@ -185,7 +185,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
                           ),
                           child: Text(
                             widget.update.notes!,
-                            style: const TextStyle(color: text, height: 1.35),
+                            style: TextStyle(color: text, height: 1.35),
                           ),
                         ),
                       ],
@@ -205,12 +205,12 @@ class _UpdateDialogState extends State<_UpdateDialog> {
                           _installer == null
                               ? 'Загрузка: $percent%'
                               : 'Обновление скачано',
-                          style: const TextStyle(color: muted, fontSize: 12),
+                          style: TextStyle(color: muted, fontSize: 12),
                         ),
                       ],
                       if (_error != null) ...[
                         const SizedBox(height: 12),
-                        Text(_error!, style: const TextStyle(color: danger)),
+                        Text(_error!, style: TextStyle(color: danger)),
                       ],
                       const SizedBox(height: 22),
                       Row(
@@ -220,7 +220,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
                               onPressed: _busy
                                   ? null
                                   : () => Navigator.of(context).pop(),
-                              child: const Text('Позже'),
+                              child: Text('Позже'),
                             ),
                           ),
                           const SizedBox(width: 12),

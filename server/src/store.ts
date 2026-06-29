@@ -1,10 +1,12 @@
 import { v4 as uuid } from 'uuid';
-import type { Chat, Message, User } from './types.js';
-import {
-  DISABLED_PASSWORD,
-  hashPassword,
-  isPasswordHash,
-} from './password.js';
+import type {
+  Chat,
+  Message,
+  User,
+  UserReport,
+  UserReportStatus
+} from './types.js';
+import { DISABLED_PASSWORD, hashPassword, isPasswordHash } from './password.js';
 
 export type PushSubscriptionData = {
   endpoint: string;
@@ -19,8 +21,10 @@ export type ChatParticipantRow = {
   username: string;
   displayName?: string;
   avatarUrl?: string;
+  blockedByViewer?: boolean;
   privacy?: {
     showOnline?: boolean;
+    allowMessages?: boolean;
     allowCalls?: boolean;
     showEmail?: boolean;
   };
@@ -58,6 +62,7 @@ export function previewForMessage(msg: Message): string {
 const users = new Map<string, User>();
 const chats = new Map<string, Chat>();
 const messagesByChat = new Map<string, Message[]>();
+const reports = new Map<string, UserReport>();
 /** userId -> Set<chatId> без уведомлений */
 const mutedChatsByUser = new Map<string, Set<string>>();
 /** userId -> Set<chatId> закреплённые вверху списка */
@@ -107,18 +112,22 @@ export function setChatPinnedTopForUser(
   else s.delete(chatId);
 }
 
-export function isChatPinnedTopForUser(userId: string, chatId: string): boolean {
+export function isChatPinnedTopForUser(
+  userId: string,
+  chatId: string
+): boolean {
   return pinnedChatsByUser.get(userId)?.has(chatId) ?? false;
 }
 
-function rowForParticipant(id: string): ChatParticipantRow {
+function rowForParticipant(id: string, viewerId?: string): ChatParticipantRow {
   const p = users.get(id);
   return {
     id,
     username: p?.username ?? 'User',
     displayName: p?.displayName,
     avatarUrl: p?.avatarUrl,
-    privacy: p?.privacy,
+    blockedByViewer: viewerId ? isUserBlocked(viewerId, id) : undefined,
+    privacy: p?.privacy
   };
 }
 
@@ -127,7 +136,9 @@ export function serializeChatForViewer(
   chat: Chat,
   viewerId: string
 ): SerializedChat {
-  const participants = chat.participantIds.map((id) => rowForParticipant(id));
+  const participants = chat.participantIds.map((id) =>
+    rowForParticipant(id, viewerId)
+  );
   const displayName =
     chat.type === 'group' || chat.type === 'channel'
       ? chat.name
@@ -155,19 +166,38 @@ export function serializeChatForViewer(
             chat.lastMessage.text === 'Защищённое сообщение' ||
             chat.lastMessage.text === 'Защищенное сообщение' ||
             chat.lastMessage.text === 'Пробуем расшифровать сообщение…' ||
-            chat.lastMessage.text === 'Ожидается восстановление ключа шифрования' ||
-            chat.lastMessage.text === 'Не удалось расшифровать защищённое сообщение' ||
-            chat.lastMessage.text === 'Не удалось расшифровать защищенное сообщение' ||
+            chat.lastMessage.text ===
+              'Ожидается восстановление ключа шифрования' ||
+            chat.lastMessage.text ===
+              'Не удалось расшифровать защищённое сообщение' ||
+            chat.lastMessage.text ===
+              'Не удалось расшифровать защищенное сообщение' ||
             chat.lastMessage.text === 'Новое сообщение'
               ? '🔒 Зашифровано'
-              : chat.lastMessage.text,
+              : chat.lastMessage.text
         }
-      : null,
+      : null
   };
 }
 
+export function isChannelAdmin(chat: Chat, userId: string): boolean {
+  return (
+    chat.type === 'channel' &&
+    (chat.channelOwnerId === userId ||
+      (chat.channelAdminIds ?? []).includes(userId))
+  );
+}
+
+export function canPostToChat(chat: Chat, userId: string): boolean {
+  if (!chat.participantIds.includes(userId)) return false;
+  if (chat.type !== 'channel') return true;
+  return isChannelAdmin(chat, userId);
+}
+
 /** Все пользователи кроме себя — для выбора в новом чате / группе. */
-export function listDirectoryUsers(excludeUserId: string): ChatParticipantRow[] {
+export function listDirectoryUsers(
+  excludeUserId: string
+): ChatParticipantRow[] {
   return [...users.values()]
     .filter((u) => u.id !== excludeUserId && !u.banned)
     .map((u) => ({
@@ -175,7 +205,8 @@ export function listDirectoryUsers(excludeUserId: string): ChatParticipantRow[] 
       username: u.username,
       displayName: u.displayName,
       avatarUrl: u.avatarUrl,
-      privacy: u.privacy,
+      blockedByViewer: isUserBlocked(excludeUserId, u.id),
+      privacy: u.privacy
     }))
     .sort((a, b) => {
       const la = (a.displayName?.trim() || a.username).toLowerCase();
@@ -221,7 +252,10 @@ export function usersShareDirectChat(a: string, b: string): boolean {
   return false;
 }
 
-function canAddContactToSharedChat(requesterId: string, targetId: string): boolean {
+function canAddContactToSharedChat(
+  requesterId: string,
+  targetId: string
+): boolean {
   const requester = users.get(requesterId);
   if (requester?.isAdmin) return users.has(targetId);
   return usersShareDirectChat(requesterId, targetId);
@@ -243,7 +277,8 @@ export function listContactUsers(userId: string): ChatParticipantRow[] {
       username: u.username,
       displayName: u.displayName,
       avatarUrl: u.avatarUrl,
-      privacy: u.privacy,
+      blockedByViewer: isUserBlocked(userId, u.id),
+      privacy: u.privacy
     }))
     .sort((a, b) => {
       const la = (a.displayName?.trim() || a.username).toLowerCase();
@@ -262,18 +297,19 @@ function ensureMessages(chatId: string): Message[] {
 }
 
 /** Зарезервированные администраторы без встроенных паролей. */
-const BUILTIN_ADMIN_ACCOUNTS: Array<Pick<User, 'id' | 'username' | 'isAdmin'>> = [
-  {
-    id: 'user-admin-roz1es',
-    username: 'roz1es',
-    isAdmin: true,
-  },
-  {
-    id: 'user-admin-elzi',
-    username: 'ELZI',
-    isAdmin: true,
-  },
-];
+const BUILTIN_ADMIN_ACCOUNTS: Array<Pick<User, 'id' | 'username' | 'isAdmin'>> =
+  [
+    {
+      id: 'user-admin-roz1es',
+      username: 'roz1es',
+      isAdmin: true
+    },
+    {
+      id: 'user-admin-elzi',
+      username: 'ELZI',
+      isAdmin: true
+    }
+  ];
 
 /** Синхронизация флагов администраторов без изменения существующих паролей. */
 export function ensureBuiltinAccounts(): void {
@@ -297,7 +333,8 @@ export function ensureBuiltinAccounts(): void {
     bot.displayName = 'БренксЧат';
     bot.password = DISABLED_PASSWORD;
     for (const chat of chats.values()) {
-      if (chat.type !== 'direct' || !chat.participantIds.includes(bot.id)) continue;
+      if (chat.type !== 'direct' || !chat.participantIds.includes(bot.id))
+        continue;
       if (['silentx', 'brenkschat'].includes(chat.name.toLowerCase())) {
         chat.name = 'БренксЧат';
       }
@@ -318,7 +355,7 @@ function seed() {
     id: 'user-bot',
     username: 'brenkschat',
     displayName: 'БренксЧат',
-    password: DISABLED_PASSWORD,
+    password: DISABLED_PASSWORD
   };
   users.set(bot.id, bot);
   for (const a of BUILTIN_ADMIN_ACCOUNTS) {
@@ -349,6 +386,7 @@ export type PersistedStateV1 = {
   users: User[];
   chats: Chat[];
   messagesByChat: [string, Message[]][];
+  reports?: UserReport[];
   muted: [string, string[]][];
   pinned: [string, string[]][];
   pushSubscriptions: [string, PushSubscriptionData[]][];
@@ -360,9 +398,13 @@ export function exportPersistedState(): PersistedStateV1 {
     users: [...users.values()],
     chats: [...chats.values()],
     messagesByChat: [...messagesByChat.entries()],
+    reports: [...reports.values()],
     muted: [...mutedChatsByUser.entries()].map(([k, v]) => [k, [...v]]),
     pinned: [...pinnedChatsByUser.entries()].map(([k, v]) => [k, [...v]]),
-    pushSubscriptions: [...pushSubscriptionsByUser.entries()].map(([k, v]) => [k, [...v]]),
+    pushSubscriptions: [...pushSubscriptionsByUser.entries()].map(([k, v]) => [
+      k,
+      [...v]
+    ])
   };
 }
 
@@ -370,6 +412,7 @@ export function importPersistedState(data: PersistedStateV1): void {
   users.clear();
   chats.clear();
   messagesByChat.clear();
+  reports.clear();
   mutedChatsByUser.clear();
   pinnedChatsByUser.clear();
   pushSubscriptionsByUser.clear();
@@ -377,6 +420,9 @@ export function importPersistedState(data: PersistedStateV1): void {
   for (const c of data.chats) chats.set(c.id, c);
   for (const [id, arr] of data.messagesByChat) {
     messagesByChat.set(id, [...arr]);
+  }
+  for (const report of data.reports ?? []) {
+    reports.set(report.id, report);
   }
   for (const [uid, ids] of data.muted) {
     mutedChatsByUser.set(uid, new Set(ids));
@@ -419,7 +465,7 @@ export function createUser(
     username,
     password: passwordHash,
     email,
-    emailVerified: email ? emailVerified : undefined,
+    emailVerified: email ? emailVerified : undefined
   };
   users.set(user.id, user);
   return user;
@@ -470,6 +516,7 @@ export function updateUserProfile(
     birthDate?: string | null;
     privacy?: {
       showOnline?: boolean;
+      allowMessages?: boolean;
       allowCalls?: boolean;
       showEmail?: boolean;
     };
@@ -512,24 +559,203 @@ export function updateUserProfile(
   if ('privacy' in patch && patch.privacy) {
     u.privacy = {
       showOnline: patch.privacy.showOnline !== false,
+      allowMessages: patch.privacy.allowMessages !== false,
       allowCalls: patch.privacy.allowCalls !== false,
-      showEmail: patch.privacy.showEmail === true,
+      showEmail: patch.privacy.showEmail === true
     };
   }
   return u;
 }
 
-export function setUserBlocked(userId: string, banned: boolean): User | undefined {
+export function isUserBlocked(ownerId: string, targetId: string): boolean {
+  if (ownerId === targetId) return false;
+  return users.get(ownerId)?.blockedUserIds?.includes(targetId) ?? false;
+}
+
+export function usersBlockedEitherWay(a: string, b: string): boolean {
+  return isUserBlocked(a, b) || isUserBlocked(b, a);
+}
+
+export function setUserPersonalBlock(
+  ownerId: string,
+  targetId: string,
+  blocked: boolean
+): User | undefined {
+  if (ownerId === targetId) return undefined;
+  const owner = users.get(ownerId);
+  const target = users.get(targetId);
+  if (!owner || !target || target.banned) return undefined;
+  const next = new Set(owner.blockedUserIds ?? []);
+  if (blocked) next.add(targetId);
+  else next.delete(targetId);
+  owner.blockedUserIds = [...next];
+  if (owner.blockedUserIds.length === 0) {
+    owner.blockedUserIds = undefined;
+  }
+  return owner;
+}
+
+export function setUserBlocked(
+  userId: string,
+  banned: boolean
+): User | undefined {
   const u = users.get(userId);
   if (!u || u.isAdmin) return undefined;
   u.banned = banned ? true : undefined;
   return u;
 }
 
+export type UserReportRow = UserReport & {
+  reporter?: ChatParticipantRow;
+  target?: ChatParticipantRow;
+};
+
+export function createUserReport(input: {
+  reporterId: string;
+  targetUserId: string;
+  chatId?: string;
+  messageId?: string;
+  reason: string;
+  comment?: string;
+}): UserReport | undefined {
+  const reporter = users.get(input.reporterId);
+  const target = users.get(input.targetUserId);
+  if (!reporter || !target || reporter.id === target.id || target.banned) {
+    return undefined;
+  }
+  if (input.chatId) {
+    const chat = chats.get(input.chatId);
+    if (!chat?.participantIds.includes(input.reporterId)) return undefined;
+    if (!chat.participantIds.includes(input.targetUserId)) return undefined;
+    if (input.messageId) {
+      const message = messagesByChat
+        .get(input.chatId)
+        ?.find((item) => item.id === input.messageId);
+      if (!message || message.deleted) return undefined;
+    }
+  } else if (!usersShareChat(input.reporterId, input.targetUserId)) {
+    return undefined;
+  }
+
+  const now = Date.now();
+  const report: UserReport = {
+    id: uuid(),
+    reporterId: input.reporterId,
+    targetUserId: input.targetUserId,
+    chatId: input.chatId,
+    messageId: input.messageId,
+    reason: input.reason.trim().slice(0, 80) || 'Другая причина',
+    comment:
+      input.comment && input.comment.trim().length > 0
+        ? input.comment.trim().slice(0, 1000)
+        : undefined,
+    status: 'open',
+    createdAt: now,
+    updatedAt: now
+  };
+  reports.set(report.id, report);
+  return report;
+}
+
+export function listReports(
+  status?: UserReportStatus | 'all'
+): UserReportRow[] {
+  return [...reports.values()]
+    .filter((report) => !status || status === 'all' || report.status === status)
+    .map((report) => ({
+      ...report,
+      reporter: rowForParticipant(report.reporterId),
+      target: rowForParticipant(report.targetUserId)
+    }))
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export function setReportStatus(
+  reportId: string,
+  status: UserReportStatus,
+  adminId: string
+): UserReport | undefined {
+  const report = reports.get(reportId);
+  if (!report) return undefined;
+  report.status = status;
+  report.updatedAt = Date.now();
+  report.closedBy = status === 'closed' ? adminId : undefined;
+  return report;
+}
+
+export function listAdminUserIds(): string[] {
+  return [...users.values()]
+    .filter((u) => u.isAdmin && !u.banned)
+    .map((u) => u.id);
+}
+
+export function deleteUserAccount(userId: string):
+  | {
+      deletedChatIds: string[];
+      updatedChatIds: string[];
+      notifyDeletedFor: Record<string, string[]>;
+    }
+  | undefined {
+  const user = users.get(userId);
+  if (!user) return undefined;
+
+  users.delete(userId);
+  for (const report of reports.values()) {
+    if (report.reporterId === userId || report.targetUserId === userId) {
+      reports.delete(report.id);
+    }
+  }
+  mutedChatsByUser.delete(userId);
+  pinnedChatsByUser.delete(userId);
+  pushSubscriptionsByUser.delete(userId);
+
+  const deletedChatIds: string[] = [];
+  const updatedChatIds: string[] = [];
+  const notifyDeletedFor: Record<string, string[]> = {};
+
+  for (const chat of [...chats.values()]) {
+    if (!chat.participantIds.includes(userId)) continue;
+    const before = [...chat.participantIds];
+    const deleteWholeChat =
+      chat.type === 'direct' ||
+      (chat.type === 'channel' && chat.channelOwnerId === userId);
+
+    if (deleteWholeChat) {
+      chats.delete(chat.id);
+      messagesByChat.delete(chat.id);
+      purgeChatPrefsForUsers(chat.id, before);
+      deletedChatIds.push(chat.id);
+      notifyDeletedFor[chat.id] = before;
+      continue;
+    }
+
+    chat.participantIds = chat.participantIds.filter((id) => id !== userId);
+    chat.channelAdminIds = (chat.channelAdminIds ?? []).filter(
+      (id) => id !== userId
+    );
+    delete chat.unread[userId];
+    if (chat.lastReadAt) delete chat.lastReadAt[userId];
+    purgeChatPrefsForUsers(chat.id, [userId]);
+
+    if (chat.participantIds.length === 0) {
+      chats.delete(chat.id);
+      messagesByChat.delete(chat.id);
+      deletedChatIds.push(chat.id);
+      notifyDeletedFor[chat.id] = before;
+      continue;
+    }
+
+    updatedChatIds.push(chat.id);
+  }
+
+  return { deletedChatIds, updatedChatIds, notifyDeletedFor };
+}
+
 export function usersShareChat(a: string, b: string): boolean {
   if (a === b) return true;
   for (const c of chats.values()) {
-    if (c.participantIds.includes(a) && c.participantIds.includes(b)) return true;
+    if (c.participantIds.includes(a) && c.participantIds.includes(b))
+      return true;
   }
   return false;
 }
@@ -558,7 +784,7 @@ export function addMessage(msg: Message): void {
   chat.lastMessage = {
     text: previewText,
     time: msg.createdAt,
-    senderId: msg.senderId,
+    senderId: msg.senderId
   };
   chat.participantIds.forEach((pid) => {
     if (pid !== msg.senderId) {
@@ -600,7 +826,7 @@ function updateLastMessageForChat(chatId: string): void {
     ? {
         text: previewForMessage(last),
         time: last.createdAt,
-        senderId: last.senderId,
+        senderId: last.senderId
       }
     : undefined;
 }
@@ -660,7 +886,7 @@ export function editMessageText(
       chat.lastMessage = {
         text: previewForMessage(msg),
         time: msg.createdAt,
-        senderId: msg.senderId,
+        senderId: msg.senderId
       };
     }
   }
@@ -688,7 +914,7 @@ export function editMessageEncryptedText(
       chat.lastMessage = {
         text: previewForMessage(msg),
         time: msg.createdAt,
-        senderId: msg.senderId,
+        senderId: msg.senderId
       };
     }
   }
@@ -703,7 +929,7 @@ export function updateChatProfile(
   const chat = chats.get(chatId);
   if (!chat || chat.type === 'direct') return undefined;
   if (!chat.participantIds.includes(requesterId)) return undefined;
-  if (chat.type === 'channel' && chat.channelOwnerId !== requesterId)
+  if (chat.type === 'channel' && !isChannelAdmin(chat, requesterId))
     return undefined;
   if (typeof patch.name === 'string') {
     const n = patch.name.trim();
@@ -711,8 +937,7 @@ export function updateChatProfile(
   }
   if ('avatarUrl' in patch) {
     const v = patch.avatarUrl;
-    chat.avatarUrl =
-      v && typeof v === 'string' && v.length > 0 ? v : undefined;
+    chat.avatarUrl = v && typeof v === 'string' && v.length > 0 ? v : undefined;
   }
   return chat;
 }
@@ -735,7 +960,7 @@ export function addChatMembers(
   const chat = chats.get(chatId);
   if (!chat || chat.type === 'direct') return undefined;
   if (!chat.participantIds.includes(requesterId)) return undefined;
-  if (chat.type === 'channel' && chat.channelOwnerId !== requesterId)
+  if (chat.type === 'channel' && !isChannelAdmin(chat, requesterId))
     return undefined;
   const set = new Set(chat.participantIds);
   for (const id of memberIds) {
@@ -751,7 +976,30 @@ export function addChatMembers(
   return chat;
 }
 
-export function purgeChatPrefsForUsers(chatId: string, userIds: string[]): void {
+export function setChannelAdmins(
+  chatId: string,
+  requesterId: string,
+  adminIds: string[]
+): Chat | undefined {
+  const chat = chats.get(chatId);
+  if (!chat || chat.type !== 'channel') return undefined;
+  if (chat.channelOwnerId !== requesterId) return undefined;
+  const allowed = new Set(chat.participantIds);
+  const next = [
+    ...new Set(
+      adminIds
+        .filter((id) => id !== chat.channelOwnerId)
+        .filter((id) => allowed.has(id) && users.has(id))
+    )
+  ];
+  chat.channelAdminIds = next;
+  return chat;
+}
+
+export function purgeChatPrefsForUsers(
+  chatId: string,
+  userIds: string[]
+): void {
   for (const uid of userIds) {
     mutedChatsByUser.get(uid)?.delete(chatId);
     pinnedChatsByUser.get(uid)?.delete(chatId);
@@ -779,7 +1027,7 @@ export function userLeavesChat(
     return {
       fullDelete: true,
       notifyDeletedFor: allBefore,
-      remainingParticipantIds: [],
+      remainingParticipantIds: []
     };
   }
 
@@ -791,17 +1039,20 @@ export function userLeavesChat(
       return {
         fullDelete: true,
         notifyDeletedFor: allBefore,
-        remainingParticipantIds: [],
+        remainingParticipantIds: []
       };
     }
     chat.participantIds = chat.participantIds.filter((id) => id !== userId);
+    chat.channelAdminIds = (chat.channelAdminIds ?? []).filter(
+      (id) => id !== userId
+    );
     delete chat.unread[userId];
     if (chat.lastReadAt) delete chat.lastReadAt[userId];
     purgeChatPrefsForUsers(chatId, [userId]);
     return {
       fullDelete: false,
       notifyDeletedFor: [userId],
-      remainingParticipantIds: [...chat.participantIds],
+      remainingParticipantIds: [...chat.participantIds]
     };
   }
 
@@ -816,14 +1067,14 @@ export function userLeavesChat(
     return {
       fullDelete: true,
       notifyDeletedFor: [userId],
-      remainingParticipantIds: [],
+      remainingParticipantIds: []
     };
   }
 
   return {
     fullDelete: false,
     notifyDeletedFor: [userId],
-    remainingParticipantIds: [...chat.participantIds],
+    remainingParticipantIds: [...chat.participantIds]
   };
 }
 
@@ -835,7 +1086,7 @@ export function setChatPinnedMessage(
   const chat = chats.get(chatId);
   if (!chat?.participantIds.includes(requesterId)) return undefined;
   const channelNonOwner =
-    chat.type === 'channel' && chat.channelOwnerId !== requesterId;
+    chat.type === 'channel' && !isChannelAdmin(chat, requesterId);
   if (channelNonOwner && messageId) return undefined;
   if (messageId) {
     const list = ensureMessages(chatId);
@@ -854,7 +1105,7 @@ export function clearAllMessagesInChat(
 ): Chat | undefined {
   const chat = chats.get(chatId);
   if (!chat?.participantIds.includes(requesterId)) return undefined;
-  if (chat.type === 'channel' && chat.channelOwnerId !== requesterId)
+  if (chat.type === 'channel' && !isChannelAdmin(chat, requesterId))
     return undefined;
   const list = messagesByChat.get(chatId);
   if (list) list.length = 0;
@@ -863,10 +1114,10 @@ export function clearAllMessagesInChat(
   return chat;
 }
 
-export function createDirectChatIfNeeded(
-  userA: string,
-  userB: string
-): Chat {
+export function createDirectChatIfNeeded(userA: string, userB: string): Chat {
+  if (usersBlockedEitherWay(userA, userB)) {
+    throw new Error('users-blocked');
+  }
   const existing = [...chats.values()].find(
     (c) =>
       c.type === 'direct' &&
@@ -882,7 +1133,7 @@ export function createDirectChatIfNeeded(
     name: other?.username ?? 'Чат',
     participantIds: [userA, userB],
     unread: {},
-    lastReadAt: {},
+    lastReadAt: {}
   };
   chats.set(chat.id, chat);
   return chat;
@@ -902,7 +1153,7 @@ export function ensureSavedChat(userId: string): Chat {
     name: 'Избранное',
     participantIds: [userId],
     unread: {},
-    lastReadAt: {},
+    lastReadAt: {}
   };
   chats.set(chat.id, chat);
   return chat;
@@ -916,8 +1167,8 @@ export function createGroupChat(
   const participantIds = [
     ...new Set([
       creatorId,
-      ...memberIds.filter((id) => canAddContactToSharedChat(creatorId, id)),
-    ]),
+      ...memberIds.filter((id) => canAddContactToSharedChat(creatorId, id))
+    ])
   ];
   const chat: Chat = {
     id: uuid(),
@@ -925,7 +1176,7 @@ export function createGroupChat(
     name,
     participantIds,
     unread: {},
-    lastReadAt: {},
+    lastReadAt: {}
   };
   chats.set(chat.id, chat);
   const welcome: Message = {
@@ -933,7 +1184,7 @@ export function createGroupChat(
     chatId: chat.id,
     senderId: creatorId,
     text: `Группа «${name}» создана`,
-    createdAt: Date.now(),
+    createdAt: Date.now()
   };
   addMessage(welcome);
   return chat;
@@ -947,8 +1198,8 @@ export function createChannelChat(
   const participantIds = [
     ...new Set([
       ownerId,
-      ...subscriberIds.filter((id) => canAddContactToSharedChat(ownerId, id)),
-    ]),
+      ...subscriberIds.filter((id) => canAddContactToSharedChat(ownerId, id))
+    ])
   ];
   const chat: Chat = {
     id: uuid(),
@@ -956,8 +1207,9 @@ export function createChannelChat(
     name,
     participantIds,
     channelOwnerId: ownerId,
+    channelAdminIds: [],
     unread: {},
-    lastReadAt: {},
+    lastReadAt: {}
   };
   chats.set(chat.id, chat);
   addMessage({
@@ -965,7 +1217,7 @@ export function createChannelChat(
     chatId: chat.id,
     senderId: ownerId,
     text: `Канал «${name}» создан. Писать может только владелец.`,
-    createdAt: Date.now(),
+    createdAt: Date.now()
   });
   return chat;
 }
@@ -986,7 +1238,7 @@ export function ensureWelcomeChat(userId: string): void {
     name: 'БренксЧат',
     participantIds: [userId, bot.id],
     unread: { [userId]: 1 },
-    lastReadAt: {},
+    lastReadAt: {}
   };
   chats.set(chat.id, chat);
   addMessage({
@@ -994,7 +1246,7 @@ export function ensureWelcomeChat(userId: string): void {
     chatId: chat.id,
     senderId: bot.id,
     text: 'Добро пожаловать в БренксЧат!',
-    createdAt: Date.now(),
+    createdAt: Date.now()
   });
 }
 
@@ -1013,6 +1265,7 @@ export type AdminUserRow = {
 export function getAdminOverview(): {
   userCount: number;
   blockedUserCount: number;
+  openReportCount: number;
   chatCount: number;
   directChatCount: number;
   groupChatCount: number;
@@ -1025,13 +1278,18 @@ export function getAdminOverview(): {
   for (const list of messagesByChat.values()) {
     messageCount += list.length;
     for (const msg of list) {
-      byUserMessages.set(msg.senderId, (byUserMessages.get(msg.senderId) ?? 0) + 1);
+      byUserMessages.set(
+        msg.senderId,
+        (byUserMessages.get(msg.senderId) ?? 0) + 1
+      );
     }
   }
   const chatList = [...chats.values()];
   return {
     userCount: users.size,
     blockedUserCount: [...users.values()].filter((u) => !!u.banned).length,
+    openReportCount: [...reports.values()].filter((r) => r.status !== 'closed')
+      .length,
     chatCount: chatList.length,
     directChatCount: chatList.filter((c) => c.type === 'direct').length,
     groupChatCount: chatList.filter((c) => c.type === 'group').length,
@@ -1047,9 +1305,10 @@ export function getAdminOverview(): {
         emailVerified: !!u.emailVerified,
         banned: !!u.banned,
         messageCount: byUserMessages.get(u.id) ?? 0,
-        chatCount: chatList.filter((c) => c.participantIds.includes(u.id)).length,
+        chatCount: chatList.filter((c) => c.participantIds.includes(u.id))
+          .length
       }))
-      .sort((a, b) => a.username.localeCompare(b.username, 'ru')),
+      .sort((a, b) => a.username.localeCompare(b.username, 'ru'))
   };
 }
 
@@ -1068,10 +1327,7 @@ export function addPushSubscription(
   }
 }
 
-export function removePushSubscription(
-  userId: string,
-  endpoint: string
-): void {
+export function removePushSubscription(userId: string, endpoint: string): void {
   const subs = pushSubscriptionsByUser.get(userId);
   if (!subs) return;
   const idx = subs.findIndex((s) => s.endpoint === endpoint);

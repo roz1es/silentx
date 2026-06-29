@@ -19,7 +19,7 @@ import {
   requireAuth,
   revokeTokenSession,
   tokenFromRequest,
-  verifyUserToken,
+  verifyUserToken
 } from './auth.js';
 import {
   consumeChallenge,
@@ -27,26 +27,26 @@ import {
   createChallenge,
   isValidEmail,
   maskEmail,
-  normalizeEmail,
+  normalizeEmail
 } from './emailAuth.js';
 import { sendAuthCodeEmail } from './email.js';
 import * as store from './store.js';
 import { bootstrapPersistence, startPeriodicPersistence } from './persist.js';
 import { registerSocketHandlers } from './socketHandlers.js';
-import { setupWebPush } from './pushNotifications.js';
+import { sendPushNotification, setupWebPush } from './pushNotifications.js';
 import {
   initializeSessionStore,
   listUserSessions,
   revokeAllUserSessions,
   revokeOtherUserSessions,
-  revokeUserSession,
+  revokeUserSession
 } from './sessions.js';
 import {
   hashPassword,
   isAcceptableNewPassword,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
-  verifyPassword,
+  verifyPassword
 } from './password.js';
 import {
   initializeE2eeDevices,
@@ -57,7 +57,7 @@ import {
   listE2eeDevices,
   registerE2eeDevice,
   removeE2eeDevice,
-  saveE2eeKeyBackup,
+  saveE2eeKeyBackup
 } from './e2eeDevices.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -82,7 +82,7 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
 const MAX_AVATAR_LEN = 900_000;
 const RESERVED_USERNAMES = new Set(['roz1es', 'elzi']);
 
-function publicUser(u: User, includePrivate = true) {
+function publicUser(u: User, includePrivate = true, viewerId?: string) {
   return {
     id: u.id,
     username: u.username,
@@ -95,7 +95,9 @@ function publicUser(u: User, includePrivate = true) {
     birthDate: u.birthDate,
     isAdmin: !!u.isAdmin,
     banned: !!u.banned,
-    privacy: u.privacy,
+    blockedUserIds: includePrivate ? (u.blockedUserIds ?? []) : undefined,
+    blockedByViewer: viewerId ? store.isUserBlocked(viewerId, u.id) : undefined,
+    privacy: u.privacy
   };
 }
 
@@ -165,10 +167,10 @@ app.use(
         workerSrc: ["'self'", 'blob:'],
         manifestSrc: ["'self'"],
         upgradeInsecureRequests:
-          process.env.NODE_ENV === 'production' ? [] : null,
-      },
+          process.env.NODE_ENV === 'production' ? [] : null
+      }
     },
-    crossOriginEmbedderPolicy: false,
+    crossOriginEmbedderPolicy: false
   })
 );
 app.use(cors({ origin: corsOrigin, credentials: true }));
@@ -177,7 +179,7 @@ app.use(express.json({ limit: '50mb' }));
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: corsOrigin, credentials: true },
-  maxHttpBufferSize: 16 * 1024 * 1024,
+  maxHttpBufferSize: 16 * 1024 * 1024
 });
 registerSocketHandlers(io);
 
@@ -186,7 +188,7 @@ function broadcastChatToParticipants(chatId: string): void {
   if (!chat) return;
   chat.participantIds.forEach((pid) => {
     io.to(`user:${pid}`).emit('chat_updated', {
-      chat: store.serializeChatForViewer(chat, pid),
+      chat: store.serializeChatForViewer(chat, pid)
     });
   });
 }
@@ -204,7 +206,7 @@ async function respondWithAuthenticatedUser(
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
     path: '/',
-    ...(rememberMe ? { maxAge: REMEMBER_COOKIE_MAX_AGE_MS } : {}),
+    ...(rememberMe ? { maxAge: REMEMBER_COOKIE_MAX_AGE_MS } : {})
   });
   res.json({ user: publicUser(user), token });
 }
@@ -220,7 +222,7 @@ const apiGeneralLimiter = rateLimit({
   max: 400,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Слишком много запросов. Подождите минуту.' },
+  message: { error: 'Слишком много запросов. Подождите минуту.' }
 });
 
 const authRouteLimiter = rateLimit({
@@ -228,7 +230,7 @@ const authRouteLimiter = rateLimit({
   max: 40,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Слишком много попыток входа. Попробуйте позже.' },
+  message: { error: 'Слишком много попыток входа. Попробуйте позже.' }
 });
 
 app.use('/api', apiGeneralLimiter);
@@ -237,7 +239,7 @@ app.post('/api/register', authRouteLimiter, async (req, res) => {
   const { username, password, email } = req.body ?? {};
   if (!validUsernamePassword(username, password)) {
     return res.status(400).json({
-      error: `Пароль должен содержать от ${PASSWORD_MIN_LENGTH} до ${PASSWORD_MAX_LENGTH} символов`,
+      error: `Пароль должен содержать от ${PASSWORD_MIN_LENGTH} до ${PASSWORD_MAX_LENGTH} символов`
     });
   }
   if (typeof email !== 'string' || !isValidEmail(email)) {
@@ -260,13 +262,15 @@ app.post('/api/register', authRouteLimiter, async (req, res) => {
     passwordHash = await hashPassword(password);
   } catch (err) {
     console.error('[auth] password hashing failed', err);
-    return res.status(500).json({ error: 'Не удалось безопасно сохранить пароль' });
+    return res
+      .status(500)
+      .json({ error: 'Не удалось безопасно сохранить пароль' });
   }
   const { ticket, code } = createChallenge({
     purpose: 'register',
     username: cleanUsername,
     passwordHash,
-    email: cleanEmail,
+    email: cleanEmail
   });
   try {
     await sendChallengeCode(cleanEmail, code, 'register');
@@ -276,7 +280,7 @@ app.post('/api/register', authRouteLimiter, async (req, res) => {
   res.json({
     emailVerificationRequired: true,
     ticket,
-    emailMasked: maskEmail(cleanEmail),
+    emailMasked: maskEmail(cleanEmail)
   });
 });
 
@@ -314,14 +318,16 @@ app.get('/api/me', requireAuth, (req, res) => {
 
 app.get('/api/me/sessions', requireAuth, (req, res) => {
   res.json({
-    sessions: listUserSessions(req.userId!, req.sessionId),
+    sessions: listUserSessions(req.userId!, req.sessionId)
   });
 });
 
 app.delete('/api/me/sessions/:sessionId', requireAuth, async (req, res) => {
   const sessionId = req.params.sessionId;
   if (sessionId === req.sessionId) {
-    return res.status(400).json({ error: 'Текущую сессию завершите через выход' });
+    return res
+      .status(400)
+      .json({ error: 'Текущую сессию завершите через выход' });
   }
   const revoked = await revokeUserSession(req.userId!, sessionId);
   if (!revoked) {
@@ -345,7 +351,7 @@ app.get('/api/calls/ice-servers', requireAuth, (req, res) => {
   }> = [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun.cloudflare.com:3478' },
+    { urls: 'stun:stun.cloudflare.com:3478' }
   ];
   const secret = process.env.TURN_SECRET?.trim();
   const urls = process.env.TURN_URLS?.split(',')
@@ -367,42 +373,86 @@ app.get('/api/admin/overview', requireAuth, requireAdmin, (_req, res) => {
   res.json(store.getAdminOverview());
 });
 
+app.get('/api/admin/reports', requireAuth, requireAdmin, (req, res) => {
+  const status = String(req.query.status ?? 'all');
+  const normalized =
+    status === 'open' || status === 'reviewing' || status === 'closed'
+      ? status
+      : 'all';
+  res.json({ reports: store.listReports(normalized) });
+});
+
+app.post(
+  '/api/admin/reports/:reportId/status',
+  requireAuth,
+  requireAdmin,
+  (req, res) => {
+    const status = String((req.body as { status?: unknown })?.status ?? '');
+    if (status !== 'open' && status !== 'reviewing' && status !== 'closed') {
+      return res.status(400).json({ error: 'Некорректный статус жалобы' });
+    }
+    const report = store.setReportStatus(
+      req.params.reportId,
+      status,
+      req.userId!
+    );
+    if (!report) return res.status(404).json({ error: 'Жалоба не найдена' });
+    const reportRow =
+      store.listReports('all').find((item) => item.id === report.id) ?? report;
+    const payload = { report: reportRow };
+    store.listAdminUserIds().forEach((adminId) => {
+      io.to(`user:${adminId}`).emit('admin_report_updated', payload);
+    });
+    res.json(payload);
+  }
+);
+
 app.get('/api/admin/database', requireAuth, requireAdmin, (_req, res) => {
   const url = process.env.PHPMYADMIN_URL?.trim();
   res.json({ url: url || null });
 });
 
-app.post('/api/admin/users/:userId/block', requireAuth, requireAdmin, async (req, res) => {
-  const targetId = req.params.userId;
-  const banned = Boolean((req.body as { banned?: boolean })?.banned);
-  if (targetId === req.userId) {
-    return res.status(400).json({ error: 'Нельзя заблокировать себя' });
+app.post(
+  '/api/admin/users/:userId/block',
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    const targetId = req.params.userId;
+    const banned = Boolean((req.body as { banned?: boolean })?.banned);
+    if (targetId === req.userId) {
+      return res.status(400).json({ error: 'Нельзя заблокировать себя' });
+    }
+    const updated = store.setUserBlocked(targetId, banned);
+    if (!updated) {
+      return res.status(404).json({ error: 'Пользователь не найден' });
+    }
+    if (banned) {
+      await revokeAllUserSessions(targetId);
+      io.in(`user:${targetId}`).disconnectSockets(true);
+    }
+    res.json({ user: publicUser(updated) });
   }
-  const updated = store.setUserBlocked(targetId, banned);
-  if (!updated) {
-    return res.status(404).json({ error: 'Пользователь не найден' });
-  }
-  if (banned) {
-    await revokeAllUserSessions(targetId);
-    io.in(`user:${targetId}`).disconnectSockets(true);
-  }
-  res.json({ user: publicUser(updated) });
-});
+);
 
-app.post('/api/admin/chats/:chatId/verified', requireAuth, requireAdmin, (req, res) => {
-  const chatId = req.params.chatId;
-  const verified = Boolean((req.body as { verified?: boolean })?.verified);
-  const updated = store.setChatVerified(chatId, verified);
-  if (!updated) {
-    return res.status(404).json({ error: 'Канал не найден' });
-  }
-  updated.participantIds.forEach((pid) => {
-    io.to(`user:${pid}`).emit('chat_updated', {
-      chat: store.serializeChatForViewer(updated, pid),
+app.post(
+  '/api/admin/chats/:chatId/verified',
+  requireAuth,
+  requireAdmin,
+  (req, res) => {
+    const chatId = req.params.chatId;
+    const verified = Boolean((req.body as { verified?: boolean })?.verified);
+    const updated = store.setChatVerified(chatId, verified);
+    if (!updated) {
+      return res.status(404).json({ error: 'Канал не найден' });
+    }
+    updated.participantIds.forEach((pid) => {
+      io.to(`user:${pid}`).emit('chat_updated', {
+        chat: store.serializeChatForViewer(updated, pid)
+      });
     });
-  });
-  res.json({ chat: store.serializeChatForViewer(updated, req.userId!) });
-});
+    res.json({ chat: store.serializeChatForViewer(updated, req.userId!) });
+  }
+);
 
 app.patch('/api/me', requireAuth, (req, res) => {
   const userId = req.userId!;
@@ -417,6 +467,7 @@ app.patch('/api/me', requireAuth, (req, res) => {
     birthDate?: string | null;
     privacy?: {
       showOnline?: boolean;
+      allowMessages?: boolean;
       allowCalls?: boolean;
       showEmail?: boolean;
     };
@@ -462,17 +513,21 @@ app.patch('/api/me', requireAuth, (req, res) => {
     const privacy = body.privacy as
       | {
           showOnline?: unknown;
+          allowMessages?: unknown;
           allowCalls?: unknown;
           showEmail?: unknown;
         }
       | undefined;
     if (!privacy || typeof privacy !== 'object') {
-      return res.status(400).json({ error: 'Некорректные настройки приватности' });
+      return res
+        .status(400)
+        .json({ error: 'Некорректные настройки приватности' });
     }
     patch.privacy = {
       showOnline: privacy.showOnline !== false,
+      allowMessages: privacy.allowMessages !== false,
       allowCalls: privacy.allowCalls !== false,
-      showEmail: privacy.showEmail === true,
+      showEmail: privacy.showEmail === true
     };
   }
   if (Object.keys(patch).length === 0) {
@@ -484,32 +539,62 @@ app.patch('/api/me', requireAuth, (req, res) => {
   res.json({ user: publicUser(fresh) });
 });
 
-app.post('/api/me/email/request', authRouteLimiter, requireAuth, async (req, res) => {
+app.delete('/api/me', requireAuth, async (req, res) => {
   const userId = req.userId!;
-  const { email } = req.body ?? {};
-  if (typeof email !== 'string' || !isValidEmail(email)) {
-    return res.status(400).json({ error: 'Укажите корректную почту' });
+  const result = store.deleteUserAccount(userId);
+  if (!result) return res.status(404).json({ error: 'Пользователь не найден' });
+
+  for (const chatId of result.deletedChatIds) {
+    for (const pid of result.notifyDeletedFor[chatId] ?? []) {
+      io.to(`user:${pid}`).emit('chat_deleted', { chatId });
+    }
   }
-  const cleanEmail = normalizeEmail(email);
-  const existing = store.findUserByEmail(cleanEmail);
-  if (existing && existing.id !== userId) {
-    return res.status(409).json({ error: 'Эта почта уже используется' });
+  for (const chatId of result.updatedChatIds) {
+    broadcastChatToParticipants(chatId);
   }
-  const { ticket, code } = createChallenge({
-    purpose: 'bind',
-    userId,
-    email: cleanEmail,
+
+  await revokeAllUserSessions(userId);
+  io.in(`user:${userId}`).disconnectSockets(true);
+  res.clearCookie(AUTH_COOKIE_NAME, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/'
   });
-  try {
-    await sendChallengeCode(cleanEmail, code, 'bind');
-  } catch {
-    return res.status(502).json({ error: 'Не удалось отправить письмо' });
-  }
-  res.json({
-    ticket,
-    emailMasked: maskEmail(cleanEmail),
-  });
+  res.json({ ok: true });
 });
+
+app.post(
+  '/api/me/email/request',
+  authRouteLimiter,
+  requireAuth,
+  async (req, res) => {
+    const userId = req.userId!;
+    const { email } = req.body ?? {};
+    if (typeof email !== 'string' || !isValidEmail(email)) {
+      return res.status(400).json({ error: 'Укажите корректную почту' });
+    }
+    const cleanEmail = normalizeEmail(email);
+    const existing = store.findUserByEmail(cleanEmail);
+    if (existing && existing.id !== userId) {
+      return res.status(409).json({ error: 'Эта почта уже используется' });
+    }
+    const { ticket, code } = createChallenge({
+      purpose: 'bind',
+      userId,
+      email: cleanEmail
+    });
+    try {
+      await sendChallengeCode(cleanEmail, code, 'bind');
+    } catch {
+      return res.status(502).json({ error: 'Не удалось отправить письмо' });
+    }
+    res.json({
+      ticket,
+      emailMasked: maskEmail(cleanEmail)
+    });
+  }
+);
 
 app.post('/api/me/email/confirm', authRouteLimiter, requireAuth, (req, res) => {
   const userId = req.userId!;
@@ -536,7 +621,7 @@ app.get('/api/users/directory', requireAuth, (req, res) => {
   res.json({
     users: me?.isAdmin
       ? store.listDirectoryUsers(userId)
-      : store.listContactUsers(userId),
+      : store.listContactUsers(userId)
   });
 });
 
@@ -559,7 +644,93 @@ app.get('/api/users/:userId', requireAuth, (req, res) => {
   if (!store.usersShareChat(viewerId, targetId)) {
     return res.status(403).json({ error: 'Нет доступа к профилю' });
   }
-  res.json({ user: publicUser(target, viewerId === targetId) });
+  res.json({ user: publicUser(target, viewerId === targetId, viewerId) });
+});
+
+app.post('/api/users/:userId/block', requireAuth, (req, res) => {
+  const viewerId = req.userId!;
+  const targetId = req.params.userId;
+  const target = store.getUser(targetId);
+  if (!target || target.banned) {
+    return res.status(404).json({ error: 'Пользователь не найден' });
+  }
+  const updated = store.setUserPersonalBlock(viewerId, targetId, true);
+  if (!updated) {
+    return res
+      .status(400)
+      .json({ error: 'Не удалось заблокировать пользователя' });
+  }
+  res.json({
+    user: publicUser(updated),
+    target: publicUser(target, false, viewerId)
+  });
+});
+
+app.delete('/api/users/:userId/block', requireAuth, (req, res) => {
+  const viewerId = req.userId!;
+  const targetId = req.params.userId;
+  const target = store.getUser(targetId);
+  if (!target) return res.status(404).json({ error: 'Пользователь не найден' });
+  const updated = store.setUserPersonalBlock(viewerId, targetId, false);
+  if (!updated) {
+    return res
+      .status(400)
+      .json({ error: 'Не удалось разблокировать пользователя' });
+  }
+  res.json({
+    user: publicUser(updated),
+    target: publicUser(target, false, viewerId)
+  });
+});
+
+app.post('/api/reports', requireAuth, async (req, res) => {
+  const body = req.body as {
+    targetUserId?: unknown;
+    chatId?: unknown;
+    messageId?: unknown;
+    reason?: unknown;
+    comment?: unknown;
+  };
+  const targetUserId = String(body?.targetUserId ?? '');
+  const reason = String(body?.reason ?? '').trim();
+  if (!targetUserId || reason.length < 2) {
+    return res
+      .status(400)
+      .json({ error: 'Укажите пользователя и причину жалобы' });
+  }
+  const report = store.createUserReport({
+    reporterId: req.userId!,
+    targetUserId,
+    chatId: typeof body.chatId === 'string' ? body.chatId : undefined,
+    messageId: typeof body.messageId === 'string' ? body.messageId : undefined,
+    reason,
+    comment: typeof body.comment === 'string' ? body.comment : undefined
+  });
+  if (!report) {
+    return res.status(400).json({ error: 'Не удалось создать жалобу' });
+  }
+  const row = store.listReports('all').find((item) => item.id === report.id);
+  if (!row) {
+    return res.status(201).json({ report });
+  }
+  const payload = { report: row };
+  const admins = store.listAdminUserIds();
+  admins.forEach((adminId) => {
+    io.to(`user:${adminId}`).emit('admin_report_created', payload);
+  });
+  await Promise.allSettled(
+    admins
+      .filter((adminId) => adminId !== req.userId)
+      .map((adminId) =>
+        sendPushNotification(adminId, {
+          title: 'Новая жалоба в БренксЧат',
+          body: `${row.reporter?.displayName ?? row.reporter?.username ?? 'Пользователь'} пожаловался на ${row.target?.displayName ?? row.target?.username ?? 'пользователя'}`,
+          tag: 'admin-reports',
+          requireInteraction: true
+        })
+      )
+  );
+  res.status(201).json(payload);
 });
 
 app.post('/api/login', authRouteLimiter, async (req, res) => {
@@ -584,7 +755,9 @@ app.post('/api/login', authRouteLimiter, async (req, res) => {
       store.updateUserPassword(u.id, await hashPassword(password));
     } catch (err) {
       console.error('[auth] legacy password migration failed', err);
-      return res.status(500).json({ error: 'Не удалось обновить защиту пароля' });
+      return res
+        .status(500)
+        .json({ error: 'Не удалось обновить защиту пароля' });
     }
   }
   if (u.banned) {
@@ -600,7 +773,7 @@ app.post('/api/login', authRouteLimiter, async (req, res) => {
     }
     const { ticket, code } = createChallenge({
       purpose: 'login',
-      userId: u.id,
+      userId: u.id
     });
     try {
       await sendChallengeCode(u.email, code, 'login');
@@ -618,7 +791,7 @@ app.post('/api/login', authRouteLimiter, async (req, res) => {
     return res.json({
       emailCodeRequired: true,
       ticket,
-      emailMasked: maskEmail(u.email),
+      emailMasked: maskEmail(u.email)
     });
   }
   await respondWithAuthenticatedUser(res, u, remember);
@@ -650,7 +823,7 @@ app.post('/api/logout', async (req, res) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
-    path: '/',
+    path: '/'
   });
   res.json({ ok: true });
 });
@@ -659,16 +832,18 @@ app.post('/api/password-reset/request', authRouteLimiter, async (req, res) => {
   const login = String((req.body as { login?: unknown })?.login ?? '').trim();
   const u =
     store.findUserByUsername(login) ||
-    (isValidEmail(login) ? store.findUserByEmail(normalizeEmail(login)) : undefined);
+    (isValidEmail(login)
+      ? store.findUserByEmail(normalizeEmail(login))
+      : undefined);
   if (!u?.email || !u.emailVerified) {
     return res.json({
       ok: true,
-      message: 'Если почта привязана к аккаунту, мы отправили код.',
+      message: 'Если почта привязана к аккаунту, мы отправили код.'
     });
   }
   const { ticket, code } = createChallenge({
     purpose: 'reset',
-    userId: u.id,
+    userId: u.id
   });
   try {
     await sendChallengeCode(u.email, code, 'reset');
@@ -678,7 +853,7 @@ app.post('/api/password-reset/request', authRouteLimiter, async (req, res) => {
   res.json({
     ok: true,
     ticket,
-    emailMasked: maskEmail(u.email),
+    emailMasked: maskEmail(u.email)
   });
 });
 
@@ -690,7 +865,7 @@ app.post('/api/password-reset/confirm', authRouteLimiter, async (req, res) => {
     !isAcceptableNewPassword(password)
   ) {
     return res.status(400).json({
-      error: `Пароль должен содержать от ${PASSWORD_MIN_LENGTH} до ${PASSWORD_MAX_LENGTH} символов`,
+      error: `Пароль должен содержать от ${PASSWORD_MIN_LENGTH} до ${PASSWORD_MAX_LENGTH} символов`
     });
   }
   const challenge = consumeChallenge(ticket, code, 'reset');
@@ -702,7 +877,9 @@ app.post('/api/password-reset/confirm', authRouteLimiter, async (req, res) => {
     passwordHash = await hashPassword(password);
   } catch (err) {
     console.error('[auth] password reset hashing failed', err);
-    return res.status(500).json({ error: 'Не удалось безопасно сохранить пароль' });
+    return res
+      .status(500)
+      .json({ error: 'Не удалось безопасно сохранить пароль' });
   }
   const u = store.updateUserPassword(challenge.userId, passwordHash);
   if (!u) return res.status(404).json({ error: 'Пользователь не найден' });
@@ -746,21 +923,18 @@ app.post('/api/e2ee/devices', requireAuth, async (req, res) => {
     deviceId?: unknown;
     publicKey?: unknown;
   };
-  if (
-    !isValidDeviceId(deviceId) ||
-    !isValidCurve25519PublicKey(publicKey)
-  ) {
+  if (!isValidDeviceId(deviceId) || !isValidCurve25519PublicKey(publicKey)) {
     return res.status(400).json({ error: 'Некорректный ключ устройства' });
   }
   const result = await registerE2eeDevice(userId, deviceId, publicKey);
   if (result === 'key-mismatch') {
     return res.status(409).json({
-      error: 'Ключ этого устройства изменился. Создайте новый идентификатор.',
+      error: 'Ключ этого устройства изменился. Создайте новый идентификатор.'
     });
   }
   if (result === 'limit') {
     return res.status(409).json({
-      error: 'Достигнут лимит защищённых устройств',
+      error: 'Достигнут лимит защищённых устройств'
     });
   }
   res.json({ ok: true, deviceId });
@@ -773,7 +947,7 @@ app.get('/api/e2ee/key-backup', requireAuth, (req, res) => {
 app.put('/api/e2ee/key-backup', requireAuth, async (req, res) => {
   const value = {
     ...(req.body ?? {}),
-    updatedAt: Date.now(),
+    updatedAt: Date.now()
   };
   if (!isValidE2eeKeyBackup(value)) {
     return res.status(400).json({ error: 'Некорректная копия ключа' });
@@ -783,7 +957,7 @@ app.put('/api/e2ee/key-backup', requireAuth, async (req, res) => {
     salt: value.salt,
     iv: value.iv,
     ciphertext: value.ciphertext,
-    iterations: value.iterations,
+    iterations: value.iterations
   });
   res.json({ ok: true });
 });
@@ -800,16 +974,13 @@ app.delete('/api/e2ee/devices/:deviceId', requireAuth, async (req, res) => {
 app.get('/api/chats/:chatId/e2ee-devices', requireAuth, (req, res) => {
   const userId = req.userId!;
   const chat = store.getChat(req.params.chatId);
-  if (
-    !chat?.participantIds.includes(userId) ||
-    chat.type !== 'direct'
-  ) {
+  if (!chat?.participantIds.includes(userId) || chat.type !== 'direct') {
     return res.status(404).json({ error: 'Личный чат не найден' });
   }
   res.json({
     chatId: chat.id,
     participantIds: chat.participantIds,
-    devices: listE2eeDevices(chat.participantIds),
+    devices: listE2eeDevices(chat.participantIds)
   });
 });
 
@@ -885,6 +1056,12 @@ app.post('/api/chats/direct', requireAuth, (req, res) => {
   if (!other || other.id === userId || other.banned) {
     return res.status(404).json({ error: 'Пользователь не найден' });
   }
+  if (store.usersBlockedEitherWay(userId, other.id)) {
+    return res.status(403).json({ error: 'Пользователь заблокирован' });
+  }
+  if (other.privacy?.allowMessages === false) {
+    return res.status(403).json({ error: 'Пользователь ограничил сообщения' });
+  }
   const chat = store.createDirectChatIfNeeded(userId, other.id);
   const forSelf = store.serializeChatForViewer(chat, userId);
   const forPeer = store.serializeChatForViewer(chat, other.id);
@@ -929,7 +1106,7 @@ app.post('/api/chats/group', requireAuth, (req, res) => {
   const chat = store.createGroupChat(userId, name.trim(), ids);
   chat.participantIds.forEach((pid) => {
     io.to(`user:${pid}`).emit('chat_updated', {
-      chat: store.serializeChatForViewer(chat, pid),
+      chat: store.serializeChatForViewer(chat, pid)
     });
   });
   res.json({ chat: store.serializeChatForViewer(chat, userId) });
@@ -963,7 +1140,7 @@ app.post('/api/chats/channel', requireAuth, (req, res) => {
   const chat = store.createChannelChat(userId, name.trim(), ids);
   chat.participantIds.forEach((pid) => {
     io.to(`user:${pid}`).emit('chat_updated', {
-      chat: store.serializeChatForViewer(chat, pid),
+      chat: store.serializeChatForViewer(chat, pid)
     });
   });
   res.json({ chat: store.serializeChatForViewer(chat, userId) });
@@ -1008,6 +1185,21 @@ app.post('/api/chats/:chatId/members', requireAuth, (req, res) => {
   res.json({ chat: store.serializeChatForViewer(updated, userId) });
 });
 
+app.post('/api/chats/:chatId/channel-admins', requireAuth, (req, res) => {
+  const userId = req.userId!;
+  const chatId = req.params.chatId;
+  const raw = (req.body as { adminIds?: unknown })?.adminIds;
+  const adminIds = Array.isArray(raw)
+    ? raw.map((x) => String(x)).filter(Boolean)
+    : [];
+  const updated = store.setChannelAdmins(chatId, userId, adminIds);
+  if (!updated) {
+    return res.status(403).json({ error: 'Нет прав или канал не найден' });
+  }
+  broadcastChatToParticipants(chatId);
+  res.json({ chat: store.serializeChatForViewer(updated, userId) });
+});
+
 app.delete('/api/chats/:chatId', requireAuth, (req, res) => {
   const userId = req.userId!;
   const chatId = req.params.chatId;
@@ -1023,7 +1215,7 @@ app.delete('/api/chats/:chatId', requireAuth, (req, res) => {
       const c = store.getChat(chatId);
       if (c) {
         io.to(`user:${pid}`).emit('chat_updated', {
-          chat: store.serializeChatForViewer(c, pid),
+          chat: store.serializeChatForViewer(c, pid)
         });
       }
     });
@@ -1042,7 +1234,11 @@ app.get('/api/push/vapid-public-key', (_req, res) => {
 app.post('/api/push/subscribe', requireAuth, (req, res) => {
   const userId = req.userId!;
   const subscription = req.body as store.PushSubscriptionData;
-  if (!subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
+  if (
+    !subscription?.endpoint ||
+    !subscription?.keys?.p256dh ||
+    !subscription?.keys?.auth
+  ) {
     return res.status(400).json({ error: 'Некорректная подписка' });
   }
   store.addPushSubscription(userId, subscription);

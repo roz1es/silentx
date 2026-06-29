@@ -29,6 +29,8 @@ export interface EncryptedTextEnvelope {
 export interface UserPrivacy {
   /** Показывать ли пользователя онлайн в статусах */
   showOnline?: boolean;
+  /** Разрешать ли личные сообщения от собеседников */
+  allowMessages?: boolean;
   /** Разрешать ли звонки от собеседников */
   allowCalls?: boolean;
   /** Показывать ли почту в профиле другим пользователям */
@@ -52,6 +54,8 @@ export interface User {
   isAdmin?: boolean;
   /** Заблокирован администратором */
   banned?: boolean;
+  /** Личные блокировки: кому этот пользователь запретил писать и звонить */
+  blockedUserIds?: string[];
   privacy?: UserPrivacy;
 }
 
@@ -76,6 +80,8 @@ export interface Chat {
   pinnedMessageId?: string | null;
   /** Канал: только этот пользователь может писать */
   channelOwnerId?: string;
+  /** Канал: дополнительные администраторы, которым разрешено писать */
+  channelAdminIds?: string[];
   /** Канал подтвержден администрацией */
   verified?: boolean;
 }
@@ -96,4 +102,20 @@ export interface Message {
   replyToMessageId?: string;
   /** emoji -> userIds */
   reactions?: Record<string, string[]>;
+}
+
+export type UserReportStatus = 'open' | 'reviewing' | 'closed';
+
+export interface UserReport {
+  id: string;
+  reporterId: string;
+  targetUserId: string;
+  chatId?: string;
+  messageId?: string;
+  reason: string;
+  comment?: string;
+  status: UserReportStatus;
+  createdAt: number;
+  updatedAt: number;
+  closedBy?: string;
 }

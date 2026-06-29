@@ -35,6 +35,7 @@ class _BrenksChatDesktopAppState extends State<BrenksChatDesktopApp> {
   User? _user;
   ApiClient? _api;
   ThemeMode _themeMode = ThemeMode.dark;
+  BrenksAccentPreset _accentPreset = BrenksAccentPreset.gold;
   double _uiScale = 0.9;
 
   @override
@@ -45,16 +46,21 @@ class _BrenksChatDesktopAppState extends State<BrenksChatDesktopApp> {
 
   Future<void> _bootstrap() async {
     final savedTheme = await _authStore.loadTheme();
+    final savedAccent = await _authStore.loadAccent();
     final savedScale = await _authStore.loadUiScale();
     final token = await _authStore.loadToken();
     final serverUrl = normalizeServerUrl(defaultApiUrl);
     final themeMode = savedTheme == 'light' ? ThemeMode.light : ThemeMode.dark;
+    final accentPreset = accentPresetFromId(savedAccent);
+    setBrenksAccentPreset(accentPreset);
+    setBrenksThemeMode(themeMode);
     final uiScale = _clampUiScale(savedScale ?? 0.9);
     if (token == null || token.isEmpty) {
       if (!mounted) return;
       setState(() {
         _serverUrl = serverUrl;
         _themeMode = themeMode;
+        _accentPreset = accentPreset;
         _uiScale = uiScale;
         _bootstrapping = false;
       });
@@ -72,6 +78,7 @@ class _BrenksChatDesktopAppState extends State<BrenksChatDesktopApp> {
         _user = user;
         _api = api;
         _themeMode = themeMode;
+        _accentPreset = accentPreset;
         _uiScale = uiScale;
         _bootstrapping = false;
       });
@@ -82,6 +89,7 @@ class _BrenksChatDesktopAppState extends State<BrenksChatDesktopApp> {
       setState(() {
         _serverUrl = serverUrl;
         _themeMode = themeMode;
+        _accentPreset = accentPreset;
         _uiScale = uiScale;
         _bootstrapping = false;
       });
@@ -136,8 +144,17 @@ class _BrenksChatDesktopAppState extends State<BrenksChatDesktopApp> {
 
   Future<void> _setThemeMode(ThemeMode mode) async {
     await _authStore.saveTheme(mode == ThemeMode.light ? 'light' : 'dark');
+    setBrenksThemeMode(mode);
     if (!mounted) return;
     setState(() => _themeMode = mode);
+  }
+
+  Future<void> _setAccentPreset(BrenksAccentPreset preset) async {
+    await _authStore.saveAccent(accentStorageId(preset));
+    setBrenksAccentPreset(preset);
+    setBrenksThemeMode(_themeMode);
+    if (!mounted) return;
+    setState(() => _accentPreset = preset);
   }
 
   Future<void> _setUiScale(double scale) async {
@@ -196,6 +213,8 @@ class _BrenksChatDesktopAppState extends State<BrenksChatDesktopApp> {
       token: token,
       themeMode: _themeMode,
       onThemeModeChanged: _setThemeMode,
+      accentPreset: _accentPreset,
+      onAccentPresetChanged: _setAccentPreset,
       uiScale: _uiScale,
       onUiScaleChanged: _setUiScale,
       onLogout: _logout,

@@ -30,6 +30,8 @@ class AudioMessageService {
   String? _recordingPath;
 
   Stream<PlayerState> get playerState => _player.onPlayerStateChanged;
+  Stream<Duration> get positionChanged => _player.onPositionChanged;
+  Stream<Duration> get durationChanged => _player.onDurationChanged;
 
   Stream<double> amplitudeLevels(Duration interval) {
     return _recorder.onAmplitudeChanged(interval).map((amplitude) {
@@ -58,8 +60,12 @@ class AudioMessageService {
     await _recorder.start(
       const RecordConfig(
         encoder: AudioEncoder.aacLc,
-        bitRate: 64000,
+        bitRate: 128000,
         sampleRate: 44100,
+        numChannels: 1,
+        autoGain: true,
+        echoCancel: true,
+        noiseSuppress: true,
       ),
       path: path,
     );
@@ -77,6 +83,7 @@ class AudioMessageService {
     if (!await file.exists()) return null;
     final bytes = await file.readAsBytes();
     unawaited(file.delete().catchError((_) => file));
+    await _resetRecorder();
     if (bytes.isEmpty) return null;
 
     final durationMs =
@@ -105,22 +112,71 @@ class AudioMessageService {
   }
 
   Future<void> playDataUrl(String dataUrl) async {
-    final bytes = _bytesFromDataUrl(dataUrl);
-    if (bytes == null || bytes.isEmpty) return;
+    await playSource(dataUrl);
+  }
+
+  Future<void> playSource(
+    String source, {
+    String? baseUrl,
+    String? mimeType,
+  }) async {
+    final resolved = _resolveSource(source, baseUrl);
+    if (resolved == null || resolved.isEmpty) return;
     await _player.stop();
-    await _player.play(BytesSource(bytes));
+    await _player.setReleaseMode(ReleaseMode.stop);
+    await _player.setPlayerMode(PlayerMode.mediaPlayer);
+    if (resolved.startsWith('data:')) {
+      final bytes = _bytesFromDataUrl(resolved);
+      if (bytes == null || bytes.isEmpty) return;
+      final path = await _writePlaybackFile(bytes, resolved, mimeType);
+      await _player.play(DeviceFileSource(path));
+      return;
+    }
+    final uri = Uri.tryParse(resolved);
+    if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
+      await _player.play(UrlSource(resolved));
+      return;
+    }
+    final file = io.File(resolved);
+    if (await file.exists()) {
+      await _player.play(DeviceFileSource(file.path));
+    }
   }
 
   Future<void> stopPlayback() => _player.stop();
 
+  Future<void> pausePlayback() => _player.pause();
+
+  Future<void> resumePlayback() => _player.resume();
+
+  Future<void> seekPlayback(Duration position) => _player.seek(position);
+
   Future<void> dispose() async {
     await _recorder.dispose();
+    await _player.stop();
     await _player.dispose();
   }
 
   Future<void> _resetRecorder() async {
     await _recorder.dispose().catchError((_) {});
     _recorder = AudioRecorder();
+  }
+
+  Future<String> _writePlaybackFile(
+    Uint8List bytes,
+    String source,
+    String? mimeType,
+  ) async {
+    final dir = await getApplicationCacheDirectory();
+    final mediaDir = io.Directory('${dir.path}/brenkschat-playback');
+    await mediaDir.create(recursive: true);
+    final ext = _extensionFromMime(mimeType ?? _mimeFromDataUrl(source));
+    final path = '${mediaDir.path}/${_stableHash(source)}$ext';
+    final file = io.File(path);
+    if (!await file.exists() || await file.length() != bytes.length) {
+      await file.writeAsBytes(bytes, flush: false);
+    }
+    return path;
   }
 }
 
@@ -133,4 +189,41 @@ Uint8List? _bytesFromDataUrl(String dataUrl) {
   } on Object {
     return null;
   }
+}
+
+String? _resolveSource(String? value, String? baseUrl) {
+  final raw = value?.trim();
+  if (raw == null || raw.isEmpty || raw.startsWith('data:')) return raw;
+  final uri = Uri.tryParse(raw);
+  if (uri == null) return raw;
+  if (uri.hasScheme || baseUrl == null || baseUrl.isEmpty) return raw;
+  return Uri.parse(baseUrl).resolve(raw).toString();
+}
+
+String? _mimeFromDataUrl(String value) {
+  if (!value.startsWith('data:')) return null;
+  final semicolon = value.indexOf(';');
+  if (semicolon <= 5) return null;
+  return value.substring(5, semicolon);
+}
+
+String _extensionFromMime(String? mimeType) {
+  return switch (mimeType) {
+    'audio/mpeg' => '.mp3',
+    'audio/wav' || 'audio/x-wav' => '.wav',
+    'audio/ogg' => '.ogg',
+    'video/mp4' => '.mp4',
+    _ => '.m4a',
+  };
+}
+
+String _stableHash(String value) {
+  const offset = 0xcbf29ce484222325;
+  const prime = 0x100000001b3;
+  var hash = offset;
+  for (final byte in utf8.encode(value)) {
+    hash ^= byte;
+    hash = (hash * prime) & 0xffffffffffffffff;
+  }
+  return hash.toRadixString(16).padLeft(16, '0');
 }

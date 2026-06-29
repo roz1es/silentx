@@ -36,7 +36,7 @@ class EmptyState extends StatelessWidget {
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w800,
               ),
@@ -45,7 +45,7 @@ class EmptyState extends StatelessWidget {
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: muted, fontSize: 15),
+              style: TextStyle(color: muted, fontSize: 15),
             ),
           ],
         ),

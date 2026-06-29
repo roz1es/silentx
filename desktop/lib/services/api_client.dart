@@ -70,6 +70,16 @@ class ApiClient {
     return Uri.parse(baseUrl).resolve(raw).toString();
   }
 
+  Future<List<Map<String, dynamic>>> fetchCallIceServers() async {
+    final json = await _request('/api/calls/ice-servers');
+    final raw = json['iceServers'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((item) => item.cast<String, dynamic>())
+        .toList(growable: false);
+  }
+
   Future<Map<String, dynamic>> _request(
     String path, {
     String method = 'GET',
@@ -125,6 +135,7 @@ class ApiClient {
   Future<AuthResult> login({
     required String username,
     required String password,
+    bool rememberMe = true,
   }) async {
     final json = await _request(
       '/api/login',
@@ -132,6 +143,7 @@ class ApiClient {
       body: {
         'username': username,
         'password': password,
+        'rememberMe': rememberMe,
       },
     );
 
@@ -189,6 +201,7 @@ class ApiClient {
   Future<AuthResult> confirmLogin({
     required String ticket,
     required String code,
+    bool rememberMe = true,
   }) async {
     final json = await _request(
       '/api/login/confirm',
@@ -196,6 +209,7 @@ class ApiClient {
       body: {
         'ticket': ticket,
         'code': code,
+        'rememberMe': rememberMe,
       },
     );
 
@@ -265,6 +279,36 @@ class ApiClient {
     );
   }
 
+  Future<PasswordResetRequestResult> requestEmailChange({
+    required String email,
+  }) async {
+    final json = await _request(
+      '/api/me/email/request',
+      method: 'POST',
+      body: {'email': email},
+    );
+    return PasswordResetRequestResult(
+      ticket: json['ticket']?.toString(),
+      emailMasked: json['emailMasked']?.toString(),
+      message: json['message']?.toString(),
+    );
+  }
+
+  Future<User> confirmEmailChange({
+    required String ticket,
+    required String code,
+  }) async {
+    final json = await _request(
+      '/api/me/email/confirm',
+      method: 'POST',
+      body: {
+        'ticket': ticket,
+        'code': code,
+      },
+    );
+    return User.fromJson((json['user'] as Map).cast<String, dynamic>());
+  }
+
   Future<User> fetchMe() async {
     final json = await _request('/api/me');
     return User.fromJson((json['user'] as Map).cast<String, dynamic>());
@@ -273,12 +317,77 @@ class ApiClient {
   Future<User> updateProfile({
     String? displayName,
     Object? avatarUrl = _unchanged,
+    String? bio,
+    String? phone,
+    String? birthDate,
+    UserPrivacy? privacy,
   }) async {
     final body = <String, Object?>{};
     if (displayName != null) body['displayName'] = displayName;
     if (!identical(avatarUrl, _unchanged)) body['avatarUrl'] = avatarUrl;
+    if (bio != null) body['bio'] = bio;
+    if (phone != null) body['phone'] = phone;
+    if (birthDate != null) body['birthDate'] = birthDate;
+    if (privacy != null) body['privacy'] = privacy.toJson();
     final json = await _request('/api/me', method: 'PATCH', body: body);
     return User.fromJson((json['user'] as Map).cast<String, dynamic>());
+  }
+
+  Future<void> deleteAccount() async {
+    await _request('/api/me', method: 'DELETE');
+  }
+
+  Future<List<AuthSessionInfo>> fetchSessions() async {
+    final json = await _request('/api/me/sessions');
+    final sessions = json['sessions'];
+    if (sessions is! List) return const [];
+    return sessions
+        .whereType<Map>()
+        .map((item) => AuthSessionInfo.fromJson(item.cast<String, dynamic>()))
+        .toList(growable: false);
+  }
+
+  Future<void> revokeSession(String sessionId) async {
+    await _request(
+      '/api/me/sessions/${Uri.encodeComponent(sessionId)}',
+      method: 'DELETE',
+    );
+  }
+
+  Future<void> revokeOtherSessions() async {
+    await _request('/api/me/sessions/revoke-others', method: 'POST');
+  }
+
+  Future<User> setUserBlocked({
+    required String userId,
+    required bool blocked,
+  }) async {
+    final json = await _request(
+      '/api/users/${Uri.encodeComponent(userId)}/block',
+      method: blocked ? 'POST' : 'DELETE',
+    );
+    return User.fromJson((json['user'] as Map).cast<String, dynamic>());
+  }
+
+  Future<void> createUserReport({
+    required String targetUserId,
+    required String reason,
+    String? chatId,
+    String? messageId,
+    String? comment,
+  }) async {
+    await _request(
+      '/api/reports',
+      method: 'POST',
+      body: {
+        'targetUserId': targetUserId,
+        'reason': reason,
+        if (chatId != null) 'chatId': chatId,
+        if (messageId != null) 'messageId': messageId,
+        if (comment != null && comment.trim().isNotEmpty)
+          'comment': comment.trim(),
+      },
+    );
   }
 
   Future<List<Chat>> fetchChats() async {
@@ -381,6 +490,30 @@ class ApiClient {
     return Chat.fromJson((json['chat'] as Map).cast<String, dynamic>());
   }
 
+  Future<Chat> addChatMembers({
+    required String chatId,
+    required List<String> memberIds,
+  }) async {
+    final json = await _request(
+      '/api/chats/${Uri.encodeComponent(chatId)}/members',
+      method: 'POST',
+      body: {'memberIds': memberIds},
+    );
+    return Chat.fromJson((json['chat'] as Map).cast<String, dynamic>());
+  }
+
+  Future<Chat> setChannelAdmins({
+    required String chatId,
+    required List<String> adminIds,
+  }) async {
+    final json = await _request(
+      '/api/chats/${Uri.encodeComponent(chatId)}/channel-admins',
+      method: 'POST',
+      body: {'adminIds': adminIds},
+    );
+    return Chat.fromJson((json['chat'] as Map).cast<String, dynamic>());
+  }
+
   Future<void> setPinnedMessage({
     required String chatId,
     required String? messageId,
@@ -424,6 +557,47 @@ class ApiClient {
       body: {'verified': verified},
     );
     return Chat.fromJson((json['chat'] as Map).cast<String, dynamic>());
+  }
+
+  Future<AdminOverview> fetchAdminOverview() async {
+    final json = await _request('/api/admin/overview');
+    return AdminOverview.fromJson(json);
+  }
+
+  Future<List<UserReport>> fetchAdminReports({String status = 'all'}) async {
+    final json = await _request(
+      '/api/admin/reports?status=${Uri.encodeQueryComponent(status)}',
+    );
+    final reports = json['reports'];
+    if (reports is! List) return const [];
+    return reports
+        .whereType<Map>()
+        .map((item) => UserReport.fromJson(item.cast<String, dynamic>()))
+        .toList(growable: false);
+  }
+
+  Future<UserReport> setAdminReportStatus({
+    required String reportId,
+    required String status,
+  }) async {
+    final json = await _request(
+      '/api/admin/reports/${Uri.encodeComponent(reportId)}/status',
+      method: 'POST',
+      body: {'status': status},
+    );
+    return UserReport.fromJson((json['report'] as Map).cast<String, dynamic>());
+  }
+
+  Future<User> setAdminUserBlocked({
+    required String userId,
+    required bool banned,
+  }) async {
+    final json = await _request(
+      '/api/admin/users/${Uri.encodeComponent(userId)}/block',
+      method: 'POST',
+      body: {'banned': banned},
+    );
+    return User.fromJson((json['user'] as Map).cast<String, dynamic>());
   }
 
   Future<void> clearChat(String chatId) async {

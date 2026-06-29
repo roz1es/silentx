@@ -300,9 +300,17 @@ export function registerSocketHandlers(io: IOServer): void {
       }) => {
         const chat = store.getChat(payload.chatId);
         if (!chat?.participantIds.includes(userId)) return;
+        if (!store.canPostToChat(chat, userId)) {
+          return;
+        }
         if (
-          chat.type === 'channel' &&
-          chat.channelOwnerId !== userId
+          chat.type === 'direct' &&
+          chat.participantIds.some(
+            (pid) =>
+              pid !== userId &&
+              (store.usersBlockedEitherWay(userId, pid) ||
+                store.getUser(pid)?.privacy?.allowMessages === false)
+          )
         ) {
           return;
         }
@@ -409,10 +417,7 @@ export function registerSocketHandlers(io: IOServer): void {
         const text = String(payload?.text ?? '');
         const chat = store.getChat(chatId);
         if (!chat?.participantIds.includes(userId)) return;
-        if (
-          chat.type === 'channel' &&
-          chat.channelOwnerId !== userId
-        ) {
+        if (!store.canPostToChat(chat, userId)) {
           return;
         }
         const encryptedText = payload.encryptedText;
@@ -478,7 +483,7 @@ export function registerSocketHandlers(io: IOServer): void {
         const targetChat = store.getChat(targetChatId);
         if (!sourceChat?.participantIds.includes(userId)) return;
         if (!targetChat?.participantIds.includes(userId)) return;
-        if (targetChat.type === 'channel' && targetChat.channelOwnerId !== userId) {
+        if (!store.canPostToChat(targetChat, userId)) {
           return;
         }
         const ids = Array.isArray(payload?.messageIds)
@@ -534,13 +539,10 @@ export function registerSocketHandlers(io: IOServer): void {
 
     socket.on(
       'typing',
-      (payload: { chatId: string; isTyping: boolean }) => {
+      (payload: { chatId: string; isTyping: boolean; activity?: string }) => {
         const chat = store.getChat(payload.chatId);
         if (!chat?.participantIds.includes(userId)) return;
-        if (
-          chat.type === 'channel' &&
-          chat.channelOwnerId !== userId
-        ) {
+        if (!store.canPostToChat(chat, userId)) {
           return;
         }
 
@@ -548,6 +550,10 @@ export function registerSocketHandlers(io: IOServer): void {
         if (uTyping?.privacy?.showOnline === false) return;
         const username =
           uTyping?.displayName?.trim() || uTyping?.username || 'User';
+        const activity =
+          payload.activity === 'voice' || payload.activity === 'video_note'
+            ? payload.activity
+            : 'text';
         const key = `${payload.chatId}:${userId}`;
         if (payload.isTyping) {
           if (typingTimeouts.has(key)) clearTimeout(typingTimeouts.get(key));
@@ -559,6 +565,7 @@ export function registerSocketHandlers(io: IOServer): void {
                 chatId: payload.chatId,
                 userId,
                 username,
+                activity,
                 isTyping: false,
               });
             }, 3000)
@@ -572,6 +579,7 @@ export function registerSocketHandlers(io: IOServer): void {
           chatId: payload.chatId,
           userId,
           username,
+          activity,
           isTyping: payload.isTyping,
         });
       }
@@ -616,6 +624,7 @@ export function registerSocketHandlers(io: IOServer): void {
         const kind = payload?.kind;
         if (typeof toUserId !== 'string' || typeof kind !== 'string') return;
         if (!store.usersShareChat(userId, toUserId)) return;
+        if (store.usersBlockedEitherWay(userId, toUserId)) return;
         const callee = store.getUser(toUserId);
         if (callee?.privacy?.allowCalls === false) return;
         io.to(`user:${toUserId}`).emit('call_signal', {

@@ -65,7 +65,7 @@ class AudioMessageService {
     );
   }
 
-  Future<VoiceRecording?> stopRecording() async {
+  Future<VoiceRecording?> stopRecording({List<double>? envelope}) async {
     final started = _startedAt;
     final path = await _recorder.stop();
     _startedAt = null;
@@ -85,7 +85,7 @@ class AudioMessageService {
       media: MessageMedia(
         kind: 'voice',
         dataUrl: 'data:audio/mp4;base64,${base64Encode(bytes)}',
-        fileName: 'voice.m4a',
+        fileName: encodeVoiceWaveform(envelope),
         mimeType: 'audio/mp4',
         durationMs: durationMs,
       ),
@@ -134,4 +134,43 @@ Uint8List? _bytesFromDataUrl(String dataUrl) {
   } on Object {
     return null;
   }
+}
+
+// ── Огибающая громкости голосового ────────────────────────────────────────
+// Реальная форма волны снимается при записи (амплитуда микрофона) и кодируется
+// в media.fileName (сервер хранит это поле как есть). Иначе волна на
+// воспроизведении считается из сжатых AAC-байтов и не отражает голос.
+const _wfMarker = '~wf';
+const _wfBars = 28;
+
+/// Кодирует огибающую (0..1) в строку для media.fileName. Пусто → обычное имя.
+String encodeVoiceWaveform(List<double>? env) {
+  if (env == null || env.isEmpty) return 'voice.m4a';
+  final sb = StringBuffer(_wfMarker);
+  final n = env.length;
+  for (var i = 0; i < _wfBars; i++) {
+    final start = (i * n / _wfBars).floor();
+    final end = ((i + 1) * n / _wfBars).ceil();
+    var m = 0.0;
+    for (var j = start; j < end && j < n; j++) {
+      if (env[j] > m) m = env[j];
+    }
+    final q = (m.clamp(0.0, 1.0) * 35).round().clamp(0, 35);
+    sb.write(q.toRadixString(36));
+  }
+  return sb.toString();
+}
+
+/// Декодирует огибающую (0..1) из media.fileName, либо null если её там нет.
+List<double>? decodeVoiceWaveform(String? fileName) {
+  if (fileName == null || !fileName.startsWith(_wfMarker)) return null;
+  final body = fileName.substring(_wfMarker.length);
+  if (body.isEmpty) return null;
+  final out = <double>[];
+  for (var i = 0; i < body.length; i++) {
+    final q = int.tryParse(body[i], radix: 36);
+    if (q == null) return null;
+    out.add(q / 35);
+  }
+  return out.isEmpty ? null : out;
 }

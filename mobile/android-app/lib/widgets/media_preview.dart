@@ -10,6 +10,7 @@ import 'package:video_player/video_player.dart';
 
 import '../format.dart';
 import '../models.dart';
+import '../services/audio_message_service.dart';
 import '../theme/app_theme.dart';
 
 /// Отрисовка вложения сообщения: фото, голосовое, видеокружок или файл.
@@ -119,10 +120,17 @@ class _VoicePreviewState extends State<VoicePreview> {
   Duration _dur = Duration.zero;
   String? _path;
   bool _preparing = false;
-  // Форма волны, вычисленная из самих байтов записи — у каждого голосового
-  // своя «дорожка» (а не одинаковая гребёнка у всех).
-  late final List<double> _wave =
-      waveformFromBytes(bytesFromDataUrl(widget.media.dataUrl));
+  // Реальная огибающая снимается при записи и хранится в fileName. Если её
+  // нет (старые сообщения) — fallback на форму из байтов.
+  late final List<double> _wave = _resolveWave();
+
+  List<double> _resolveWave() {
+    final env = decodeVoiceWaveform(widget.media.fileName);
+    if (env != null && env.isNotEmpty) {
+      return [for (final v in env) 3.0 + v.clamp(0.0, 1.0) * 17.0];
+    }
+    return waveformFromBytes(bytesFromDataUrl(widget.media.dataUrl));
+  }
 
   bool get _playing => _state == PlayerState.playing;
 

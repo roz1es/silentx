@@ -68,6 +68,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final ValueNotifier<List<double>> _recLevels =
       ValueNotifier<List<double>>(const []);
   StreamSubscription<double>? _ampSub;
+  // Полная огибающая громкости за всю запись — сохраняется в голосовом.
+  final List<double> _recEnv = [];
   int _lastTick = -1;
   int _bgIndex = 0;
   bool _recordingCircle = false;
@@ -406,11 +408,14 @@ class _ChatScreenState extends State<ChatScreen> {
         _recordingMs.value = _recWatch.elapsedMilliseconds;
       });
       _recLevels.value = const [];
+      _recEnv.clear();
       _ampSub?.cancel();
       _ampSub = _audioService.amplitudeStream().listen((lvl) {
         final list = List<double>.of(_recLevels.value)..add(lvl);
         if (list.length > 64) list.removeRange(0, list.length - 64);
         _recLevels.value = list;
+        _recEnv.add(lvl);
+        if (_recEnv.length > 2000) _recEnv.removeAt(0);
       });
     } on Object catch (err) {
       _showSnack('Не удалось начать запись: $err');
@@ -423,10 +428,12 @@ class _ChatScreenState extends State<ChatScreen> {
     _recWatch.stop();
     _ampSub?.cancel();
     _ampSub = null;
+    final envelope = List<double>.of(_recEnv);
     _recLevels.value = const [];
+    _recEnv.clear();
     setState(() => _recordingVoice = false);
     try {
-      final recording = await _audioService.stopRecording();
+      final recording = await _audioService.stopRecording(envelope: envelope);
       if (recording == null || recording.durationMs < 500) {
         _showSnack('Голосовое слишком короткое.');
         return;

@@ -73,11 +73,14 @@ class MessageBubble extends StatelessWidget {
   /// Тело пузыря без жестов — переиспользуется как «приподнятая» копия в меню.
   Widget _bubbleBody(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
-    // Исходящее — тёплый тёмный (лёгкий золотой оттенок), входящее — графит.
-    final ownBg = isLight ? const Color(0xFFF0E7D6) : const Color(0xFF34312A);
+    // Исходящее — пузырь с лёгким акцентным оттенком (следует за темой),
+    // входящее — нейтральный графит.
+    final ownBg = isLight
+        ? Color.alphaBlend(accent.withValues(alpha: 0.16), Colors.white)
+        : Color.alphaBlend(
+            accent.withValues(alpha: 0.15), const Color(0xFF24262B));
     final otherBg = isLight ? Colors.white : const Color(0xFF34373E);
-    final ownBorder =
-        isLight ? const Color(0xFFE3D6B8) : accent.withValues(alpha: 0.18);
+    final ownBorder = accent.withValues(alpha: isLight ? 0.35 : 0.28);
     final otherBorder = isLight
         ? const Color(0xFFE6E2D8)
         : Colors.white.withValues(alpha: 0.06);
@@ -662,7 +665,7 @@ class _ReplyChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: isLight
-              ? const Color(0xFF96BFDF).withValues(alpha: 0.25)
+              ? accent.withValues(alpha: 0.14)
               : Colors.black.withValues(alpha: 0.18),
           borderRadius: BorderRadius.circular(10),
           border: Border(left: BorderSide(color: accent, width: 3)),

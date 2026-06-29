@@ -505,7 +505,11 @@ class _ChatListScreenState extends State<ChatListScreen>
   }
 
   Widget _previewRow(String label, bool own, bool isLight, double maxW) {
-    final ownBg = isLight ? const Color(0xFFF0E7D6) : const Color(0xFF34312A);
+    // Тот же акцентный тинт, что и в реальном пузыре (message_bubble.dart).
+    final ownBg = isLight
+        ? Color.alphaBlend(accent.withValues(alpha: 0.16), Colors.white)
+        : Color.alphaBlend(
+            accent.withValues(alpha: 0.15), const Color(0xFF24262B));
     final otherBg = isLight ? Colors.white : const Color(0xFF34373E);
     final textColor = isLight ? lightText : text;
     return Padding(
@@ -526,7 +530,7 @@ class _ChatListScreenState extends State<ChatListScreen>
               ),
               border: Border.all(
                   color: own
-                      ? accent.withValues(alpha: 0.18)
+                      ? accent.withValues(alpha: 0.28)
                       : Colors.white.withValues(alpha: 0.06)),
             ),
             child: Text(

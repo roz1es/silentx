@@ -1608,13 +1608,7 @@ class _SettingsViewState extends State<_SettingsView>
     _secCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 260),
-    )..addStatusListener((s) {
-        // Доехал до края (увезён вправо) — закрываем раздел и сбрасываем слайд.
-        if (s == AnimationStatus.completed) {
-          setState(() => _openSection = null);
-          _secCtrl.value = 0;
-        }
-      });
+    );
     final u = _ctrl.currentUser;
     _nameCtrl = TextEditingController(text: u.displayName ?? '');
     _bioCtrl = TextEditingController(text: u.bio ?? '');
@@ -1645,9 +1639,14 @@ class _SettingsViewState extends State<_SettingsView>
     _secCtrl.animateBack(0, curve: Curves.easeOutCubic);
   }
 
-  /// Закрыть раздел: увозим панель вправо (статус-листенер сбросит _openSection).
+  /// Закрыть раздел: увозим панель вправо и по завершении возвращаем к списку.
   void _closeSettingsSection() {
-    _secCtrl.animateTo(1, curve: Curves.easeInCubic);
+    _secCtrl.animateTo(1, curve: Curves.easeInCubic).whenComplete(() {
+      if (mounted && _secCtrl.value >= 0.999) {
+        setState(() => _openSection = null);
+        _secCtrl.value = 0;
+      }
+    });
   }
 
   Future<void> _saveProfile() async {
@@ -2714,7 +2713,7 @@ class _SettingsViewState extends State<_SettingsView>
           onHorizontalDragEnd: (d) {
             final v = d.primaryVelocity ?? 0;
             if (_secCtrl.value > 0.32 || v > 700) {
-              _secCtrl.animateTo(1, curve: Curves.easeOutCubic);
+              _closeSettingsSection();
             } else {
               _secCtrl.animateBack(0, curve: Curves.easeOutCubic);
             }

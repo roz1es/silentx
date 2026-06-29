@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../theme/app_theme.dart';
 import 'brenks_avatar.dart';
 
 /// Стилизованный QR-код в фирменной палитре BrenksChat: золотые круглые модули
@@ -21,19 +22,28 @@ class StyledQr extends StatelessWidget {
   final String serverUrl;
   final double size;
 
-  // Золотой градиент модулей.
-  static const _gold = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0xFFEAD392), Color(0xFFD8B76C), Color(0xFF9C7C3C)],
-  );
-
   // Графит карточки и «дырки» под аватаром.
   static const _cardTop = Color(0xFF26282E);
   static const _cardBottom = Color(0xFF15171B);
 
+  // Градиент модулей строится из акцентного цвета: светлее → акцент → темнее
+  // (металлический отлив). Меняется вместе с темой/акцентом.
+  static LinearGradient _accentGradient() {
+    final hsl = HSLColor.fromColor(accent);
+    final light =
+        hsl.withLightness((hsl.lightness + 0.12).clamp(0.0, 1.0)).toColor();
+    final dark =
+        hsl.withLightness((hsl.lightness - 0.18).clamp(0.0, 1.0)).toColor();
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [light, accent, dark],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final grad = _accentGradient();
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -46,14 +56,14 @@ class StyledQr extends StatelessWidget {
               end: Alignment.bottomRight,
               colors: [_cardTop, _cardBottom],
             ),
-            border: Border.all(color: const Color(0x33D8B76C)),
+            border: Border.all(color: accent.withValues(alpha: 0.2)),
           ),
           child: Stack(
             alignment: Alignment.center,
             children: [
               // Золото накладываем на сами модули (срез по непрозрачным).
               ShaderMask(
-                shaderCallback: (rect) => _gold.createShader(rect),
+                shaderCallback: (rect) => grad.createShader(rect),
                 blendMode: BlendMode.srcIn,
                 child: QrImageView(
                   data: data,
@@ -91,7 +101,7 @@ class StyledQr extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         ShaderMask(
-          shaderCallback: (rect) => _gold.createShader(rect),
+          shaderCallback: (rect) => grad.createShader(rect),
           blendMode: BlendMode.srcIn,
           child: Text(
             '@$username',

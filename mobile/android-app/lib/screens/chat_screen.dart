@@ -594,7 +594,11 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: _bgIndex == 5
                       ? const SizedBox.shrink()
                       : _bgIndex == 0
-                          ? const CustomPaint(painter: _PatternPainter())
+                          ? DecoratedBox(
+                              decoration:
+                                  BoxDecoration(gradient: _bgGradient(0)),
+                              child: CustomPaint(painter: _PatternPainter(accent)),
+                            )
                           : Container(decoration: BoxDecoration(gradient: _bgGradient(_bgIndex))),
                 ),
                 _controller.loadingMessages
@@ -1037,6 +1041,15 @@ class _ChatScreenState extends State<ChatScreen> {
 
   static LinearGradient? _bgGradient(int idx) {
     switch (idx) {
+      case 0: // По умолчанию — лёгкий акцентный оттенок (следует за темой)
+        return LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.alphaBlend(accent.withValues(alpha: 0.08), bg),
+            Color.alphaBlend(accent.withValues(alpha: 0.03), deepBg),
+          ],
+        );
       case 1: // Тёплый графит
         return const LinearGradient(
           begin: Alignment.topLeft,
@@ -1202,12 +1215,14 @@ class _TypingIndicatorState extends State<_TypingIndicator>
 
 /// Лёгкий фоновый «крестовый» паттерн как в desktop-версии.
 class _PatternPainter extends CustomPainter {
-  const _PatternPainter();
+  const _PatternPainter(this.color);
+
+  final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = accent.withValues(alpha: 0.035)
+      ..color = color.withValues(alpha: 0.05)
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round;
 
@@ -1222,5 +1237,6 @@ class _PatternPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _PatternPainter oldDelegate) =>
+      oldDelegate.color != color;
 }

@@ -1574,8 +1574,9 @@ class _SettingsViewState extends State<_SettingsView> {
   bool _savingProfile = false;
   List<String> _avatarHistory = const [];
 
-  /// Активная вкладка настроек: 0 — Профиль, 1 — Оформление, 2 — Безопасность.
-  int _settingsTab = 0;
+  /// Открытый раздел настроек: null — список разделов, иначе 'profile' /
+  /// 'appearance' / 'security'.
+  String? _openSection;
 
   late final TextEditingController _nameCtrl;
   late final TextEditingController _bioCtrl;
@@ -2142,6 +2143,7 @@ class _SettingsViewState extends State<_SettingsView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+                    if (_openSection == null) ...[
                     // Hero card: avatar + name + status
                     GlassCard(
                       borderRadius: 26,
@@ -2249,10 +2251,11 @@ class _SettingsViewState extends State<_SettingsView> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    _settingsTabs(),
                     const SizedBox(height: 18),
-                    if (_settingsTab == 0) ...[
+                    _settingsMenu(),
+                    ] else ...[
+                    if (_openSection == 'profile') ...[
+                    _sectionHeaderRow('Профиль'),
                     _sectionLabel('ВАШ ID'),
                     const SizedBox(height: 8),
                     GlassCard(
@@ -2455,7 +2458,8 @@ class _SettingsViewState extends State<_SettingsView> {
                       ),
                     ),
                     ],
-                    if (_settingsTab == 1) ...[
+                    if (_openSection == 'appearance') ...[
+                    _sectionHeaderRow('Оформление'),
                     _sectionLabel('ЧАТЫ'),
                     const SizedBox(height: 8),
                     GestureDetector(
@@ -2566,7 +2570,8 @@ class _SettingsViewState extends State<_SettingsView> {
                       ),
                     ),
                     ],
-                    if (_settingsTab == 2) ...[
+                    if (_openSection == 'security') ...[
+                    _sectionHeaderRow('Безопасность'),
                     _sectionLabel('АККАУНТ'),
                     const SizedBox(height: 8),
                     _settingsRow(Icons.alternate_email_rounded, 'Сменить почту',
@@ -2661,65 +2666,86 @@ class _SettingsViewState extends State<_SettingsView> {
                       ),
                     ),
                     ],
+                    ],
         ],
       ),
     );
   }
 
-  /// Сегмент-переключатель разделов настроек (вкладки в стекле).
-  Widget _settingsTabs() {
-    final tabs = <(int, IconData, String)>[
-      (0, Icons.person_rounded, 'Профиль'),
-      (1, Icons.palette_rounded, 'Оформление'),
-      (2, Icons.shield_rounded, 'Безопасность'),
-    ];
-    return GlassCard(
-      borderRadius: 16,
-      padding: const EdgeInsets.all(4),
-      child: Row(
-        children: [
-          for (final t in tabs)
+  /// Список разделов настроек (как в Telegram): иконка + заголовок + подпись +
+  /// шеврон; тап открывает раздел.
+  Widget _settingsMenu() {
+    return Column(
+      children: [
+        _menuRow(Icons.person_rounded, 'Профиль', 'Имя, фото, приватность, QR',
+            () => setState(() => _openSection = 'profile')),
+        const SizedBox(height: 8),
+        _menuRow(Icons.palette_rounded, 'Оформление', 'Тема, акцент, шрифт, папки',
+            () => setState(() => _openSection = 'appearance')),
+        const SizedBox(height: 8),
+        _menuRow(Icons.shield_rounded, 'Безопасность',
+            'Почта, пароль, сеансы, выход',
+            () => setState(() => _openSection = 'security')),
+      ],
+    );
+  }
+
+  Widget _menuRow(
+      IconData icon, String title, String subtitle, VoidCallback onTap) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: GlassCard(
+        borderRadius: 18,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        child: Row(
+          children: [
+            _miniIcon(icon),
+            const SizedBox(width: 14),
             Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => setState(() => _settingsTab = t.$1),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeOutCubic,
-                  padding: const EdgeInsets.symmetric(vertical: 9),
-                  decoration: BoxDecoration(
-                    color: _settingsTab == t.$1
-                        ? accent.withValues(alpha: 0.18)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _settingsTab == t.$1
-                          ? accent.withValues(alpha: 0.55)
-                          : Colors.transparent,
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(t.$2,
-                          size: 20,
-                          color: _settingsTab == t.$1 ? accent : _mutedColor),
-                      const SizedBox(height: 3),
-                      Text(
-                        t.$3,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700,
-                          color: _settingsTab == t.$1 ? accent : _mutedColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15.5,
+                          color: _textColor)),
+                  const SizedBox(height: 2),
+                  Text(subtitle,
+                      style: TextStyle(fontSize: 12.5, color: _mutedColor)),
+                ],
               ),
             ),
+            Icon(Icons.chevron_right_rounded, color: _mutedColor),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Шапка открытого раздела: стрелка назад к списку + заголовок.
+  Widget _sectionHeaderRow(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() => _openSection = null),
+            child: Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.centerLeft,
+              child: Icon(Icons.arrow_back_rounded, color: _textColor),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(title,
+              style: TextStyle(
+                  fontSize: 21,
+                  fontWeight: FontWeight.w900,
+                  color: _textColor)),
         ],
       ),
     );

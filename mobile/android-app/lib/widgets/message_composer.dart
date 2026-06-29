@@ -31,6 +31,7 @@ class MessageComposer extends StatefulWidget {
     required this.sendingMedia,
     required this.recordingVoice,
     required this.recordingMs,
+    required this.recordingLevels,
     required this.onAttach,
     required this.onSend,
     required this.onStartVoice,
@@ -47,6 +48,7 @@ class MessageComposer extends StatefulWidget {
   final bool sendingMedia;
   final bool recordingVoice;
   final ValueListenable<int> recordingMs;
+  final ValueListenable<List<double>> recordingLevels;
   final VoidCallback onAttach;
   final VoidCallback onSend;
   final VoidCallback onStartVoice;
@@ -394,7 +396,20 @@ class _MessageComposerState extends State<MessageComposer> {
                     ),
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ValueListenableBuilder<List<double>>(
+                    valueListenable: widget.recordingLevels,
+                    builder: (_, levels, __) => SizedBox(
+                      height: 24,
+                      child: CustomPaint(
+                        painter: _RecWavePainter(levels, accent),
+                        size: Size.infinite,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: widget.onCancelVoice,
@@ -496,6 +511,41 @@ class _MessageComposerState extends State<MessageComposer> {
       ),
     );
   }
+}
+
+/// Живая волна записи: бегущие столбики из уровней громкости (новые справа).
+class _RecWavePainter extends CustomPainter {
+  _RecWavePainter(this.levels, this.color);
+
+  final List<double> levels;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (levels.isEmpty) return;
+    const barW = 2.5;
+    const step = barW + 2.0;
+    final maxBars = (size.width / step).floor();
+    if (maxBars <= 0) return;
+    final shown = levels.length > maxBars
+        ? levels.sublist(levels.length - maxBars)
+        : levels;
+    final paint = Paint()
+      ..color = color
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = barW;
+    final cy = size.height / 2;
+    double x = size.width - shown.length * step + barW / 2;
+    for (final lvl in shown) {
+      final h = lvl.clamp(0.0, 1.0) * (size.height - 3) + 3;
+      canvas.drawLine(Offset(x, cy - h / 2), Offset(x, cy + h / 2), paint);
+      x += step;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RecWavePainter old) =>
+      !identical(old.levels, levels) || old.color != color;
 }
 
 /// Кнопка отправки с анимацией «вылета» самолётика при нажатии.

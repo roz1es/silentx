@@ -35,6 +35,15 @@ class AudioMessageService {
 
   Future<bool> hasRecordingPermission() => _recorder.hasPermission();
 
+  /// Поток нормализованной громкости (0..1) во время записи — для живой волны.
+  /// Интервал маленький, чтобы волна шла плавно почти в реальном времени.
+  Stream<double> amplitudeStream(
+          {Duration interval = const Duration(milliseconds: 60)}) =>
+      _recorder.onAmplitudeChanged(interval).map((a) {
+        final db = a.current.isFinite ? a.current : -45.0;
+        return ((db + 45) / 45).clamp(0.0, 1.0).toDouble();
+      });
+
   Future<void> startRecording() async {
     final allowed = await _recorder.hasPermission();
     if (!allowed) {

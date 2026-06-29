@@ -63,6 +63,10 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _recordingVoice = false;
   final ValueNotifier<int> _recordingMs = ValueNotifier<int>(0);
   Timer? _recordingTimer;
+  // Уровни громкости для живой волны при записи (последние ~64 отсчёта).
+  final ValueNotifier<List<double>> _recLevels =
+      ValueNotifier<List<double>>(const []);
+  StreamSubscription<double>? _ampSub;
   int _lastTick = -1;
   int _bgIndex = 0;
   bool _recordingCircle = false;
@@ -91,12 +95,14 @@ class _ChatScreenState extends State<ChatScreen> {
     AppSettings.instance.removeListener(_onAppSettings);
     _controller.closeActiveChat();
     _recordingTimer?.cancel();
+    _ampSub?.cancel();
     _highlightTimer?.cancel();
     unawaited(_audioService.dispose());
     _messageController.dispose();
     _msgSearchController.dispose();
     _scrollController.dispose();
     _recordingMs.dispose();
+    _recLevels.dispose();
     super.dispose();
   }
 
@@ -395,6 +401,13 @@ class _ChatScreenState extends State<ChatScreen> {
         // Только обновляем таймер, без rebuild всего экрана (лента не прыгает).
         _recordingMs.value += 250;
       });
+      _recLevels.value = const [];
+      _ampSub?.cancel();
+      _ampSub = _audioService.amplitudeStream().listen((lvl) {
+        final list = List<double>.of(_recLevels.value)..add(lvl);
+        if (list.length > 64) list.removeRange(0, list.length - 64);
+        _recLevels.value = list;
+      });
     } on Object catch (err) {
       _showSnack('Не удалось начать запись: $err');
     }
@@ -403,6 +416,9 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _finishVoice() async {
     if (!_recordingVoice) return;
     _recordingTimer?.cancel();
+    _ampSub?.cancel();
+    _ampSub = null;
+    _recLevels.value = const [];
     setState(() => _recordingVoice = false);
     try {
       final recording = await _audioService.stopRecording();
@@ -424,8 +440,11 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _cancelVoice() async {
     if (!_recordingVoice) return;
     _recordingTimer?.cancel();
+    _ampSub?.cancel();
+    _ampSub = null;
     setState(() => _recordingVoice = false);
     _recordingMs.value = 0;
+    _recLevels.value = const [];
     await _audioService.cancelRecording();
   }
 
@@ -665,6 +684,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         sendingMedia: _sendingMedia,
                         recordingVoice: _recordingVoice,
                         recordingMs: _recordingMs,
+                        recordingLevels: _recLevels,
                         onAttach: _openAttachSheet,
                         onSend: _send,
                         onStartVoice: _startVoice,

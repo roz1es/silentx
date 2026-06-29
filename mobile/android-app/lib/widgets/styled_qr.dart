@@ -26,10 +26,21 @@ class StyledQr extends StatelessWidget {
   static const _cardTop = Color(0xFF26282E);
   static const _cardBottom = Color(0xFF15171B);
 
-  // Градиент модулей строится из акцентного цвета: светлее → акцент → темнее
-  // (металлический отлив). Меняется вместе с темой/акцентом.
-  static LinearGradient _accentGradient() {
+  // Базовый цвет модулей: на тёмной карточке — сам акцент; на светлой —
+  // темнее и насыщеннее, чтобы QR оставался контрастным и сканировался.
+  static Color _moduleBase(bool isLight) {
+    if (!isLight) return accent;
     final hsl = HSLColor.fromColor(accent);
+    return hsl
+        .withLightness((hsl.lightness - 0.26).clamp(0.0, 1.0))
+        .withSaturation((hsl.saturation + 0.08).clamp(0.0, 1.0))
+        .toColor();
+  }
+
+  // Градиент модулей из базового цвета: светлее → база → темнее
+  // (металлический отлив). Меняется вместе с темой/акцентом.
+  static LinearGradient _gradientFrom(Color base) {
+    final hsl = HSLColor.fromColor(base);
     final light =
         hsl.withLightness((hsl.lightness + 0.12).clamp(0.0, 1.0)).toColor();
     final dark =
@@ -37,13 +48,15 @@ class StyledQr extends StatelessWidget {
     return LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
-      colors: [light, accent, dark],
+      colors: [light, base, dark],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final grad = _accentGradient();
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final grad = _gradientFrom(_moduleBase(isLight));
+    final holeColor = isLight ? const Color(0xFFEEF1F5) : _cardBottom;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -51,12 +64,15 @@ class StyledQr extends StatelessWidget {
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
-            gradient: const LinearGradient(
+            gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [_cardTop, _cardBottom],
+              colors: isLight
+                  ? const [Color(0xFFFFFFFF), Color(0xFFEEF1F5)]
+                  : const [_cardTop, _cardBottom],
             ),
-            border: Border.all(color: accent.withValues(alpha: 0.2)),
+            border: Border.all(
+                color: accent.withValues(alpha: isLight ? 0.32 : 0.2)),
           ),
           child: Stack(
             alignment: Alignment.center,
@@ -85,8 +101,8 @@ class StyledQr extends StatelessWidget {
               // Аватар поверх центра (вне ShaderMask — сохраняет свои цвета).
               Container(
                 padding: const EdgeInsets.all(5),
-                decoration: const BoxDecoration(
-                  color: _cardBottom,
+                decoration: BoxDecoration(
+                  color: holeColor,
                   shape: BoxShape.circle,
                 ),
                 child: BrenksAvatar(

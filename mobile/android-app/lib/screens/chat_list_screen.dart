@@ -1578,6 +1578,10 @@ class _SettingsViewState extends State<_SettingsView> {
   /// 'appearance' / 'security'.
   String? _openSection;
 
+  /// Накопленный горизонтальный сдвиг свайпа в открытом разделе (свайп вправо
+  /// = возврат к списку разделов).
+  double _sectionDragDx = 0;
+
   late final TextEditingController _nameCtrl;
   late final TextEditingController _bioCtrl;
   late final TextEditingController _phoneCtrl;
@@ -2137,7 +2141,7 @@ class _SettingsViewState extends State<_SettingsView> {
   @override
   Widget build(BuildContext context) {
     final user = _ctrl.currentUser;
-    return SingleChildScrollView(
+    final body = SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
           18, 12, 18, 28 + MediaQuery.of(context).padding.bottom + 70),
       child: Column(
@@ -2669,6 +2673,20 @@ class _SettingsViewState extends State<_SettingsView> {
                     ],
         ],
       ),
+    );
+    if (_openSection == null) return body;
+    // В открытом разделе свайп вправо возвращает к списку разделов
+    // (как свайп-выход из чата в остальном приложении).
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragStart: (_) => _sectionDragDx = 0,
+      onHorizontalDragUpdate: (d) => _sectionDragDx += d.delta.dx,
+      onHorizontalDragEnd: (d) {
+        if (_sectionDragDx > 80 || (d.primaryVelocity ?? 0) > 300) {
+          setState(() => _openSection = null);
+        }
+      },
+      child: body,
     );
   }
 

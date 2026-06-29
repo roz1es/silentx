@@ -4247,11 +4247,14 @@ class _PinnedBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lightUi = _isLightUi(context);
     return _GlassSurface(
       margin: const EdgeInsets.fromLTRB(18, 12, 18, 0),
       padding: EdgeInsets.zero,
       radius: 18,
-      color: const Color(0xA1282A2F),
+      color: lightUi
+          ? Colors.white.withValues(alpha: 0.78)
+          : const Color(0xA1282A2F),
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(18),
@@ -4301,7 +4304,7 @@ class _PinnedBanner extends StatelessWidget {
                 IconButton(
                   tooltip: 'Открепить',
                   onPressed: onClose,
-                  icon: Icon(Icons.close_rounded),
+                  icon: Icon(Icons.close_rounded, color: muted),
                 ),
               ],
             ),
@@ -5815,7 +5818,7 @@ class _MessageContent extends StatelessWidget {
     }
 
     final media = message.media;
-    final text = message.text.trim();
+    final messageText = message.text.trim();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -5832,30 +5835,28 @@ class _MessageContent extends StatelessWidget {
           ),
         if (message.imageUrl?.isNotEmpty == true)
           _LegacyImagePreview(dataUrl: message.imageUrl!, serverUrl: serverUrl),
-        if (text.isNotEmpty) ...[
+        if (messageText.isNotEmpty) ...[
           if (media != null || message.imageUrl?.isNotEmpty == true)
             const SizedBox(height: 8),
           Text(
-            text,
-            style: TextStyle(color: textColorAlias, fontSize: 15),
+            messageText,
+            style: TextStyle(color: text, fontSize: 15),
           ),
         ],
         if (media == null &&
             message.imageUrl?.isNotEmpty != true &&
-            text.isEmpty &&
+            messageText.isEmpty &&
             message.encryptedText)
           const _EncryptedMessageNotice(),
         if (media == null &&
             message.imageUrl?.isNotEmpty != true &&
-            text.isEmpty &&
+            messageText.isEmpty &&
             !message.encryptedText)
           Text('Сообщение', style: TextStyle(fontSize: 15)),
       ],
     );
   }
 }
-
-final textColorAlias = text;
 
 class _EncryptedMessageNotice extends StatelessWidget {
   const _EncryptedMessageNotice();
@@ -5981,6 +5982,7 @@ class _VoicePreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lightUi = _isLightUi(context);
     final fallbackMs = media.durationMs ?? 0;
     final totalMs =
         duration.inMilliseconds > 0 ? duration.inMilliseconds : fallbackMs;
@@ -5991,7 +5993,9 @@ class _VoicePreview extends StatelessWidget {
       width: 292,
       padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
       radius: 25,
-      color: const Color(0xA0202328),
+      color: lightUi
+          ? Colors.white.withValues(alpha: 0.82)
+          : const Color(0xA0202328),
       child: Row(
         children: [
           IconButton.filled(
@@ -6004,6 +6008,11 @@ class _VoicePreview extends StatelessWidget {
               fixedSize: const Size(48, 48),
               backgroundColor: accent,
               foregroundColor: const Color(0xFF08131A),
+              side: BorderSide(
+                color: lightUi
+                    ? accent.withValues(alpha: 0.22)
+                    : Colors.white.withValues(alpha: 0.08),
+              ),
             ),
           ),
           const SizedBox(width: 11),
@@ -6029,6 +6038,10 @@ class _VoicePreview extends StatelessWidget {
                         seed: (media.durationMs ?? 1) / 1000,
                         progress: progress,
                         playing: playing,
+                        activeColor: accent.withValues(alpha: 0.9),
+                        passiveColor: lightUi
+                            ? muted.withValues(alpha: 0.24)
+                            : Colors.white.withValues(alpha: 0.12),
                       ),
                       size: Size.infinite,
                     ),
@@ -6057,20 +6070,24 @@ class _VoiceWavePreviewPainter extends CustomPainter {
     required this.seed,
     required this.progress,
     required this.playing,
+    required this.activeColor,
+    required this.passiveColor,
   });
 
   final double seed;
   final double progress;
   final bool playing;
+  final Color activeColor;
+  final Color passiveColor;
 
   @override
   void paint(Canvas canvas, Size size) {
     final active = Paint()
-      ..color = accent.withValues(alpha: 0.86)
+      ..color = activeColor
       ..strokeCap = StrokeCap.round
       ..strokeWidth = 4.2;
     final passive = Paint()
-      ..color = Colors.white.withValues(alpha: 0.12)
+      ..color = passiveColor
       ..strokeCap = StrokeCap.round
       ..strokeWidth = 4.2;
     const bars = 28;
@@ -6097,7 +6114,9 @@ class _VoiceWavePreviewPainter extends CustomPainter {
   bool shouldRepaint(covariant _VoiceWavePreviewPainter oldDelegate) {
     return oldDelegate.seed != seed ||
         oldDelegate.progress != progress ||
-        oldDelegate.playing != playing;
+        oldDelegate.playing != playing ||
+        oldDelegate.activeColor != activeColor ||
+        oldDelegate.passiveColor != passiveColor;
   }
 }
 

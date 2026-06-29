@@ -828,8 +828,10 @@ class _VideoNoteViewerState extends State<_VideoNoteViewer> {
 
     return GestureDetector(
       onTap: () => Navigator.of(context).pop(),
+      // Кружок увеличивается поверх живого чата (как в Telegram): фон не
+      // размывается и не затемняется.
       child: Material(
-        color: Colors.black.withValues(alpha: 0.86),
+        color: Colors.transparent,
         child: SafeArea(
           child: Center(
             child: Column(

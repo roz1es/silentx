@@ -453,8 +453,9 @@ class _MessageComposerState extends State<MessageComposer> {
 
   String _fmtVoice(int ms) {
     final s = (ms / 1000).truncate();
-    final d = (ms % 1000) ~/ 100;
-    return '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')},$d';
+    final cs = (ms % 1000) ~/ 10; // сотые доли секунды (две цифры)
+    return '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')},'
+        '${cs.toString().padLeft(2, '0')}';
   }
 
   Widget _modeBanner(Message modeMessage, bool isLight) {

@@ -63,6 +63,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _recordingVoice = false;
   final ValueNotifier<int> _recordingMs = ValueNotifier<int>(0);
   Timer? _recordingTimer;
+  final Stopwatch _recWatch = Stopwatch();
   // Уровни громкости для живой волны при записи (последние ~64 отсчёта).
   final ValueNotifier<List<double>> _recLevels =
       ValueNotifier<List<double>>(const []);
@@ -395,11 +396,14 @@ class _ChatScreenState extends State<ChatScreen> {
         _replyTo = null;
       });
       _recordingMs.value = 0;
+      _recWatch
+        ..reset()
+        ..start();
       _recordingTimer?.cancel();
-      _recordingTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+      // Часто и от точного времени (без дрейфа) — счётчик бежит плавно.
+      _recordingTimer = Timer.periodic(const Duration(milliseconds: 33), (_) {
         if (!mounted) return;
-        // Только обновляем таймер, без rebuild всего экрана (лента не прыгает).
-        _recordingMs.value += 250;
+        _recordingMs.value = _recWatch.elapsedMilliseconds;
       });
       _recLevels.value = const [];
       _ampSub?.cancel();
@@ -416,6 +420,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _finishVoice() async {
     if (!_recordingVoice) return;
     _recordingTimer?.cancel();
+    _recWatch.stop();
     _ampSub?.cancel();
     _ampSub = null;
     _recLevels.value = const [];
@@ -440,6 +445,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _cancelVoice() async {
     if (!_recordingVoice) return;
     _recordingTimer?.cancel();
+    _recWatch.stop();
     _ampSub?.cancel();
     _ampSub = null;
     setState(() => _recordingVoice = false);

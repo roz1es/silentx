@@ -817,7 +817,9 @@ class _VideoNoteViewerState extends State<_VideoNoteViewer> {
   Widget build(BuildContext context) {
     final c = _ctrl;
     final ready = c != null && c.value.isInitialized;
-    final dia = (MediaQuery.of(context).size.width * 0.82).clamp(220.0, 360.0);
+    final dia = (MediaQuery.of(context).size.shortestSide * 0.9)
+        .clamp(280.0, 520.0)
+        .toDouble();
     final dur = c?.value.duration ?? Duration.zero;
     final pos = c?.value.position ?? Duration.zero;
     final progress = dur.inMilliseconds == 0

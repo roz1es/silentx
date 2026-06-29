@@ -1574,6 +1574,9 @@ class _SettingsViewState extends State<_SettingsView> {
   bool _savingProfile = false;
   List<String> _avatarHistory = const [];
 
+  /// Активная вкладка настроек: 0 — Профиль, 1 — Оформление, 2 — Безопасность.
+  int _settingsTab = 0;
+
   late final TextEditingController _nameCtrl;
   late final TextEditingController _bioCtrl;
   late final TextEditingController _phoneCtrl;
@@ -2246,7 +2249,10 @@ class _SettingsViewState extends State<_SettingsView> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
+                    _settingsTabs(),
+                    const SizedBox(height: 18),
+                    if (_settingsTab == 0) ...[
                     _sectionLabel('ВАШ ID'),
                     const SizedBox(height: 8),
                     GlassCard(
@@ -2448,7 +2454,8 @@ class _SettingsViewState extends State<_SettingsView> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    ],
+                    if (_settingsTab == 1) ...[
                     _sectionLabel('ЧАТЫ'),
                     const SizedBox(height: 8),
                     GestureDetector(
@@ -2558,7 +2565,8 @@ class _SettingsViewState extends State<_SettingsView> {
                         },
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    ],
+                    if (_settingsTab == 2) ...[
                     _sectionLabel('АККАУНТ'),
                     const SizedBox(height: 8),
                     _settingsRow(Icons.alternate_email_rounded, 'Сменить почту',
@@ -2652,6 +2660,66 @@ class _SettingsViewState extends State<_SettingsView> {
                             borderRadius: BorderRadius.circular(16)),
                       ),
                     ),
+                    ],
+        ],
+      ),
+    );
+  }
+
+  /// Сегмент-переключатель разделов настроек (вкладки в стекле).
+  Widget _settingsTabs() {
+    final tabs = <(int, IconData, String)>[
+      (0, Icons.person_rounded, 'Профиль'),
+      (1, Icons.palette_rounded, 'Оформление'),
+      (2, Icons.shield_rounded, 'Безопасность'),
+    ];
+    return GlassCard(
+      borderRadius: 16,
+      padding: const EdgeInsets.all(4),
+      child: Row(
+        children: [
+          for (final t in tabs)
+            Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => setState(() => _settingsTab = t.$1),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  padding: const EdgeInsets.symmetric(vertical: 9),
+                  decoration: BoxDecoration(
+                    color: _settingsTab == t.$1
+                        ? accent.withValues(alpha: 0.18)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _settingsTab == t.$1
+                          ? accent.withValues(alpha: 0.55)
+                          : Colors.transparent,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(t.$2,
+                          size: 20,
+                          color: _settingsTab == t.$1 ? accent : _mutedColor),
+                      const SizedBox(height: 3),
+                      Text(
+                        t.$3,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: _settingsTab == t.$1 ? accent : _mutedColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:swipeable_page_route/swipeable_page_route.dart';
+import '../widgets/swipe_back_route.dart';
 
 import '../config.dart';
 import '../format.dart';
@@ -262,8 +262,7 @@ class _ChatListScreenState extends State<ChatListScreen>
     Navigator.of(context).push(
       // Полноэкранный свайп-назад (follow-finger) по всему экрану — едет за
       // пальцем. Свайп-ответ по сообщению — только влево, не конфликтует.
-      SwipeablePageRoute(
-        canOnlySwipeFromEdge: false,
+      SwipeBackPageRoute(
         builder: (_) => ChatScreen(controller: _controller, chatId: chat.id),
       ),
     );
@@ -356,8 +355,7 @@ class _ChatListScreenState extends State<ChatListScreen>
   void _openProfileFromMenu(Chat chat) {
     Navigator.of(context, rootNavigator: true).pop();
     Navigator.of(context).push(
-      SwipeablePageRoute(
-        canOnlySwipeFromEdge: false,
+      SwipeBackPageRoute(
         builder: (_) =>
             ChatProfileScreen(controller: _controller, chatId: chat.id),
       ),

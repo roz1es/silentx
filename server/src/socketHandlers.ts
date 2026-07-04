@@ -177,11 +177,74 @@ function looksLikeRegularMp4(dataUrl: string, expectedMime: string): boolean {
   }
 }
 
+// Форма волны голосового. Кодируется в media.fileName в том же формате, что и
+// клиент («~wf» + 28 символов base36, 0..35). Считаем на сервере, чтобы волна
+// была реальной даже для голосовых со старых клиентов / десктопа / веба.
+const WF_MARKER = '~wf';
+const WF_BARS = 28;
+
+function encodeWaveformFromPcm(pcm: Buffer): string {
+  const sampleCount = Math.floor(pcm.length / 2); // s16le: 2 байта/отсчёт
+  if (sampleCount === 0) return '';
+  const rms = new Array<number>(WF_BARS).fill(0);
+  for (let i = 0; i < WF_BARS; i++) {
+    const start = Math.floor((i * sampleCount) / WF_BARS);
+    const end = Math.floor(((i + 1) * sampleCount) / WF_BARS);
+    let sumSq = 0;
+    let n = 0;
+    for (let j = start; j < end; j++) {
+      const s = pcm.readInt16LE(j * 2) / 32768;
+      sumSq += s * s;
+      n++;
+    }
+    rms[i] = n > 0 ? Math.sqrt(sumSq / n) : 0;
+  }
+  const peak = Math.max(...rms, 1e-6);
+  let out = WF_MARKER;
+  for (const v of rms) {
+    const q = Math.max(0, Math.min(35, Math.round((v / peak) * 35)));
+    out += q.toString(36);
+  }
+  return out;
+}
+
+async function computeVoiceWaveform(inputPath: string): Promise<string | null> {
+  const pcmPath = `${inputPath}.pcm`;
+  try {
+    await runFfmpeg([
+      '-y',
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-i',
+      inputPath,
+      '-ac',
+      '1',
+      '-ar',
+      '8000',
+      '-f',
+      's16le',
+      pcmPath,
+    ]);
+    const pcm = await fs.readFile(pcmPath);
+    const wf = encodeWaveformFromPcm(pcm);
+    return wf.length > WF_MARKER.length ? wf : null;
+  } catch {
+    return null;
+  } finally {
+    await fs.rm(pcmPath).catch(() => {});
+  }
+}
+
 async function transcodeVoiceIfPossible(
   media: MessageMedia | undefined
 ): Promise<MessageMedia | undefined> {
   if (!media || media.kind !== 'voice') return media;
-  if (looksLikeRegularMp4(media.dataUrl, 'audio/mp4')) return media;
+
+  const hasClientWaveform = media.fileName?.startsWith(WF_MARKER) ?? false;
+  const isRegularMp4 = looksLikeRegularMp4(media.dataUrl, 'audio/mp4');
+  // Уже нормальный mp4 и волна от клиента — делать нечего.
+  if (hasClientWaveform && isRegularMp4) return media;
 
   const parsed = parseDataUrl(media.dataUrl);
   if (!parsed || parsed.buffer.length === 0) return media;
@@ -191,6 +254,16 @@ async function transcodeVoiceIfPossible(
   const outputPath = path.join(os.tmpdir(), `brenks-${id}.m4a`);
   try {
     await fs.writeFile(inputPath, parsed.buffer);
+
+    const waveform = hasClientWaveform
+      ? media.fileName
+      : (await computeVoiceWaveform(inputPath)) ?? media.fileName;
+
+    if (isRegularMp4) {
+      // Перекодировать не нужно — добавляем только волну.
+      return { ...media, fileName: waveform };
+    }
+
     await runFfmpeg([
       '-y',
       '-hide_banner',
@@ -213,11 +286,12 @@ async function transcodeVoiceIfPossible(
     ]);
     const output = await fs.readFile(outputPath);
     const dataUrl = `data:audio/mp4;base64,${output.toString('base64')}`;
-    if (dataUrl.length > 14_000_000) return media;
+    if (dataUrl.length > 14_000_000) return { ...media, fileName: waveform };
     return {
       ...media,
       dataUrl,
       mimeType: 'audio/mp4',
+      fileName: waveform,
     };
   } catch (error) {
     console.warn('[voice] не удалось нормализовать голосовое:', error);

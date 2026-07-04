@@ -32,6 +32,7 @@ class BrenksSocket {
       required String userId,
       required String username,
       required bool isTyping,
+      String? action,
     }) onTyping,
     required void Function(Map<String, dynamic> payload) onCallSignal,
   }) {
@@ -106,6 +107,7 @@ class BrenksSocket {
         userId: payload['userId']?.toString() ?? '',
         username: payload['username']?.toString() ?? '...',
         isTyping: payload['isTyping'] == true,
+        action: payload['action']?.toString(),
       );
     });
 
@@ -172,10 +174,12 @@ class BrenksSocket {
   void typing({
     required String chatId,
     required bool isTyping,
+    String action = 'text',
   }) {
     _socket?.emit('typing', {
       'chatId': chatId,
       'isTyping': isTyping,
+      'action': action,
     });
   }
 

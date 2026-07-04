@@ -528,7 +528,7 @@ export function registerSocketHandlers(io: IOServer): void {
 
     socket.on(
       'typing',
-      (payload: { chatId: string; isTyping: boolean }) => {
+      (payload: { chatId: string; isTyping: boolean; action?: string }) => {
         const chat = store.getChat(payload.chatId);
         if (!chat?.participantIds.includes(userId)) return;
         if (!store.canWriteToChat(chat, userId)) {
@@ -559,11 +559,16 @@ export function registerSocketHandlers(io: IOServer): void {
           typingTimeouts.delete(key);
         }
 
+        const action =
+          payload.action === 'voice' || payload.action === 'video'
+            ? payload.action
+            : 'text';
         socket.to(`chat:${payload.chatId}`).emit('typing', {
           chatId: payload.chatId,
           userId,
           username,
           isTyping: payload.isTyping,
+          action,
         });
       }
     );

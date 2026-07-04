@@ -397,6 +397,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _editing = null;
         _replyTo = null;
       });
+      _controller.setRecordingStatus('voice');
       _recordingMs.value = 0;
       _recWatch
         ..reset()
@@ -428,6 +429,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _recWatch.stop();
     _ampSub?.cancel();
     _ampSub = null;
+    _controller.setRecordingStatus(null);
     final envelope = List<double>.of(_recEnv);
     _recLevels.value = const [];
     _recEnv.clear();
@@ -458,6 +460,7 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => _recordingVoice = false);
     _recordingMs.value = 0;
     _recLevels.value = const [];
+    _controller.setRecordingStatus(null);
     await _audioService.cancelRecording();
   }
 
@@ -708,6 +711,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         onStartVideoCircle: () {
                           FocusScope.of(context).unfocus();
                           setState(() => _recordingCircle = true);
+                          _controller.setRecordingStatus('video');
                         },
                       ),
                     ],
@@ -737,11 +741,14 @@ class _ChatScreenState extends State<ChatScreen> {
                     child: InlineVideoRecorder(
                       onSend: (media) {
                         setState(() => _recordingCircle = false);
+                        _controller.setRecordingStatus(null);
                         _controller.sendMessage(media: media);
                         _scrollToBottom();
                       },
-                      onCancel: () =>
-                          setState(() => _recordingCircle = false),
+                      onCancel: () {
+                        setState(() => _recordingCircle = false);
+                        _controller.setRecordingStatus(null);
+                      },
                     ),
                   ),
               ],
@@ -886,9 +893,14 @@ class _ChatScreenState extends State<ChatScreen> {
                     builder: (context) {
                       final typing = _controller.typingNames;
                       if (typing.isNotEmpty) {
+                        final verb = switch (_controller.typingAction) {
+                          'voice' => 'записывает голосовое',
+                          'video' => 'записывает видео',
+                          _ => 'печатает',
+                        };
                         final label = chat.type == ChatType.direct
-                            ? 'печатает'
-                            : '${typing.join(', ')} печатает';
+                            ? verb
+                            : '${typing.join(', ')} $verb';
                         return _TypingIndicator(label: label);
                       }
                       return Text(

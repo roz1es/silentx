@@ -44,6 +44,7 @@ class MessengerController extends ChangeNotifier {
   String? _activeChatId;
   List<Message> _messages = const [];
   Map<String, String> _typingNames = const {};
+  Map<String, String> _typingActions = const {};
   bool _loadingMessages = false;
   String? _messagesError;
 
@@ -68,6 +69,10 @@ class MessengerController extends ChangeNotifier {
   String? get activeChatId => _activeChatId;
   List<Message> get messages => _messages;
   List<String> get typingNames => _typingNames.values.toList(growable: false);
+
+  /// Действие первого «печатающего»: 'text' | 'voice' | 'video'.
+  String get typingAction =>
+      _typingActions.values.isNotEmpty ? _typingActions.values.first : 'text';
   bool get loadingMessages => _loadingMessages;
   String? get messagesError => _messagesError;
   int get incomingMessageTick => _incomingMessageTick;
@@ -213,15 +218,20 @@ class MessengerController extends ChangeNotifier {
         required userId,
         required username,
         required isTyping,
+        action,
       }) {
         if (chatId != _activeChatId || userId == currentUser.id) return;
         final next = {..._typingNames};
+        final acts = {..._typingActions};
         if (isTyping) {
           next[userId] = username;
+          acts[userId] = action ?? 'text';
         } else {
           next.remove(userId);
+          acts.remove(userId);
         }
         _typingNames = next;
+        _typingActions = acts;
         notifyListeners();
       },
       onCallSignal: (payload) => call.handleSignal(payload),
@@ -290,6 +300,7 @@ class MessengerController extends ChangeNotifier {
     _activeChatId = chatId;
     _messages = const [];
     _typingNames = const {};
+    _typingActions = const {};
     _loadingMessages = true;
     _messagesError = null;
     notifyListeners();
@@ -318,6 +329,7 @@ class MessengerController extends ChangeNotifier {
     _activeChatId = null;
     _messages = const [];
     _typingNames = const {};
+    _typingActions = const {};
   }
 
   /// Отметить чат прочитанным без его открытия (для «прочитать всё» в папке).
@@ -373,6 +385,26 @@ class MessengerController extends ChangeNotifier {
   }
 
   Timer? _typingTimer;
+  Timer? _recStatusTimer;
+
+  /// Статус записи ('voice'/'video') в шапке у собеседника (как «печатает»).
+  /// Держим keep-alive'ом (1.8с), т.к. у сервера свой таймаут на typing (3с).
+  void setRecordingStatus(String? action) {
+    _recStatusTimer?.cancel();
+    final chatId = _activeChatId;
+    if (chatId == null) return;
+    if (action != null) {
+      _socket?.typing(chatId: chatId, isTyping: true, action: action);
+      _recStatusTimer = Timer.periodic(const Duration(milliseconds: 1800), (_) {
+        final id = _activeChatId;
+        if (id != null) {
+          _socket?.typing(chatId: id, isTyping: true, action: action);
+        }
+      });
+    } else {
+      _socket?.typing(chatId: chatId, isTyping: false);
+    }
+  }
 
   void notifyTyping(bool isTyping) {
     final chatId = _activeChatId;
@@ -485,6 +517,7 @@ class MessengerController extends ChangeNotifier {
   @override
   void dispose() {
     _typingTimer?.cancel();
+    _recStatusTimer?.cancel();
     _socket?.dispose();
     call.dispose();
     super.dispose();

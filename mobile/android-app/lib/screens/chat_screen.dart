@@ -623,7 +623,12 @@ class _ChatScreenState extends State<ChatScreen> {
                   style: const TextStyle(color: danger)),
             ),
           Expanded(
-            child: Stack(
+            // Тап по пустому месту ленты прячет клавиатуру (тапы по пузырям и
+            // composer выигрывают арену жестов и работают как раньше).
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => FocusScope.of(context).unfocus(),
+              child: Stack(
               children: [
                 Positioned.fill(
                   child: _bgIndex == 5
@@ -645,6 +650,9 @@ class _ChatScreenState extends State<ChatScreen> {
                           )
                         : ListView.builder(
                             controller: _scrollController,
+                            // Свайп по ленте плавно прячет клавиатуру.
+                            keyboardDismissBehavior:
+                                ScrollViewKeyboardDismissBehavior.onDrag,
                             padding: const EdgeInsets.fromLTRB(14, 16, 14, 92),
                             itemCount: messages.length,
                             itemBuilder: (context, index) {
@@ -653,6 +661,8 @@ class _ChatScreenState extends State<ChatScreen> {
                                   _controller.currentUser.id;
                               return KeyedSubtree(
                                 key: GlobalObjectKey(message),
+                                // Изолируем перерисовку пузыря от соседей.
+                                child: RepaintBoundary(
                                 child: MessageBubble(
                                   message: message,
                                   serverUrl: _controller.serverUrl,
@@ -678,6 +688,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                       .toggleReaction(message.id, emoji),
                                   onPlayVoice: _playVoice,
                                   fontScale: AppSettings.instance.msgFontScale,
+                                ),
                                 ),
                               );
                             },
@@ -752,6 +763,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
               ],
+            ),
             ),
           ),
         ],
@@ -1228,10 +1240,16 @@ class _TypingIndicatorState extends State<_TypingIndicator>
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          widget.label,
-          style: TextStyle(
-              color: accent, fontSize: 12, fontWeight: FontWeight.w600),
+        // Flexible + ellipsis: длинные подписи («записывает голосовое», имена
+        // в группе) не переполняют шапку (красный overflow-баннер в debug).
+        Flexible(
+          child: Text(
+            widget.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+                color: accent, fontSize: 12, fontWeight: FontWeight.w600),
+          ),
         ),
         const SizedBox(width: 5),
         AnimatedBuilder(

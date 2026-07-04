@@ -120,6 +120,10 @@ class _VoicePreviewState extends State<VoicePreview> {
   Duration _dur = Duration.zero;
   String? _path;
   bool _preparing = false;
+  // Байты декодируем ОДИН раз: раньше base64-декод шёл в каждом build —
+  // при десятках голосовых любой rebuild ленты жевал мегабайты в UI-потоке.
+  late final Uint8List? _bytes = bytesFromDataUrl(widget.media.dataUrl);
+
   // Реальная огибающая снимается при записи и хранится в fileName. Если её
   // нет (старые сообщения) — fallback на форму из байтов.
   late final List<double> _wave = _resolveWave();
@@ -129,7 +133,7 @@ class _VoicePreviewState extends State<VoicePreview> {
     if (env != null && env.isNotEmpty) {
       return [for (final v in env) 3.0 + v.clamp(0.0, 1.0) * 17.0];
     }
-    return waveformFromBytes(bytesFromDataUrl(widget.media.dataUrl));
+    return waveformFromBytes(_bytes);
   }
 
   bool get _playing => _state == PlayerState.playing;
@@ -169,7 +173,7 @@ class _VoicePreviewState extends State<VoicePreview> {
       if (_preparing) return;
       _preparing = true;
       if (_path == null) {
-        final bytes = bytesFromDataUrl(widget.media.dataUrl);
+        final bytes = _bytes;
         if (bytes == null || bytes.isEmpty) {
           _preparing = false;
           return;
@@ -200,8 +204,7 @@ class _VoicePreviewState extends State<VoicePreview> {
 
   @override
   Widget build(BuildContext context) {
-    final bytes = bytesFromDataUrl(widget.media.dataUrl);
-    final size = _formatSize(bytes?.length ?? 0);
+    final size = _formatSize(_bytes?.length ?? 0);
     final totalMs = _dur.inMilliseconds > 0
         ? _dur.inMilliseconds
         : (widget.media.durationMs ?? 0);
@@ -319,7 +322,11 @@ class _VoiceWave extends StatelessWidget {
   }
 }
 
-class _VideoNotePreview extends StatefulWidget {
+/// Кружок в ленте — лёгкая статичная заглушка. Раньше на КАЖДЫЙ кружок
+/// создавался свой VideoPlayerController (hardware-декодер + запись файла во
+/// временную папку + setState на каждый кадр) — несколько кружков в ленте
+/// роняли fps всего приложения. Видео декодируется только в просмотрщике.
+class _VideoNotePreview extends StatelessWidget {
   const _VideoNotePreview({
     required this.media,
     this.timeLabel,
@@ -332,42 +339,6 @@ class _VideoNotePreview extends StatefulWidget {
   final bool read;
   final bool own;
 
-  @override
-  State<_VideoNotePreview> createState() => _VideoNotePreviewState();
-}
-
-class _VideoNotePreviewState extends State<_VideoNotePreview> {
-  VideoPlayerController? _ctrl;
-  bool _playing = false;
-  bool _muted = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _initPlayer();
-  }
-
-  Future<void> _initPlayer() async {
-    final bytes = bytesFromDataUrl(widget.media.dataUrl);
-    if (bytes == null || bytes.isEmpty) return;
-    try {
-      final dir = await getTemporaryDirectory();
-      final path =
-          '${dir.path}/vnote_${widget.media.dataUrl.hashCode.abs()}.mp4';
-      await io.File(path).writeAsBytes(bytes);
-      final ctrl = VideoPlayerController.file(io.File(path));
-      await ctrl.initialize();
-      await ctrl.setVolume(0); // по умолчанию без звука (как в Telegram)
-      await ctrl.setLooping(true);
-      ctrl.addListener(() {
-        if (mounted) setState(() => _playing = ctrl.value.isPlaying);
-      });
-      if (mounted) setState(() => _ctrl = ctrl);
-    } on Object {
-      // Не удалось инициализировать — останется иконка-плейсхолдер.
-    }
-  }
-
   void _openViewer(BuildContext context) {
     showGeneralDialog<void>(
       context: context,
@@ -376,8 +347,8 @@ class _VideoNotePreviewState extends State<_VideoNotePreview> {
       barrierLabel: 'note',
       transitionDuration: const Duration(milliseconds: 260),
       pageBuilder: (_, __, ___) => _VideoNoteViewer(
-        media: widget.media,
-        timeLabel: widget.timeLabel,
+        media: media,
+        timeLabel: timeLabel,
       ),
       transitionBuilder: (ctx, anim, _, child) {
         final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
@@ -393,25 +364,11 @@ class _VideoNotePreviewState extends State<_VideoNotePreview> {
     );
   }
 
-  void _toggleMute() {
-    final ctrl = _ctrl;
-    setState(() => _muted = !_muted);
-    ctrl?.setVolume(_muted ? 0 : 1);
-  }
-
-  @override
-  void dispose() {
-    _ctrl?.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
-    final ctrl = _ctrl;
-    final ready = ctrl != null && ctrl.value.isInitialized;
     const size = 192.0;
-    final dur = widget.media.durationMs ?? 0;
+    final dur = media.durationMs ?? 0;
 
     return GestureDetector(
       onTap: () => _openViewer(context),
@@ -420,7 +377,7 @@ class _VideoNotePreviewState extends State<_VideoNotePreview> {
         height: size,
         child: Stack(
           children: [
-            // Круг: видео либо иконка-плейсхолдер видеокружка.
+            // Круг-заглушка (без видеодекодера в ленте).
             Container(
               width: size,
               height: size,
@@ -430,50 +387,20 @@ class _VideoNotePreviewState extends State<_VideoNotePreview> {
                 border:
                     Border.all(color: accent.withValues(alpha: 0.5), width: 3),
               ),
-              child: ClipOval(
-                child: ready
-                    ? FittedBox(
-                        fit: BoxFit.cover,
-                        child: SizedBox(
-                          width: ctrl.value.size.width,
-                          height: ctrl.value.size.height,
-                          child: VideoPlayer(ctrl),
-                        ),
-                      )
-                    : Center(
-                        child: Icon(
-                          Icons.videocam_rounded,
-                          size: 46,
-                          color: isLight
-                              ? const Color(0xFF4E5B6B)
-                              : Colors.white.withValues(alpha: 0.85),
-                        ),
-                      ),
+              child: Center(
+                child: Icon(
+                  Icons.videocam_rounded,
+                  size: 46,
+                  color: isLight
+                      ? const Color(0xFF4E5B6B)
+                      : Colors.white.withValues(alpha: 0.85),
+                ),
               ),
             ),
-            // Кнопка play по центру, когда не воспроизводится.
-            if (ready && !_playing)
-              const Positioned.fill(
-                child: Center(
-                  child: _CircleIcon(icon: Icons.play_arrow_rounded, size: 52),
-                ),
-              ),
-            // Значок звука сверху по центру (тап — вкл/выкл).
-            Positioned(
-              top: 8,
-              left: 0,
-              right: 0,
+            // Кнопка play по центру — тап открывает круглый просмотрщик.
+            const Positioned.fill(
               child: Center(
-                child: GestureDetector(
-                  onTap: _toggleMute,
-                  child: _CircleIcon(
-                    icon: _muted
-                        ? Icons.volume_off_rounded
-                        : Icons.volume_up_rounded,
-                    size: 30,
-                    iconSize: 16,
-                  ),
-                ),
+                child: _CircleIcon(icon: Icons.play_arrow_rounded, size: 52),
               ),
             ),
             // Длительность — пилюля снизу слева.
@@ -489,7 +416,7 @@ class _VideoNotePreviewState extends State<_VideoNotePreview> {
                 ),
               ),
             // Время + галочки — снизу справа.
-            if (widget.timeLabel != null)
+            if (timeLabel != null)
               Positioned(
                 right: 10,
                 bottom: 10,
@@ -497,17 +424,17 @@ class _VideoNotePreviewState extends State<_VideoNotePreview> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(widget.timeLabel!,
+                      Text(timeLabel!,
                           style: const TextStyle(
                               color: Colors.white, fontSize: 12)),
-                      if (widget.own) ...[
+                      if (own) ...[
                         const SizedBox(width: 3),
                         Icon(
-                          widget.read
+                          read
                               ? Icons.done_all_rounded
                               : Icons.done_rounded,
                           size: 14,
-                          color: widget.read ? softGold : Colors.white,
+                          color: read ? softGold : Colors.white,
                         ),
                       ],
                     ],
@@ -523,11 +450,10 @@ class _VideoNotePreviewState extends State<_VideoNotePreview> {
 
 /// Тёмный круглый бейдж с иконкой (play / звук) поверх видеокружка.
 class _CircleIcon extends StatelessWidget {
-  const _CircleIcon({required this.icon, required this.size, this.iconSize});
+  const _CircleIcon({required this.icon, required this.size});
 
   final IconData icon;
   final double size;
-  final double? iconSize;
 
   @override
   Widget build(BuildContext context) {
@@ -538,7 +464,7 @@ class _CircleIcon extends StatelessWidget {
         color: Colors.black.withValues(alpha: 0.45),
         shape: BoxShape.circle,
       ),
-      child: Icon(icon, color: Colors.white, size: iconSize ?? size * 0.6),
+      child: Icon(icon, color: Colors.white, size: size * 0.6),
     );
   }
 }

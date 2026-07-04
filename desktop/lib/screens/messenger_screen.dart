@@ -308,6 +308,7 @@ class _MessengerScreenState extends State<MessengerScreen> {
   String? _callStatusText;
   _IncomingCallOffer? _incomingCallOffer;
   final List<Map<String, dynamic>> _pendingCallIce = [];
+  Timer? _callFailureTimer;
   bool _callMicMuted = false;
   bool _callSpeakerMuted = false;
   bool _callCameraOff = false;
@@ -353,6 +354,7 @@ class _MessengerScreenState extends State<MessengerScreen> {
   void dispose() {
     _typingTimer?.cancel();
     _userSearchTimer?.cancel();
+    _callFailureTimer?.cancel();
     _recordingLevelSub?.cancel();
     _voicePlayerStateSub?.cancel();
     _voicePositionSub?.cancel();
@@ -1453,12 +1455,16 @@ class _MessengerScreenState extends State<MessengerScreen> {
     pc.onConnectionState = (state) {
       if (!mounted) return;
       if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+        _callFailureTimer?.cancel();
         setState(() => _callPhase = _CallPhase.connected);
       }
-      if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
-          state == RTCPeerConnectionState.RTCPeerConnectionStateClosed) {
-        _showSnack('Звонок завершен.');
-        unawaited(_cleanupCall(sendEnd: false));
+      if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed) {
+        _callFailureTimer?.cancel();
+        _callFailureTimer = Timer(const Duration(milliseconds: 2200), () {
+          if (!mounted || _callPeerConnection != pc) return;
+          _showSnack('Звонок завершен.');
+          unawaited(_cleanupCall(sendEnd: false));
+        });
       }
     };
     return pc;
@@ -1668,6 +1674,8 @@ class _MessengerScreenState extends State<MessengerScreen> {
   Future<void> _cleanupCall({required bool sendEnd}) async {
     final peerId = _callPeerId;
     final callId = _callId;
+    _callFailureTimer?.cancel();
+    _callFailureTimer = null;
     if (sendEnd && peerId != null) {
       _socket?.sendCallSignal(toUserId: peerId, kind: 'end', callId: callId);
     }
@@ -1761,11 +1769,9 @@ class _MessengerScreenState extends State<MessengerScreen> {
     if (chatId == null) return;
     _typingTimer?.cancel();
     if (isTyping) {
-      if (!_typingActive) {
-        _typingActive = true;
-        _socket?.typing(chatId: chatId, isTyping: true);
-      }
-      _typingTimer = Timer(const Duration(milliseconds: 1400), () {
+      _typingActive = true;
+      _socket?.typing(chatId: chatId, isTyping: true);
+      _typingTimer = Timer(const Duration(milliseconds: 1800), () {
         if (_activeChatId == chatId) {
           _sendTypingState(false);
         }
@@ -2380,6 +2386,7 @@ class _MessengerScreenState extends State<MessengerScreen> {
               phase: _callPhase,
               kind: _callKind,
               peer: callPeer,
+              serverUrl: widget.serverUrl,
               renderersReady: _callRenderersReady,
               localRenderer: _localCallRenderer,
               remoteRenderer: _remoteCallRenderer,
@@ -2409,6 +2416,7 @@ class _CallOverlay extends StatelessWidget {
     required this.phase,
     required this.kind,
     required this.peer,
+    required this.serverUrl,
     required this.renderersReady,
     required this.localRenderer,
     required this.remoteRenderer,
@@ -2429,6 +2437,7 @@ class _CallOverlay extends StatelessWidget {
   final _CallPhase phase;
   final _CallKind kind;
   final ChatParticipant? peer;
+  final String serverUrl;
   final bool renderersReady;
   final RTCVideoRenderer localRenderer;
   final RTCVideoRenderer remoteRenderer;
@@ -2465,10 +2474,10 @@ class _CallOverlay extends StatelessWidget {
           filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 720),
+              constraints: const BoxConstraints(maxWidth: 760),
               child: _GlassSurface(
                 margin: const EdgeInsets.all(24),
-                padding: const EdgeInsets.all(18),
+                padding: const EdgeInsets.fromLTRB(28, 30, 28, 28),
                 radius: 34,
                 color: const Color(0xE01D2025),
                 child: Column(
@@ -2484,14 +2493,18 @@ class _CallOverlay extends StatelessWidget {
                         onSwapVideo: onSwapVideo,
                       )
                     else
-                      _CallAvatarStage(name: name, status: status),
+                      _CallAvatarStage(
+                        name: name,
+                        avatarUrl: peer?.avatarUrl,
+                        serverUrl: serverUrl,
+                      ),
                     const SizedBox(height: 18),
                     Text(
                       name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 26,
+                        fontSize: 30,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0,
                       ),
@@ -2651,23 +2664,31 @@ class _CallVideoStage extends StatelessWidget {
 }
 
 class _CallAvatarStage extends StatelessWidget {
-  const _CallAvatarStage({required this.name, required this.status});
+  const _CallAvatarStage({
+    required this.name,
+    required this.avatarUrl,
+    required this.serverUrl,
+  });
 
   final String name;
-  final String status;
+  final String? avatarUrl;
+  final String serverUrl;
 
   @override
   Widget build(BuildContext context) {
-    final letter = name.trim().isEmpty ? 'B' : name.trim()[0].toUpperCase();
     return Container(
-      width: 168,
-      height: 168,
+      width: 212,
+      height: 212,
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF796B45), Color(0xFF252015)],
+          colors: [
+            accent.withValues(alpha: 0.36),
+            panelStrong.withValues(alpha: 0.94),
+          ],
         ),
         border: Border.all(color: accent.withValues(alpha: 0.36), width: 2),
         boxShadow: [
@@ -2682,11 +2703,11 @@ class _CallAvatarStage extends StatelessWidget {
           ),
         ],
       ),
-      child: Center(
-        child: Text(
-          letter,
-          style: TextStyle(fontSize: 58, fontWeight: FontWeight.w900),
-        ),
+      child: BrenksAvatar(
+        title: name,
+        imageUrl: avatarUrl,
+        baseUrl: serverUrl,
+        size: 196,
       ),
     );
   }
@@ -2759,7 +2780,7 @@ class _CallRoundButton extends StatelessWidget {
           onPressed: onPressed,
           icon: Icon(icon),
           style: IconButton.styleFrom(
-            fixedSize: const Size(58, 58),
+            fixedSize: const Size(68, 68),
             backgroundColor: fill,
             foregroundColor: foreground,
             side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
@@ -2770,7 +2791,7 @@ class _CallRoundButton extends StatelessWidget {
         const SizedBox(height: 7),
         Text(
           label,
-          style: TextStyle(color: muted, fontSize: 12),
+          style: TextStyle(color: muted, fontSize: 13),
         ),
       ],
     );
@@ -3462,6 +3483,40 @@ class _ChatTile extends StatelessWidget {
                             ),
                           ),
                         ),
+                      if (unread > 0)
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            constraints: const BoxConstraints(minWidth: 18),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: accent,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(color: bg, width: 2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: accent.withValues(alpha: 0.22),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 5),
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              unread > 99 ? '99+' : '$unread',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Color(0xFF08131A),
+                                fontWeight: FontWeight.w900,
+                                fontSize: 10,
+                                height: 1,
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                   const SizedBox(width: 10),
@@ -3503,23 +3558,21 @@ class _ChatTile extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 3),
-                        Text(
-                          activityPreview ??
-                              _lastMessageLabel(chat.lastMessage?.text),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: activityPreview != null
-                                ? accent
-                                : selected
-                                    ? text.withValues(alpha: 0.74)
-                                    : muted,
-                            fontSize: 13.5,
-                            fontWeight: activityPreview != null
-                                ? FontWeight.w800
-                                : FontWeight.w500,
+                        if (activityPreview != null)
+                          _TypingPreviewText(label: activityPreview)
+                        else
+                          Text(
+                            _lastMessageLabel(chat.lastMessage?.text),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: selected
+                                  ? text.withValues(alpha: 0.74)
+                                  : muted,
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -4425,6 +4478,56 @@ class _TypingSubtitleState extends State<_TypingSubtitle>
               overflow: TextOverflow.ellipsis,
               style: TextStyle(color: muted),
             ),
+    );
+  }
+}
+
+class _TypingPreviewText extends StatefulWidget {
+  const _TypingPreviewText({required this.label});
+
+  final String label;
+
+  @override
+  State<_TypingPreviewText> createState() => _TypingPreviewTextState();
+}
+
+class _TypingPreviewTextState extends State<_TypingPreviewText>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 950),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final dots = (_controller.value * 3).floor().clamp(0, 2) + 1;
+        final suffix = List.filled(dots, '.').join();
+        return Text(
+          '${widget.label}$suffix',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: accent,
+            fontSize: 13.5,
+            fontWeight: FontWeight.w800,
+          ),
+        );
+      },
     );
   }
 }
@@ -8853,6 +8956,7 @@ class _AdminPanelDialog extends StatefulWidget {
 }
 
 class _AdminPanelDialogState extends State<_AdminPanelDialog> {
+  final _userSearchController = TextEditingController();
   AdminOverview? _overview;
   List<UserReport> _reports = const [];
   String _status = 'all';
@@ -8864,6 +8968,12 @@ class _AdminPanelDialogState extends State<_AdminPanelDialog> {
   void initState() {
     super.initState();
     unawaited(_load());
+  }
+
+  @override
+  void dispose() {
+    _userSearchController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -8930,6 +9040,19 @@ class _AdminPanelDialogState extends State<_AdminPanelDialog> {
     } finally {
       if (mounted) setState(() => _busyUserId = null);
     }
+  }
+
+  Future<void> _openReportTargetProfile(UserReport report) async {
+    final target = report.target;
+    if (target == null || !mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => _AdminReportProfileDialog(
+        user: target,
+        serverUrl: widget.api.baseUrl,
+        report: report,
+      ),
+    );
   }
 
   @override
@@ -9026,6 +9149,7 @@ class _AdminPanelDialogState extends State<_AdminPanelDialog> {
                                   setState(() => _status = value);
                                   unawaited(_load());
                                 },
+                                onOpenTargetProfile: _openReportTargetProfile,
                                 onSetStatus: _setReportStatus,
                               ),
                             ),
@@ -9034,6 +9158,8 @@ class _AdminPanelDialogState extends State<_AdminPanelDialog> {
                               flex: 5,
                               child: _AdminUsersPanel(
                                 users: overview?.users ?? const [],
+                                queryController: _userSearchController,
+                                onQueryChanged: (_) => setState(() {}),
                                 busyUserId: _busyUserId,
                                 onToggleUser: _toggleUser,
                               ),
@@ -9087,6 +9213,7 @@ class _AdminReportsPanel extends StatelessWidget {
     required this.status,
     required this.busyReportId,
     required this.onStatusFilterChanged,
+    required this.onOpenTargetProfile,
     required this.onSetStatus,
   });
 
@@ -9094,6 +9221,7 @@ class _AdminReportsPanel extends StatelessWidget {
   final String status;
   final String? busyReportId;
   final ValueChanged<String> onStatusFilterChanged;
+  final ValueChanged<UserReport> onOpenTargetProfile;
   final Future<void> Function(UserReport report, String status) onSetStatus;
 
   @override
@@ -9143,6 +9271,7 @@ class _AdminReportsPanel extends StatelessWidget {
                       return _AdminReportTile(
                         report: report,
                         busy: busy,
+                        onOpenTargetProfile: () => onOpenTargetProfile(report),
                         onSetStatus: (status) => onSetStatus(report, status),
                       );
                     },
@@ -9158,11 +9287,13 @@ class _AdminReportTile extends StatelessWidget {
   const _AdminReportTile({
     required this.report,
     required this.busy,
+    required this.onOpenTargetProfile,
     required this.onSetStatus,
   });
 
   final UserReport report;
   final bool busy;
+  final VoidCallback onOpenTargetProfile;
   final ValueChanged<String> onSetStatus;
 
   @override
@@ -9210,7 +9341,14 @@ class _AdminReportTile extends StatelessWidget {
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,
+            runSpacing: 8,
             children: [
+              if (report.target != null)
+                FilledButton.tonalIcon(
+                  onPressed: onOpenTargetProfile,
+                  icon: const Icon(Icons.person_search_rounded, size: 18),
+                  label: const Text('Профиль'),
+                ),
               FilledButton.tonal(
                 onPressed: busy ? null : () => onSetStatus('reviewing'),
                 child: Text('В работу'),
@@ -9225,6 +9363,128 @@ class _AdminReportTile extends StatelessWidget {
                   child: Text('Открыть'),
                 ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminReportProfileDialog extends StatelessWidget {
+  const _AdminReportProfileDialog({
+    required this.user,
+    required this.serverUrl,
+    required this.report,
+  });
+
+  final ChatParticipant user;
+  final String serverUrl;
+  final UserReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(30),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+          child: _GlassSurface(
+            width: 420,
+            padding: const EdgeInsets.all(22),
+            radius: 30,
+            color: panel.withValues(alpha: 0.92),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ),
+                BrenksAvatar(
+                  title: user.title,
+                  imageUrl: user.avatarUrl,
+                  baseUrl: serverUrl,
+                  size: 96,
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  user.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text('@${user.username}', style: TextStyle(color: muted)),
+                const SizedBox(height: 18),
+                _AdminProfileInfoRow(label: 'ID', value: user.id),
+                _AdminProfileInfoRow(
+                  label: 'Жалоба',
+                  value: report.reason,
+                ),
+                if (report.comment?.isNotEmpty == true)
+                  _AdminProfileInfoRow(
+                    label: 'Комментарий',
+                    value: report.comment!,
+                  ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('Готово'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AdminProfileInfoRow extends StatelessWidget {
+  const _AdminProfileInfoRow({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: panelSoft.withValues(alpha: 0.48),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: muted,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.4,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.w800),
           ),
         ],
       ),
@@ -9271,16 +9531,33 @@ class _ReportStatusPill extends StatelessWidget {
 class _AdminUsersPanel extends StatelessWidget {
   const _AdminUsersPanel({
     required this.users,
+    required this.queryController,
+    required this.onQueryChanged,
     required this.busyUserId,
     required this.onToggleUser,
   });
 
   final List<AdminUserRow> users;
+  final TextEditingController queryController;
+  final ValueChanged<String> onQueryChanged;
   final String? busyUserId;
   final ValueChanged<AdminUserRow> onToggleUser;
 
   @override
   Widget build(BuildContext context) {
+    final rawQuery = queryController.text.trim().toLowerCase();
+    final query = rawQuery.startsWith('@') ? rawQuery.substring(1) : rawQuery;
+    final filtered = query.isEmpty
+        ? users
+        : users.where((user) {
+            final haystack = [
+              user.username,
+              user.displayName ?? '',
+              user.email ?? '',
+              user.id,
+            ].join(' ').toLowerCase();
+            return haystack.contains(query);
+          }).toList(growable: false);
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 0, 20, 20),
       child: Column(
@@ -9291,48 +9568,91 @@ class _AdminUsersPanel extends StatelessWidget {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 10),
+          TextField(
+            controller: queryController,
+            onChanged: onQueryChanged,
+            decoration: InputDecoration(
+              hintText: 'Поиск по @username',
+              prefixIcon: const Icon(Icons.search_rounded),
+              suffixIcon: queryController.text.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Очистить',
+                      onPressed: () {
+                        queryController.clear();
+                        onQueryChanged('');
+                      },
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+              filled: true,
+              fillColor: panelSoft.withValues(alpha: 0.48),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: BorderSide(color: border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: BorderSide(color: border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: BorderSide(color: accent.withValues(alpha: 0.45)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
           Expanded(
-            child: ListView.separated(
-              itemCount: users.length,
-              separatorBuilder: (_, __) => Divider(color: border, height: 1),
-              itemBuilder: (context, index) {
-                final user = users[index];
-                final busy = busyUserId == user.id;
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          user.title,
+            child: filtered.isEmpty
+                ? EmptyState(
+                    title: 'Пользователь не найден',
+                    subtitle: 'Проверьте username или часть имени.',
+                  )
+                : ListView.separated(
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) =>
+                        Divider(color: border, height: 1),
+                    itemBuilder: (context, index) {
+                      final user = filtered[index];
+                      final busy = busyUserId == user.id;
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                user.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontWeight: FontWeight.w800),
+                              ),
+                            ),
+                            if (user.isAdmin)
+                              Icon(Icons.shield_rounded,
+                                  color: accent, size: 17),
+                          ],
+                        ),
+                        subtitle: Text(
+                          '@${user.username} · ${user.chatCount} чатов · ${user.messageCount} сообщений',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontWeight: FontWeight.w800),
                         ),
-                      ),
-                      if (user.isAdmin)
-                        Icon(Icons.shield_rounded, color: accent, size: 17),
-                    ],
+                        trailing: user.isAdmin
+                            ? Text('Админ', style: TextStyle(color: muted))
+                            : FilledButton.tonal(
+                                onPressed:
+                                    busy ? null : () => onToggleUser(user),
+                                style: FilledButton.styleFrom(
+                                  foregroundColor:
+                                      user.banned ? accent : danger,
+                                  backgroundColor:
+                                      (user.banned ? accent : danger)
+                                          .withValues(alpha: 0.1),
+                                ),
+                                child: Text(user.banned ? 'Разблок.' : 'Блок'),
+                              ),
+                      );
+                    },
                   ),
-                  subtitle: Text(
-                    '@${user.username} · ${user.chatCount} чатов · ${user.messageCount} сообщений',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: user.isAdmin
-                      ? Text('Админ', style: TextStyle(color: muted))
-                      : FilledButton.tonal(
-                          onPressed: busy ? null : () => onToggleUser(user),
-                          style: FilledButton.styleFrom(
-                            foregroundColor: user.banned ? accent : danger,
-                            backgroundColor: (user.banned ? accent : danger)
-                                .withValues(alpha: 0.1),
-                          ),
-                          child: Text(user.banned ? 'Разблок.' : 'Блок'),
-                        ),
-                );
-              },
-            ),
           ),
         ],
       ),

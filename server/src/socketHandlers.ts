@@ -568,7 +568,7 @@ export function registerSocketHandlers(io: IOServer): void {
                 activity,
                 isTyping: false,
               });
-            }, 3000)
+            }, 6500)
           );
         } else if (typingTimeouts.has(key)) {
           clearTimeout(typingTimeouts.get(key));

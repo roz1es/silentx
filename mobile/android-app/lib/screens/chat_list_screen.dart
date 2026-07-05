@@ -818,8 +818,9 @@ class _ChatListScreenState extends State<ChatListScreen>
                     color: _editMode ? accent : (isLight ? lightText : text))),
           ),
         ),
-        title: const Text('Чаты',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+        // При пропаже соединения заголовок сообщает об этом (как в Telegram).
+        title: Text(_controller.socketConnected ? 'Чаты' : 'Подключение…',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
         actions: [
           _PillButton(
             isLight: isLight,

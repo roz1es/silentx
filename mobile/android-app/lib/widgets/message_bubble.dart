@@ -24,6 +24,7 @@ class MessageBubble extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onPin,
+    required this.onForward,
     required this.onReaction,
     required this.onPlayVoice,
     this.senderName,
@@ -43,6 +44,7 @@ class MessageBubble extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onPin;
+  final VoidCallback onForward;
   final ValueChanged<String> onReaction;
   final ValueChanged<MessageMedia> onPlayVoice;
   final String? senderName;
@@ -55,8 +57,13 @@ class MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final body = GestureDetector(
       onLongPressStart: (d) => _openMenu(context, d.globalPosition),
-      // Двойной тап — быстрая реакция «сердце».
-      onDoubleTap: message.deleted ? null : () => onReaction('❤️'),
+      // Двойной тап — быстрая реакция «сердце» (+ лёгкое вибро).
+      onDoubleTap: message.deleted
+          ? null
+          : () {
+              HapticFeedback.lightImpact();
+              onReaction('❤️');
+            },
       child: _bubbleBody(context),
     );
     // Свайп влево — ответ; на удалённых жест не нужен.
@@ -372,6 +379,7 @@ class MessageBubble extends StatelessWidget {
   }
 
   Future<void> _openMenu(BuildContext context, Offset pos) async {
+    HapticFeedback.mediumImpact();
     final isLight = Theme.of(context).brightness == Brightness.light;
     final bubble = _bubbleBody(context);
     await showGeneralDialog<void>(
@@ -390,6 +398,7 @@ class MessageBubble extends StatelessWidget {
         onReply: onReply,
         onEdit: onEdit,
         onPin: onPin,
+        onForward: onForward,
         onDelete: onDelete,
         onReaction: onReaction,
       ),
@@ -414,6 +423,7 @@ class _ContextMenu extends StatefulWidget {
     required this.onReply,
     required this.onEdit,
     required this.onPin,
+    required this.onForward,
     required this.onDelete,
     required this.onReaction,
   });
@@ -427,6 +437,7 @@ class _ContextMenu extends StatefulWidget {
   final VoidCallback onReply;
   final VoidCallback onEdit;
   final VoidCallback onPin;
+  final VoidCallback onForward;
   final VoidCallback onDelete;
   final ValueChanged<String> onReaction;
 
@@ -603,6 +614,11 @@ class _ContextMenuState extends State<_ContextMenu> {
                     ClipboardData(text: widget.messageText.trim()));
                 showAppToast(context, 'Скопировано');
                 _close();
+              }, actionColor),
+            if (!widget.deleted)
+              _item(Icons.forward_rounded, 'Переслать', () {
+                _close();
+                widget.onForward();
               }, actionColor),
             if (widget.own && !widget.deleted)
               _item(Icons.edit_rounded, 'Изменить', () {

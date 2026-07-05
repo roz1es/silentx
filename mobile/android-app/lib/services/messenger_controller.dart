@@ -393,6 +393,16 @@ class MessengerController extends ChangeNotifier {
     _socket?.editMessage(chatId: chatId, messageId: messageId, text: text);
   }
 
+  /// Переслать сообщение в другой чат — обычная отправка копии (текст+медиа),
+  /// сервер и контракт не меняются.
+  void forwardMessage(String chatId, Message message) {
+    _socket?.sendMessage(
+      chatId: chatId,
+      text: message.text,
+      media: message.media,
+    );
+  }
+
   void deleteMessage(String messageId) {
     final chatId = _activeChatId;
     if (chatId == null) return;

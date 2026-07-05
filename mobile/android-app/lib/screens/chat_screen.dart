@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' as io;
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mime/mime.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/swipe_back_route.dart';
@@ -129,6 +129,12 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!mounted) return;
     if (_controller.incomingMessageTick != _lastTick) {
       _lastTick = _controller.incomingMessageTick;
+      // Лёгкое вибро на входящее чужое сообщение.
+      final msgs = _controller.messages;
+      if (msgs.isNotEmpty &&
+          msgs.last.senderId != _controller.currentUser.id) {
+        HapticFeedback.lightImpact();
+      }
       _scrollToBottom();
     }
     setState(() {});
@@ -197,6 +203,7 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
     if (text.isEmpty) return;
+    HapticFeedback.lightImpact();
     _controller.sendMessage(text: text, replyToMessageId: _replyTo?.id);
     setState(() => _replyTo = null);
     _messageController.clear();
@@ -622,6 +629,27 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Text(_controller.messagesError!,
                   style: const TextStyle(color: danger)),
             ),
+          // Индикатор пропавшего соединения — иначе непонятно, почему
+          // сообщения не отправляются.
+          if (!_controller.socketConnected)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              color: panelSoft.withValues(alpha: 0.92),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 8),
+                  Text('Подключение…',
+                      style: TextStyle(color: muted, fontSize: 12.5)),
+                ],
+              ),
+            ),
           Expanded(
             // Тап по пустому месту ленты прячет клавиатуру (тапы по пузырям и
             // composer выигрывают арену жестов и работают как раньше).
@@ -684,6 +712,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                       _controller.deleteMessage(message.id),
                                   onPin: () =>
                                       _controller.setPinnedMessage(message.id),
+                                  onForward: () => _forwardMessage(message),
                                   onReaction: (emoji) => _controller
                                       .toggleReaction(message.id, emoji),
                                   onPlayVoice: _playVoice,
@@ -770,6 +799,65 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       ),
     );
+  }
+
+  /// Пересылка: лист выбора чата, затем копия сообщения туда. Действие
+  /// выполняется ПОСЛЕ закрытия листа (результат через Navigator.pop).
+  Future<void> _forwardMessage(Message message) async {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final targets =
+        _controller.chats.where(_canWrite).toList(growable: false);
+    final target = await showModalBottomSheet<Chat>(
+      context: context,
+      backgroundColor: isLight ? Colors.white : panel,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+              child: Text('Переслать в…',
+                  style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                      color: isLight ? lightText : text)),
+            ),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: targets.length,
+                itemBuilder: (_, i) {
+                  final chat = targets[i];
+                  return ListTile(
+                    leading: BrenksAvatar(
+                      title: chat.title,
+                      imageUrl: chat.avatarUrl,
+                      baseUrl: _controller.serverUrl,
+                      size: 42,
+                    ),
+                    title: Text(chat.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: isLight ? lightText : text)),
+                    onTap: () => Navigator.pop(sheetCtx, chat),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (target == null || !mounted) return;
+    _controller.forwardMessage(target.id, message);
+    showAppToast(context, 'Переслано в «${target.title}»');
   }
 
   /// Может ли текущий пользователь писать в чат. В канале писать может только

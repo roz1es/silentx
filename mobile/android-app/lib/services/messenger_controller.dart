@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../format.dart';
 import '../models.dart';
 import 'api_client.dart';
 import 'call_service.dart';
 import 'chat_cache.dart';
+import 'notification_service.dart';
 import 'socket_service.dart';
 
 /// Единый источник состояния мессенджера для всех экранов.
@@ -160,6 +162,28 @@ class MessengerController extends ChangeNotifier {
     _connectSocket();
   }
 
+  /// Уведомление в шторке: чужое сообщение, когда приложение свёрнуто или
+  /// открыт другой чат, и звук чата не выключен.
+  void _maybeNotify(Message message) {
+    if (message.senderId == currentUser.id) return;
+    final ns = NotificationService.instance;
+    if (ns.inForeground && message.chatId == _activeChatId) return;
+    Chat? chat;
+    for (final c in _chats) {
+      if (c.id == message.chatId) {
+        chat = c;
+        break;
+      }
+    }
+    if (chat == null || chat.muted) return;
+    unawaited(ns.showMessage(
+      // Стабильный id на чат: новые сообщения чата заменяют старое уведомление.
+      id: message.chatId.hashCode & 0x7fffffff,
+      title: chat.title,
+      body: messagePreview(message),
+    ));
+  }
+
   void _connectSocket() {
     final socket = BrenksSocket(baseUrl: serverUrl, token: token);
     socket.connect(
@@ -170,6 +194,7 @@ class MessengerController extends ChangeNotifier {
       },
       onMessage: (message) {
         _upsertLastMessageHint(message);
+        _maybeNotify(message);
         if (message.chatId == _activeChatId) {
           if (!_messages.any((item) => item.id == message.id)) {
             _messages = [..._messages, message];

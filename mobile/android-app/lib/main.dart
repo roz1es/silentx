@@ -10,6 +10,7 @@ import 'services/api_client.dart';
 import 'services/app_settings.dart';
 import 'services/auth_store.dart';
 import 'services/messenger_controller.dart';
+import 'services/notification_service.dart';
 import 'theme/app_theme.dart';
 import 'widgets/call_overlay.dart';
 
@@ -38,6 +39,11 @@ class _BrenksChatAppState extends State<BrenksChatApp> {
   void initState() {
     super.initState();
     _bootstrap();
+    // После первого кадра: натив уже готов принимать MethodChannel-вызовы
+    // (запрос разрешения на уведомления Android 13+).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(NotificationService.instance.init());
+    });
   }
 
   @override

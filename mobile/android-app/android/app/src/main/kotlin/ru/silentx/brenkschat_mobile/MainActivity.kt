@@ -1,9 +1,16 @@
 package ru.silentx.brenkschat_mobile
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.Display
 import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -13,6 +20,77 @@ class MainActivity : FlutterActivity() {
         // Выбираем режим с текущим разрешением и максимальным refresh rate —
         // на 120-герцовых экранах Flutter начинает получать vsync 120.
         requestMaxRefreshRate()
+    }
+
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        // Локальные уведомления о сообщениях без Firebase: Dart шлёт сюда
+        // show(id, title, body), когда приложение свёрнуто или чат не открыт.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "brenks/notifications")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "requestPermission" -> {
+                        ensureNotificationPermission()
+                        result.success(true)
+                    }
+                    "show" -> {
+                        showMessageNotification(
+                            call.argument<Int>("id") ?: 0,
+                            call.argument<String>("title") ?: "БренксЧат",
+                            call.argument<String>("body") ?: "",
+                        )
+                        result.success(true)
+                    }
+                    "cancelAll" -> {
+                        getSystemService(NotificationManager::class.java)?.cancelAll()
+                        result.success(true)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    private fun ensureNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 7001)
+        }
+    }
+
+    private fun showMessageNotification(id: Int, title: String, body: String) {
+        val nm = getSystemService(NotificationManager::class.java) ?: return
+        if (Build.VERSION.SDK_INT >= 26) {
+            nm.createNotificationChannel(
+                NotificationChannel(
+                    "messages",
+                    "Сообщения",
+                    NotificationManager.IMPORTANCE_HIGH,
+                ).apply { description = "Новые сообщения" }
+            )
+        }
+        val launch = packageManager.getLaunchIntentForPackage(packageName)
+        val pending = PendingIntent.getActivity(
+            this,
+            0,
+            launch,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val builder = if (Build.VERSION.SDK_INT >= 26) {
+            Notification.Builder(this, "messages")
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(this)
+        }
+        val notification = builder
+            .setSmallIcon(applicationInfo.icon)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setAutoCancel(true)
+            .setContentIntent(pending)
+            .build()
+        nm.notify(id, notification)
     }
 
     private fun requestMaxRefreshRate() {

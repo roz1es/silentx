@@ -23,7 +23,6 @@ import '../widgets/chat_tile.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/glass.dart';
 import '../widgets/ios_context_menu.dart';
-import '../widgets/night_mode_switch.dart';
 import '../widgets/new_chat_sheet.dart';
 import '../widgets/styled_qr.dart';
 import 'chat_profile_screen.dart';
@@ -1529,18 +1528,26 @@ class _ChatListScreenState extends State<ChatListScreen>
         final chat = chats[index];
         return Padding(
           padding: const EdgeInsets.only(bottom: 5),
-          child: GlassCard(
-            borderRadius: 18,
-            padding: EdgeInsets.zero,
-            child: ChatTile(
-              chat: chat,
-              avatarUrl: _controller.displayAvatar(chat),
-              serverUrl: _controller.serverUrl,
-              unread: _controller.unreadFor(chat),
-              peerOnline: _controller.isPeerOnline(chat),
-              onTap: () => _openChat(chat),
-              onLongPress: (_) => _chatOptions(chat),
-              compact: AppSettings.instance.compactList,
+          child: _SlidableChatTile(
+            key: ValueKey('slide_${chat.id}'),
+            muted: chat.muted,
+            pinned: chat.pinnedToTop,
+            onMute: () => _controller.toggleMute(chat),
+            onPin: () => _controller.togglePinTop(chat),
+            onDelete: () => _controller.deleteChat(chat),
+            child: GlassCard(
+              borderRadius: 18,
+              padding: EdgeInsets.zero,
+              child: ChatTile(
+                chat: chat,
+                avatarUrl: _controller.displayAvatar(chat),
+                serverUrl: _controller.serverUrl,
+                unread: _controller.unreadFor(chat),
+                peerOnline: _controller.isPeerOnline(chat),
+                onTap: () => _openChat(chat),
+                onLongPress: (_) => _chatOptions(chat),
+                compact: AppSettings.instance.compactList,
+              ),
             ),
           ),
         );
@@ -1829,6 +1836,35 @@ class _SettingsViewState extends State<_SettingsView>
     Clipboard.setData(
         const ClipboardData(text: 'BrenksChat — https://brenkschat.ru'));
     showAppToast(context, 'Ссылка скопирована');
+  }
+
+  /// Чип выбора темы: Светлая / Тёмная / Система.
+  Widget _themeChip(String label, ThemeMode mode) {
+    final selected = widget.themeMode == mode;
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => widget.onThemeModeChanged(mode),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: selected
+                ? accent.withValues(alpha: 0.18)
+                : (_isLight
+                    ? const Color(0xFFF1F3F6)
+                    : Colors.black.withValues(alpha: 0.2)),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: selected ? accent : border),
+          ),
+          child: Text(label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: selected ? accent : _textColor,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13)),
+        ),
+      ),
+    );
   }
 
   Widget _fontChip(String label, double scale) {
@@ -2538,21 +2574,23 @@ class _SettingsViewState extends State<_SettingsView>
                     const SizedBox(height: 8),
                     GlassCard(
                       borderRadius: 18,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
-                      child: Row(
+                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _miniIcon(Icons.dark_mode_rounded),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text('Ночной режим',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: _textColor)),
-                          ),
-                          NightModeSwitch(
-                            isLight: _isLight,
-                            onChanged: widget.onThemeModeChanged,
+                          Text('Тема',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: _textColor)),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              _themeChip('Светлая', ThemeMode.light),
+                              const SizedBox(width: 8),
+                              _themeChip('Тёмная', ThemeMode.dark),
+                              const SizedBox(width: 8),
+                              _themeChip('Система', ThemeMode.system),
+                            ],
                           ),
                         ],
                       ),
@@ -3296,6 +3334,116 @@ class _PillButtonState extends State<_PillButton>
             ),
           ),
           child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
+/// Свайп влево по плитке чата открывает быстрые действия:
+/// мьют / закрепить / удалить. Тап по действию или по плитке закрывает.
+class _SlidableChatTile extends StatefulWidget {
+  const _SlidableChatTile({
+    super.key,
+    required this.child,
+    required this.muted,
+    required this.pinned,
+    required this.onMute,
+    required this.onPin,
+    required this.onDelete,
+  });
+
+  final Widget child;
+  final bool muted;
+  final bool pinned;
+  final VoidCallback onMute;
+  final VoidCallback onPin;
+  final VoidCallback onDelete;
+
+  @override
+  State<_SlidableChatTile> createState() => _SlidableChatTileState();
+}
+
+class _SlidableChatTileState extends State<_SlidableChatTile> {
+  static const _actionsWidth = 168.0; // 3 кнопки по 56.
+  double _dx = 0;
+
+  void _closeAnd(VoidCallback action) {
+    setState(() => _dx = 0);
+    action();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Stack(
+        children: [
+          // Кнопки действий под плиткой (справа).
+          Positioned.fill(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: SizedBox(
+                width: _actionsWidth,
+                child: Row(
+                  children: [
+                    _action(
+                      widget.muted
+                          ? Icons.notifications_active_rounded
+                          : Icons.notifications_off_rounded,
+                      isLight ? const Color(0xFFE7EBF2) : panelSoft,
+                      isLight ? lightText : text,
+                      () => _closeAnd(widget.onMute),
+                    ),
+                    _action(
+                      widget.pinned
+                          ? Icons.push_pin_outlined
+                          : Icons.push_pin_rounded,
+                      accent.withValues(alpha: 0.85),
+                      const Color(0xFF08131A),
+                      () => _closeAnd(widget.onPin),
+                    ),
+                    _action(
+                      Icons.delete_outline_rounded,
+                      danger.withValues(alpha: 0.85),
+                      Colors.white,
+                      () => _closeAnd(widget.onDelete),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOutCubic,
+            transform: Matrix4.translationValues(_dx, 0, 0),
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onHorizontalDragUpdate: (d) => setState(() =>
+                  _dx = (_dx + d.delta.dx).clamp(-_actionsWidth, 0.0)),
+              onHorizontalDragEnd: (_) => setState(
+                  () => _dx = _dx < -_actionsWidth / 2 ? -_actionsWidth : 0),
+              onTap: _dx != 0 ? () => setState(() => _dx = 0) : null,
+              child: widget.child,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _action(
+      IconData icon, Color bg, Color fg, VoidCallback onTap) {
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          color: bg,
+          height: double.infinity,
+          child: Icon(icon, color: fg, size: 22),
         ),
       ),
     );

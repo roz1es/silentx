@@ -76,6 +76,9 @@ class _ChatScreenState extends State<ChatScreen> {
   // markRead) и id первого непрочитанного — для разделителя и прыжка.
   int _initialUnread = 0;
   String? _firstUnreadId;
+  // Мульти-выделение сообщений («Выбрать» в контекстном меню).
+  final Set<String> _selectedIds = {};
+  bool get _selectionMode => _selectedIds.isNotEmpty;
   bool _recordingCircle = false;
   bool _msgSearch = false;
   final _msgSearchController = TextEditingController();
@@ -764,6 +767,38 @@ class _ChatScreenState extends State<ChatScreen> {
                 ],
               ),
             ),
+          // Панель мульти-выделения: пересылка/удаление пачкой.
+          if (_selectionMode)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              color: panelSoft.withValues(alpha: 0.95),
+              child: Row(
+                children: [
+                  IconButton(
+                    tooltip: 'Отмена',
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => setState(() => _selectedIds.clear()),
+                  ),
+                  Expanded(
+                    child: Text('Выбрано: ${_selectedIds.length}',
+                        style: const TextStyle(fontWeight: FontWeight.w800)),
+                  ),
+                  IconButton(
+                    tooltip: 'Переслать',
+                    icon: const Icon(Icons.forward_rounded),
+                    onPressed: _forwardSelected,
+                  ),
+                  if (_selectedAllOwn)
+                    IconButton(
+                      tooltip: 'Удалить',
+                      icon: const Icon(Icons.delete_outline_rounded,
+                          color: danger),
+                      onPressed: _deleteSelected,
+                    ),
+                ],
+              ),
+            ),
           Expanded(
             // Тап по пустому месту ленты прячет клавиатуру (тапы по пузырям и
             // composer выигрывают арену жестов и работают как раньше).
@@ -827,6 +862,8 @@ class _ChatScreenState extends State<ChatScreen> {
                                   onPin: () =>
                                       _controller.setPinnedMessage(message.id),
                                   onForward: () => _forwardMessage(message),
+                                  onSelect: () => setState(
+                                      () => _selectedIds.add(message.id)),
                                   onReaction: (emoji) => _controller
                                       .toggleReaction(message.id, emoji),
                                   onPlayVoice: _playVoice,
@@ -834,6 +871,30 @@ class _ChatScreenState extends State<ChatScreen> {
                                 ),
                                 ),
                               );
+                              // В режиме выделения тап по сообщению —
+                              // добавить/убрать из выбора (жесты пузыря
+                              // поглощаются).
+                              Widget item = bubble;
+                              if (_selectionMode) {
+                                final selected =
+                                    _selectedIds.contains(message.id);
+                                item = GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: () => setState(() {
+                                    if (!_selectedIds.remove(message.id)) {
+                                      _selectedIds.add(message.id);
+                                    }
+                                  }),
+                                  child: AbsorbPointer(
+                                    child: Container(
+                                      color: selected
+                                          ? accent.withValues(alpha: 0.10)
+                                          : null,
+                                      child: bubble,
+                                    ),
+                                  ),
+                                );
+                              }
                               // Разделитель перед первым непрочитанным.
                               if (message.id == _firstUnreadId) {
                                 return Column(
@@ -843,11 +904,11 @@ class _ChatScreenState extends State<ChatScreen> {
                                     _unreadDivider(
                                         Theme.of(context).brightness ==
                                             Brightness.light),
-                                    bubble,
+                                    item,
                                   ],
                                 );
                               }
-                              return bubble;
+                              return item;
                             },
                           ),
                 // Composer поверх ленты — сообщения видны за ним (как в Telegram).
@@ -930,9 +991,54 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  /// Пересылка: лист выбора чата, затем копия сообщения туда. Действие
-  /// выполняется ПОСЛЕ закрытия листа (результат через Navigator.pop).
+  /// Пересылка одного сообщения.
   Future<void> _forwardMessage(Message message) async {
+    final target = await _pickForwardTarget();
+    if (target == null || !mounted) return;
+    _controller.forwardMessage(target.id, message);
+    showAppToast(context, 'Переслано в «${target.title}»');
+  }
+
+  /// Все выбранные сообщения — свои (тогда можно удалить пачкой).
+  bool get _selectedAllOwn {
+    final me = _controller.currentUser.id;
+    return _controller.messages
+        .where((m) => _selectedIds.contains(m.id))
+        .every((m) => m.senderId == me);
+  }
+
+  /// Пересылка выбранных сообщений одной пачкой.
+  Future<void> _forwardSelected() async {
+    final msgs = _controller.messages
+        .where((m) => _selectedIds.contains(m.id) && !m.deleted)
+        .toList(growable: false);
+    if (msgs.isEmpty) return;
+    final target = await _pickForwardTarget();
+    if (target == null || !mounted) return;
+    for (final m in msgs) {
+      _controller.forwardMessage(target.id, m);
+    }
+    setState(() => _selectedIds.clear());
+    showAppToast(context, 'Переслано в «${target.title}» (${msgs.length})');
+  }
+
+  /// Удаление выбранных (только когда все свои).
+  Future<void> _deleteSelected() async {
+    final ids = Set<String>.of(_selectedIds);
+    if (ids.isEmpty) return;
+    if (!await _confirm(
+        'Удалить сообщения?', 'Будет удалено: ${ids.length}.')) {
+      return;
+    }
+    for (final id in ids) {
+      _controller.deleteMessage(id);
+    }
+    if (mounted) setState(() => _selectedIds.clear());
+  }
+
+  /// Лист выбора чата для пересылки (результат через Navigator.pop —
+  /// действие выполняется ПОСЛЕ закрытия листа).
+  Future<Chat?> _pickForwardTarget() async {
     final isLight = Theme.of(context).brightness == Brightness.light;
     final targets =
         _controller.chats.where(_canWrite).toList(growable: false);
@@ -984,9 +1090,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
     );
-    if (target == null || !mounted) return;
-    _controller.forwardMessage(target.id, message);
-    showAppToast(context, 'Переслано в «${target.title}»');
+    return target;
   }
 
   /// Может ли текущий пользователь писать в чат. В канале писать может только

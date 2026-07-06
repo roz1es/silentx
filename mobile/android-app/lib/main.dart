@@ -54,7 +54,11 @@ class _BrenksChatAppState extends State<BrenksChatApp> {
 
   Future<void> _bootstrap() async {
     final savedTheme = await _authStore.loadTheme();
-    final themeMode = savedTheme == 'light' ? ThemeMode.light : ThemeMode.dark;
+    final themeMode = switch (savedTheme) {
+      'light' => ThemeMode.light,
+      'system' => ThemeMode.system,
+      _ => ThemeMode.dark,
+    };
     final token = await _authStore.loadToken();
 
     if (token == null || token.isEmpty) {
@@ -125,7 +129,11 @@ class _BrenksChatAppState extends State<BrenksChatApp> {
   }
 
   Future<void> _setThemeMode(ThemeMode mode) async {
-    await _authStore.saveTheme(mode == ThemeMode.light ? 'light' : 'dark');
+    await _authStore.saveTheme(switch (mode) {
+      ThemeMode.light => 'light',
+      ThemeMode.system => 'system',
+      _ => 'dark',
+    });
     if (!mounted) return;
     setState(() => _themeMode = mode);
   }

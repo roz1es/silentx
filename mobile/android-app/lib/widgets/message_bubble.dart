@@ -26,6 +26,7 @@ class MessageBubble extends StatelessWidget {
     required this.onDelete,
     required this.onPin,
     required this.onForward,
+    required this.onSelect,
     required this.onReaction,
     required this.onPlayVoice,
     this.senderName,
@@ -46,6 +47,7 @@ class MessageBubble extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onPin;
   final VoidCallback onForward;
+  final VoidCallback onSelect;
   final ValueChanged<String> onReaction;
   final ValueChanged<MessageMedia> onPlayVoice;
   final String? senderName;
@@ -396,6 +398,7 @@ class MessageBubble extends StatelessWidget {
         onEdit: onEdit,
         onPin: onPin,
         onForward: onForward,
+        onSelect: onSelect,
         onDelete: onDelete,
         onReaction: onReaction,
       ),
@@ -421,6 +424,7 @@ class _ContextMenu extends StatefulWidget {
     required this.onEdit,
     required this.onPin,
     required this.onForward,
+    required this.onSelect,
     required this.onDelete,
     required this.onReaction,
   });
@@ -435,6 +439,7 @@ class _ContextMenu extends StatefulWidget {
   final VoidCallback onEdit;
   final VoidCallback onPin;
   final VoidCallback onForward;
+  final VoidCallback onSelect;
   final VoidCallback onDelete;
   final ValueChanged<String> onReaction;
 
@@ -616,6 +621,11 @@ class _ContextMenuState extends State<_ContextMenu> {
               _item(Icons.forward_rounded, 'Переслать', () {
                 _close();
                 widget.onForward();
+              }, actionColor),
+            if (!widget.deleted)
+              _item(Icons.check_circle_outline_rounded, 'Выбрать', () {
+                _close();
+                widget.onSelect();
               }, actionColor),
             if (widget.own && !widget.deleted)
               _item(Icons.edit_rounded, 'Изменить', () {

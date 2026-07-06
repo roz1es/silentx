@@ -75,8 +75,12 @@ class _ChatScreenState extends State<ChatScreen> {
   // Сколько было непрочитанных на момент открытия чата (снимается до
   // markRead) и id первого непрочитанного — для разделителя и прыжка.
   int _initialUnread = 0;
+  int _lastReadMs = 0;
   String? _firstUnreadId;
   bool _didInitialScroll = false;
+  // Лента скрыта, пока первичная позиция не применена — иначе на глазах
+  // мелькает пустой чат и прыжок.
+  bool _listReady = false;
   // Мульти-выделение сообщений («Выбрать» в контекстном меню).
   final Set<String> _selectedIds = {};
   bool get _selectionMode => _selectedIds.isNotEmpty;
@@ -96,6 +100,7 @@ class _ChatScreenState extends State<ChatScreen> {
     for (final c in _controller.chats) {
       if (c.id == widget.chatId) {
         _initialUnread = _controller.unreadFor(c);
+        _lastReadMs = c.lastReadAt[_controller.currentUser.id] ?? 0;
         break;
       }
     }
@@ -166,15 +171,26 @@ class _ChatScreenState extends State<ChatScreen> {
       _didInitialScroll = true;
       _lastTick = _controller.incomingMessageTick;
       final msgs = _controller.messages;
-      if (_initialUnread > 0) {
-        // Открываемся на первом непрочитанном (с полосой «Непрочитанные»);
-        // работает и когда непрочитано всё (clamp на первый элемент).
-        final idx = (msgs.length - _initialUnread).clamp(0, msgs.length - 1);
+      // Первое непрочитанное — первое ЧУЖОЕ сообщение новее моего lastReadAt
+      // (точнее, чем счётчик unread, который может врать/устаревать).
+      final me = _controller.currentUser.id;
+      var idx = -1;
+      if (_lastReadMs > 0) {
+        idx = msgs.indexWhere(
+            (m) => m.senderId != me && m.createdAt > _lastReadMs);
+      } else if (_initialUnread > 0) {
+        idx = (msgs.length - _initialUnread).clamp(0, msgs.length - 1);
+      }
+      if (idx > 0) {
         _firstUnreadId = msgs[idx].id;
         _revealFirstUnread();
+      } else if (idx == 0) {
+        // Непрочитано всё — лента и так открыта сверху, только полоса.
+        _firstUnreadId = msgs[0].id;
       } else {
         _scrollToBottom(instant: true);
       }
+      _revealList();
     } else if (_didInitialScroll &&
         _controller.incomingMessageTick != _lastTick) {
       _lastTick = _controller.incomingMessageTick;
@@ -624,32 +640,44 @@ class _ChatScreenState extends State<ChatScreen> {
     return 'Сообщение';
   }
 
+  /// Показ ленты после применения первичной позиции (через два кадра —
+  /// прыжок и точное наведение уже выполнены).
+  void _revealList() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_listReady) setState(() => _listReady = true);
+      });
+    });
+  }
+
   /// Открытие чата с непрочитанными: лента открывается на первом из них
-  /// (грубый прыжок по доле индекса, затем точное наведение по ключу).
+  /// (грубый прыжок по доле индекса, затем точное наведение по ключу,
+  /// с ретраями — элемент может быть ещё не построен).
   void _revealFirstUnread() {
     final messages = _controller.messages;
     final idx = messages.indexWhere((m) => m.id == _firstUnreadId);
-    if (idx < 0) {
-      _scrollToBottom(instant: true);
+    if (idx <= 0) {
+      if (idx < 0) _scrollToBottom(instant: true);
       return;
     }
-    // Непрочитано всё — лента и так открыта сверху, остаёмся на месте.
-    if (idx == 0) return;
     final target = messages[idx];
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    var attempts = 0;
+    void settle() {
       if (!mounted || !_scrollController.hasClients) return;
+      final ctx = GlobalObjectKey(target).currentContext;
+      if (ctx != null && ctx.mounted) {
+        Scrollable.ensureVisible(ctx, alignment: 0.1);
+        return;
+      }
+      if (attempts++ >= 4) return;
       final max = _scrollController.position.maxScrollExtent;
       final offset =
           messages.length <= 1 ? 0.0 : (idx / (messages.length - 1)) * max;
       _scrollController.jumpTo(offset.clamp(0.0, max));
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        final ctx = GlobalObjectKey(target).currentContext;
-        if (ctx != null && ctx.mounted) {
-          Scrollable.ensureVisible(ctx, alignment: 0.12);
-        }
-      });
-    });
+      WidgetsBinding.instance.addPostFrameCallback((_) => settle());
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => settle());
   }
 
   /// Полоса «Непрочитанные сообщения» перед первым непрочитанным
@@ -841,7 +869,9 @@ class _ChatScreenState extends State<ChatScreen> {
                             title: 'Сообщений пока нет',
                             subtitle: 'Напишите первое сообщение.',
                           )
-                        : ListView.builder(
+                        : Opacity(
+                            opacity: _listReady ? 1 : 0,
+                            child: ListView.builder(
                             controller: _scrollController,
                             // Свайп по ленте плавно прячет клавиатуру.
                             keyboardDismissBehavior:
@@ -926,6 +956,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               }
                               return item;
                             },
+                          ),
                           ),
                 // Composer поверх ленты — сообщения видны за ним (как в Telegram).
                 Positioned(

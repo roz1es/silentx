@@ -76,6 +76,7 @@ class _ChatScreenState extends State<ChatScreen> {
   // markRead) и id первого непрочитанного — для разделителя и прыжка.
   int _initialUnread = 0;
   String? _firstUnreadId;
+  bool _didInitialScroll = false;
   // Мульти-выделение сообщений («Выбрать» в контекстном меню).
   final Set<String> _selectedIds = {};
   bool get _selectionMode => _selectedIds.isNotEmpty;
@@ -156,30 +157,34 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _onControllerChanged() {
     if (!mounted) return;
-    if (_controller.incomingMessageTick != _lastTick) {
-      final firstSync = _lastTick == -1;
+    // Первичная прокрутка — только когда сообщения РЕАЛЬНО загрузились
+    // (первое уведомление контроллера может быть про presence/чаты, когда
+    // лента ещё пуста — из-за этого чат раньше открывался в начале истории).
+    if (!_didInitialScroll &&
+        !_controller.loadingMessages &&
+        _controller.messages.isNotEmpty) {
+      _didInitialScroll = true;
       _lastTick = _controller.incomingMessageTick;
       final msgs = _controller.messages;
-      if (firstSync) {
-        // Первая загрузка: если были непрочитанные — открываемся на первом
-        // из них (с разделителем), иначе как раньше — в конец. Работает и
-        // когда непрочитано ВСЁ (clamp на первый элемент).
-        if (_initialUnread > 0 && msgs.isNotEmpty) {
-          final idx =
-              (msgs.length - _initialUnread).clamp(0, msgs.length - 1);
-          _firstUnreadId = msgs[idx].id;
-          _revealFirstUnread();
-        } else {
-          _scrollToBottom(instant: true);
-        }
+      if (_initialUnread > 0) {
+        // Открываемся на первом непрочитанном (с полосой «Непрочитанные»);
+        // работает и когда непрочитано всё (clamp на первый элемент).
+        final idx = (msgs.length - _initialUnread).clamp(0, msgs.length - 1);
+        _firstUnreadId = msgs[idx].id;
+        _revealFirstUnread();
       } else {
-        // Лёгкое вибро на входящее чужое сообщение (не на загрузку чата).
-        if (msgs.isNotEmpty &&
-            msgs.last.senderId != _controller.currentUser.id) {
-          HapticFeedback.lightImpact();
-        }
-        _scrollToBottom();
+        _scrollToBottom(instant: true);
       }
+    } else if (_didInitialScroll &&
+        _controller.incomingMessageTick != _lastTick) {
+      _lastTick = _controller.incomingMessageTick;
+      // Лёгкое вибро на входящее чужое сообщение (не на загрузку чата).
+      final msgs = _controller.messages;
+      if (msgs.isNotEmpty &&
+          msgs.last.senderId != _controller.currentUser.id) {
+        HapticFeedback.lightImpact();
+      }
+      _scrollToBottom();
     }
     setState(() {});
   }

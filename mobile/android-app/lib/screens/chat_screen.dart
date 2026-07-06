@@ -72,6 +72,10 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<double> _recEnv = [];
   int _lastTick = -1;
   int _bgIndex = 0;
+  // Сколько было непрочитанных на момент открытия чата (снимается до
+  // markRead) и id первого непрочитанного — для разделителя и прыжка.
+  int _initialUnread = 0;
+  String? _firstUnreadId;
   bool _recordingCircle = false;
   bool _msgSearch = false;
   final _msgSearchController = TextEditingController();
@@ -84,6 +88,23 @@ class _ChatScreenState extends State<ChatScreen> {
     _controller.addListener(_onControllerChanged);
     _scrollController.addListener(_onScroll);
     AppSettings.instance.addListener(_onAppSettings);
+    // Снимаем количество непрочитанных ДО openChat (он делает markRead).
+    for (final c in _controller.chats) {
+      if (c.id == widget.chatId) {
+        _initialUnread = _controller.unreadFor(c);
+        break;
+      }
+    }
+    // Черновик: восстанавливаем недописанный текст.
+    unawaited(SharedPreferences.getInstance().then((p) {
+      final draft = p.getString('draft_${widget.chatId}');
+      if (draft != null &&
+          draft.isNotEmpty &&
+          mounted &&
+          _messageController.text.isEmpty) {
+        _messageController.text = draft;
+      }
+    }));
     // Открываем чат после первого кадра, чтобы синхронный notifyListeners
     // внутри openChat не вызвал setState во время инициализации.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -94,6 +115,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    // Черновик: сохраняем недописанное (пустое — удаляем).
+    final draft = _messageController.text;
+    unawaited(SharedPreferences.getInstance().then((p) => draft.trim().isEmpty
+        ? p.remove('draft_${widget.chatId}')
+        : p.setString('draft_${widget.chatId}', draft)));
     _controller.removeListener(_onControllerChanged);
     AppSettings.instance.removeListener(_onAppSettings);
     _controller.closeActiveChat();
@@ -128,14 +154,26 @@ class _ChatScreenState extends State<ChatScreen> {
   void _onControllerChanged() {
     if (!mounted) return;
     if (_controller.incomingMessageTick != _lastTick) {
+      final firstSync = _lastTick == -1;
       _lastTick = _controller.incomingMessageTick;
-      // Лёгкое вибро на входящее чужое сообщение.
       final msgs = _controller.messages;
-      if (msgs.isNotEmpty &&
-          msgs.last.senderId != _controller.currentUser.id) {
-        HapticFeedback.lightImpact();
+      if (firstSync) {
+        // Первая загрузка: если были непрочитанные — открываемся на первом
+        // из них (с разделителем), иначе как раньше — в конец.
+        if (_initialUnread > 0 && msgs.length > _initialUnread) {
+          _firstUnreadId = msgs[msgs.length - _initialUnread].id;
+          _revealFirstUnread();
+        } else {
+          _scrollToBottom(instant: true);
+        }
+      } else {
+        // Лёгкое вибро на входящее чужое сообщение (не на загрузку чата).
+        if (msgs.isNotEmpty &&
+            msgs.last.senderId != _controller.currentUser.id) {
+          HapticFeedback.lightImpact();
+        }
+        _scrollToBottom();
       }
-      _scrollToBottom();
     }
     setState(() {});
   }
@@ -543,6 +581,57 @@ class _ChatScreenState extends State<ChatScreen> {
     return 'Сообщение';
   }
 
+  /// Открытие чата с непрочитанными: лента открывается на первом из них
+  /// (грубый прыжок по доле индекса, затем точное наведение по ключу).
+  void _revealFirstUnread() {
+    final messages = _controller.messages;
+    final idx = messages.length - _initialUnread;
+    if (idx <= 0 || idx >= messages.length) {
+      _scrollToBottom(instant: true);
+      return;
+    }
+    final target = messages[idx];
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      final max = _scrollController.position.maxScrollExtent;
+      final offset =
+          messages.length <= 1 ? 0.0 : (idx / (messages.length - 1)) * max;
+      _scrollController.jumpTo(offset.clamp(0.0, max));
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final ctx = GlobalObjectKey(target).currentContext;
+        if (ctx != null && ctx.mounted) {
+          Scrollable.ensureVisible(ctx, alignment: 0.12);
+        }
+      });
+    });
+  }
+
+  /// Разделитель «Новые сообщения» перед первым непрочитанным.
+  Widget _unreadDivider(bool isLight) {
+    final line = (isLight ? lightMuted : muted).withValues(alpha: 0.35);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Expanded(child: Container(height: 1, color: line)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Text(
+              'Новые сообщения',
+              style: TextStyle(
+                color: isLight ? lightMuted : muted,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Expanded(child: Container(height: 1, color: line)),
+        ],
+      ),
+    );
+  }
+
   /// Тап по плашке-ответу: прокрутить ленту к оригинальному сообщению и кратко
   /// подсветить его. Если оригинал вне экрана — сначала грубо доскроллим по
   /// индексу, затем точно наводимся через ensureVisible.
@@ -687,7 +776,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               final message = messages[index];
                               final isOwn = message.senderId ==
                                   _controller.currentUser.id;
-                              return KeyedSubtree(
+                              final bubble = KeyedSubtree(
                                 key: GlobalObjectKey(message),
                                 // Изолируем перерисовку пузыря от соседей.
                                 child: RepaintBoundary(
@@ -720,6 +809,20 @@ class _ChatScreenState extends State<ChatScreen> {
                                 ),
                                 ),
                               );
+                              // Разделитель перед первым непрочитанным.
+                              if (message.id == _firstUnreadId) {
+                                return Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    _unreadDivider(
+                                        Theme.of(context).brightness ==
+                                            Brightness.light),
+                                    bubble,
+                                  ],
+                                );
+                              }
+                              return bubble;
                             },
                           ),
                 // Composer поверх ленты — сообщения видны за ним (как в Telegram).

@@ -277,7 +277,17 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted || bytes == null) return;
       await _previewAndSendImage(bytes, 'camera.jpg');
     } else if (result.bytes != null) {
-      await _previewAndSendImage(result.bytes!, result.name ?? 'photo.jpg');
+      final name = result.name ?? 'photo.jpg';
+      final mime = lookupMimeType(name,
+              headerBytes: result.bytes!.take(16).toList()) ??
+          '';
+      if (mime.startsWith('video/')) {
+        // Видео — сразу файлом, без фото-предпросмотра (Image.memory
+        // видео-байты не отрисует).
+        await _sendMediaBytes(result.bytes!, name);
+      } else {
+        await _previewAndSendImage(result.bytes!, name);
+      }
     }
   }
 
@@ -374,7 +384,7 @@ class _ChatScreenState extends State<ChatScreen> {
               'image/jpeg';
       final dataUrl = 'data:$mimeType;base64,${base64Encode(bytes)}';
       if (dataUrl.length > _maxMediaDataUrlLength) {
-        _showSnack('Фото слишком большое для текущего сервера.');
+        _showSnack('Вложение слишком большое для текущего сервера.');
         return;
       }
       final isImage = !asFile && mimeType.startsWith('image/');

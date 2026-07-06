@@ -120,6 +120,8 @@ class _VoicePreviewState extends State<VoicePreview> {
   Duration _dur = Duration.zero;
   String? _path;
   bool _preparing = false;
+  // Скорость воспроизведения: 1 → 1.5 → 2 → 1.
+  double _rate = 1;
   // Байты декодируем ОДИН раз: раньше base64-декод шёл в каждом build —
   // при десятках голосовых любой rebuild ленты жевал мегабайты в UI-потоке.
   late final Uint8List? _bytes = bytesFromDataUrl(widget.media.dataUrl);
@@ -187,9 +189,37 @@ class _VoicePreviewState extends State<VoicePreview> {
       }
       await _player.stop();
       await _player.play(DeviceFileSource(_path!));
+      await _player.setPlaybackRate(_rate);
       _preparing = false;
     } on Object {
       _preparing = false;
+    }
+  }
+
+  Future<void> _cycleRate() async {
+    final next = _rate >= 2 ? 1.0 : (_rate >= 1.5 ? 2.0 : 1.5);
+    setState(() => _rate = next);
+    try {
+      await _player.setPlaybackRate(next);
+    } on Object {
+      // Не критично — применится при следующем запуске.
+    }
+  }
+
+  /// Перемотка тапом по волне (когда трек уже играет/на паузе).
+  Future<void> _seekToFraction(double fraction) async {
+    final totalMs = _dur.inMilliseconds > 0
+        ? _dur.inMilliseconds
+        : (widget.media.durationMs ?? 0);
+    if (totalMs <= 0) return;
+    if (_state != PlayerState.playing && _state != PlayerState.paused) return;
+    final target =
+        Duration(milliseconds: (totalMs * fraction.clamp(0.0, 1.0)).round());
+    try {
+      await _player.seek(target);
+      if (mounted) setState(() => _pos = target);
+    } on Object {
+      // Плеер не готов — пропускаем.
     }
   }
 
@@ -240,11 +270,39 @@ class _VoicePreviewState extends State<VoicePreview> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            _VoiceWave(bars: _wave, progress: progress),
+            // Тап по волне — перемотка (когда трек играет/на паузе).
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (d) => _seekToFraction(
+                  d.localPosition.dx / (_wave.length * 4.5)),
+              child: _VoiceWave(bars: _wave, progress: progress),
+            ),
             const SizedBox(height: 5),
             Text(meta, style: const TextStyle(color: muted, fontSize: 11)),
           ],
         ),
+        if (_playing || _state == PlayerState.paused) ...[
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: _cycleRate,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: accent.withValues(alpha: 0.4)),
+              ),
+              child: Text(
+                _rate == 1 ? '1×' : (_rate == 1.5 ? '1.5×' : '2×'),
+                style: TextStyle(
+                    color: accent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

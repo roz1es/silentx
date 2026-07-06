@@ -5,6 +5,12 @@ import 'package:photo_manager/photo_manager.dart';
 
 import '../theme/app_theme.dart';
 
+String _fmtVideo(Duration d) {
+  final m = d.inMinutes;
+  final s = d.inSeconds % 60;
+  return '$m:${s.toString().padLeft(2, '0')}';
+}
+
 /// Результат листа вложений: фото из галереи (байты + имя), запрос системного
 /// файла или запрос моментальной съёмки на камеру.
 class AttachResult {
@@ -85,7 +91,8 @@ class _AttachSheetState extends State<AttachSheet> {
         return;
       }
       final paths = await PhotoManager.getAssetPathList(
-        type: RequestType.image,
+        // Фото и видео (видео уходит сообщением-файлом).
+        type: RequestType.common,
         onlyAll: true,
         filterOption: FilterOptionGroup(
           orders: [
@@ -122,7 +129,9 @@ class _AttachSheetState extends State<AttachSheet> {
         return;
       }
       final title = await asset.titleAsync;
-      final name = title.isNotEmpty ? title : 'photo.jpg';
+      final fallback =
+          asset.type == AssetType.video ? 'video.mp4' : 'photo.jpg';
+      final name = title.isNotEmpty ? title : fallback;
       if (!mounted) return;
       Navigator.of(context).pop(AttachResult.image(bytes, name));
     } on Object {
@@ -468,6 +477,33 @@ class _AssetThumbState extends State<_AssetThumb> {
                     gaplessPlayback: true,
                   ),
           ),
+          // Бейдж длительности для видео.
+          if (widget.asset.type == AssetType.video)
+            Positioned(
+              left: 5,
+              bottom: 5,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.videocam_rounded,
+                        size: 12, color: Colors.white),
+                    const SizedBox(width: 3),
+                    Text(
+                      _fmtVideo(widget.asset.videoDuration),
+                      style:
+                          const TextStyle(color: Colors.white, fontSize: 10),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           if (sel != null) ...[
             Container(
               decoration: BoxDecoration(

@@ -4,7 +4,6 @@ import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
@@ -3375,6 +3374,23 @@ class _SlidableChatTileState extends State<_SlidableChatTile> {
     action();
   }
 
+  void _onDragStart(DragStartDetails _) =>
+      setState(() => _dragging = true);
+
+  void _onDragUpdate(DragUpdateDetails d) => setState(
+      () => _dx = (_dx + d.delta.dx).clamp(-_actionsWidth, 0.0));
+
+  void _onDragEnd(DragEndDetails _) => _settle();
+
+  // Отменённый жест (его перехватил вертикальный скролл) тоже доводим —
+  // иначе плитка застревает полусдвинутой («обрезок»).
+  void _onDragCancel() => _settle();
+
+  void _settle() => setState(() {
+        _dragging = false;
+        _dx = _dx < -_actionsWidth / 2 ? -_actionsWidth : 0;
+      });
+
   @override
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
@@ -3440,48 +3456,33 @@ class _SlidableChatTileState extends State<_SlidableChatTile> {
                 _dragging ? Duration.zero : const Duration(milliseconds: 160),
             curve: Curves.easeOutCubic,
             transform: Matrix4.translationValues(_dx, 0, 0),
-            // Свайп плитки стартует только из ПРАВОЙ зоны (где время) либо
-            // когда панель уже открыта — свайп из середины списка уходит
-            // переключению папок.
-            child: RawGestureDetector(
+            // Когда панель закрыта, у плитки НЕТ горизонтальных жестов —
+            // свайп по середине гарантированно уходит переключению папок.
+            // Открытая панель тянется/закрывается из любого места плитки.
+            child: GestureDetector(
               behavior: HitTestBehavior.translucent,
-              gestures: {
-                _ZonedHDragRecognizer: GestureRecognizerFactoryWithHandlers<
-                    _ZonedHDragRecognizer>(
-                  () => _ZonedHDragRecognizer(
-                    debugOwner: this,
-                    canStart: (local) {
-                      if (_dx != 0) return true;
-                      final w = context.size?.width ?? 360;
-                      // Правая треть плитки (мин. 130px) — зона свайпа
-                      // кнопок; из середины списка листаются папки.
-                      return local.dx > w - math.max(130.0, w * 0.33);
-                    },
-                  ),
-                  (r) => r
-                    ..onStart = ((_) => setState(() => _dragging = true))
-                    ..onUpdate = ((d) => setState(() =>
-                        _dx = (_dx + d.delta.dx).clamp(-_actionsWidth, 0.0)))
-                    ..onEnd = ((_) => setState(() {
-                          _dragging = false;
-                          _dx =
-                              _dx < -_actionsWidth / 2 ? -_actionsWidth : 0;
-                        }))
-                    // Отменённый жест (его перехватил вертикальный скролл)
-                    // тоже доводим — иначе плитка застревала полусдвинутой
-                    // («обрезок»), а кнопки оставались недоступными.
-                    ..onCancel = (() => setState(() {
-                          _dragging = false;
-                          _dx =
-                              _dx < -_actionsWidth / 2 ? -_actionsWidth : 0;
-                        })),
-                ),
-              },
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: _dx != 0 ? () => setState(() => _dx = 0) : null,
-                child: widget.child,
-              ),
+              onTap: _dx != 0 ? () => setState(() => _dx = 0) : null,
+              onHorizontalDragStart: _dx != 0 ? _onDragStart : null,
+              onHorizontalDragUpdate: _dx != 0 ? _onDragUpdate : null,
+              onHorizontalDragEnd: _dx != 0 ? _onDragEnd : null,
+              onHorizontalDragCancel: _dx != 0 ? _onDragCancel : null,
+              child: widget.child,
+            ),
+          ),
+          // Прозрачная зона справа (где время): свайп отсюда открывает
+          // кнопки. Тапы проходят сквозь неё к плитке.
+          Positioned(
+            top: 0,
+            bottom: 0,
+            right: 0,
+            width: 130,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onHorizontalDragStart: _onDragStart,
+              onHorizontalDragUpdate: _onDragUpdate,
+              onHorizontalDragEnd: _onDragEnd,
+              onHorizontalDragCancel: _onDragCancel,
+              child: const SizedBox.expand(),
             ),
           ),
         ],
@@ -3502,19 +3503,5 @@ class _SlidableChatTileState extends State<_SlidableChatTile> {
         ),
       ),
     );
-  }
-}
-
-/// Горизонтальный drag, стартующий только из разрешённой зоны (правый край
-/// плитки чата) — свайп из середины списка уходит переключению папок.
-class _ZonedHDragRecognizer extends HorizontalDragGestureRecognizer {
-  _ZonedHDragRecognizer({required this.canStart, super.debugOwner});
-
-  final bool Function(Offset localPosition) canStart;
-
-  @override
-  void addAllowedPointer(PointerDownEvent event) {
-    if (!canStart(event.localPosition)) return;
-    super.addAllowedPointer(event);
   }
 }

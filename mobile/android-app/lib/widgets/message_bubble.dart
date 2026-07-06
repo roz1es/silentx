@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../format.dart';
 import '../models.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import 'glass.dart';
 import 'media_preview.dart';
@@ -297,13 +298,9 @@ class MessageBubble extends StatelessWidget {
         (hasEdited ? 30.0 : 0.0);
     return Stack(
       children: [
-        Text.rich(
-          TextSpan(
-            text: body,
-            children: [
-              WidgetSpan(child: SizedBox(width: reserve, height: 1)),
-            ],
-          ),
+        _LinkText(
+          body: body,
+          reserve: reserve,
           style: TextStyle(
             color: textColor,
             fontSize: 15 * fontScale,
@@ -840,5 +837,82 @@ class _LeftDragGestureRecognizer extends HorizontalDragGestureRecognizer {
     }
     if (_rejected) return;
     super.handleEvent(event);
+  }
+}
+
+/// Текст сообщения с кликабельными http(s)-ссылками. Stateful — чтобы
+/// корректно освобождать TapGestureRecognizer'ы ссылок.
+class _LinkText extends StatefulWidget {
+  const _LinkText({
+    required this.body,
+    required this.reserve,
+    required this.style,
+  });
+
+  final String body;
+
+  /// Ширина «резерва» под инлайн-время в конце текста.
+  final double reserve;
+  final TextStyle style;
+
+  @override
+  State<_LinkText> createState() => _LinkTextState();
+}
+
+class _LinkTextState extends State<_LinkText> {
+  static final _urlRe = RegExp(r'https?://[^\s]+');
+  final List<TapGestureRecognizer> _recognizers = [];
+
+  @override
+  void dispose() {
+    for (final r in _recognizers) {
+      r.dispose();
+    }
+    super.dispose();
+  }
+
+  List<InlineSpan> _spans() {
+    // Пересоздаём распознаватели на каждый build, старые освобождаем.
+    for (final r in _recognizers) {
+      r.dispose();
+    }
+    _recognizers.clear();
+    final spans = <InlineSpan>[];
+    var last = 0;
+    for (final m in _urlRe.allMatches(widget.body)) {
+      if (m.start > last) {
+        spans.add(TextSpan(text: widget.body.substring(last, m.start)));
+      }
+      final url = m.group(0)!;
+      final rec = TapGestureRecognizer()..onTap = () => openExternalUrl(url);
+      _recognizers.add(rec);
+      spans.add(TextSpan(
+        text: url,
+        style: TextStyle(
+          color: accent,
+          decoration: TextDecoration.underline,
+          decorationColor: accent.withValues(alpha: 0.6),
+        ),
+        recognizer: rec,
+      ));
+      last = m.end;
+    }
+    if (last < widget.body.length) {
+      spans.add(TextSpan(text: widget.body.substring(last)));
+    }
+    return spans;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Text.rich(
+      TextSpan(
+        children: [
+          ..._spans(),
+          WidgetSpan(child: SizedBox(width: widget.reserve, height: 1)),
+        ],
+      ),
+      style: widget.style,
+    );
   }
 }

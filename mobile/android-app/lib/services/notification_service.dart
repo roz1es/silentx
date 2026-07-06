@@ -1,6 +1,16 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+/// Открыть http(s)-ссылку во внешнем браузере через натив (без url_launcher).
+Future<void> openExternalUrl(String url) async {
+  try {
+    await NotificationService._channel
+        .invokeMethod<void>('openUrl', {'url': url});
+  } on Object {
+    // Натив недоступен — молча пропускаем.
+  }
+}
+
 /// Локальные уведомления о сообщениях (без Firebase): натив показывает их
 /// через MethodChannel, пока живо соединение с сокетом. Показываем, когда
 /// приложение свёрнуто или открыт другой чат.

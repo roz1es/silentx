@@ -1960,6 +1960,21 @@ class _SettingsViewState extends State<_SettingsView>
     if (mounted) setState(() {});
   }
 
+  /// «Избранное» — личный чат-заметки: создаётся сервером при первом входе.
+  Future<void> _openSaved() async {
+    try {
+      final id = await _ctrl.ensureSavedChat();
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        SwipeBackPageRoute(
+          builder: (_) => ChatScreen(controller: _ctrl, chatId: id),
+        ),
+      );
+    } on Object catch (e) {
+      if (mounted) showAppToast(context, 'Ошибка: $e', error: true);
+    }
+  }
+
   Widget _settingsRow(IconData icon, String label, VoidCallback onTap) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -2515,6 +2530,9 @@ class _SettingsViewState extends State<_SettingsView>
                         ),
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    _settingsRow(
+                        Icons.bookmark_rounded, 'Избранное', _openSaved),
                     const SizedBox(height: 20),
                     _sectionLabel('ОФОРМЛЕНИЕ'),
                     const SizedBox(height: 8),

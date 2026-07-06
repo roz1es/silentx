@@ -393,6 +393,14 @@ class MessengerController extends ChangeNotifier {
     _socket?.editMessage(chatId: chatId, messageId: messageId, text: text);
   }
 
+  /// Открыть (создав при необходимости) чат «Избранное». Возвращает его id.
+  Future<String> ensureSavedChat() async {
+    final chat = await api.ensureSavedChat();
+    _upsertChat(chat);
+    notifyListeners();
+    return chat.id;
+  }
+
   /// Переслать сообщение в другой чат — обычная отправка копии (текст+медиа),
   /// сервер и контракт не меняются.
   void forwardMessage(String chatId, Message message) {

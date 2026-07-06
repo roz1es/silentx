@@ -393,6 +393,13 @@ class ApiClient {
         .toList(growable: false);
   }
 
+  /// Личный чат «Избранное» (заметки себе): сервер создаёт при первом
+  /// обращении и возвращает существующий при повторных.
+  Future<Chat> ensureSavedChat() async {
+    final json = await _request('/api/chats/saved', method: 'POST');
+    return Chat.fromJson((json['chat'] as Map).cast<String, dynamic>());
+  }
+
   /// Последние сообщения чата (по умолчанию 80). [before] — createdAt самого
   /// старого загруженного сообщения для подгрузки истории при скролле вверх.
   Future<List<Message>> fetchMessages(String chatId,

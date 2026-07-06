@@ -45,6 +45,24 @@ class MainActivity : FlutterActivity() {
                         getSystemService(NotificationManager::class.java)?.cancelAll()
                         result.success(true)
                     }
+                    "openUrl" -> {
+                        val url = call.argument<String>("url")
+                        if (url != null &&
+                            (url.startsWith("http://") || url.startsWith("https://"))
+                        ) {
+                            try {
+                                startActivity(
+                                    android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW,
+                                        android.net.Uri.parse(url),
+                                    )
+                                )
+                            } catch (_: Throwable) {
+                                // Нет браузера — молча пропускаем.
+                            }
+                        }
+                        result.success(true)
+                    }
                     else -> result.notImplemented()
                 }
             }

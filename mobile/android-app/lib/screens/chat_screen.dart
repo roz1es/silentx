@@ -1679,7 +1679,8 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-/// Появление свежего сообщения: лёгкий подъём снизу + проявление.
+/// Появление свежего сообщения: пузырь «вырастает» по высоте (как в
+/// Telegram) — одно слитное движение вместе с автоскроллом, без прыжков.
 class _AppearAnimation extends StatelessWidget {
   const _AppearAnimation({required this.enabled, required this.child});
 
@@ -1691,13 +1692,13 @@ class _AppearAnimation extends StatelessWidget {
     if (!enabled) return child;
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 220),
+      duration: const Duration(milliseconds: 200),
       curve: Curves.easeOutCubic,
       child: child,
-      builder: (context, t, child) => Opacity(
-        opacity: t,
-        child: Transform.translate(
-          offset: Offset(0, 14 * (1 - t)),
+      builder: (context, t, child) => ClipRect(
+        child: Align(
+          alignment: Alignment.topCenter,
+          heightFactor: t,
           child: child,
         ),
       ),

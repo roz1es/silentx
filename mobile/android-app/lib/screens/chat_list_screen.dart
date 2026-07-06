@@ -3367,6 +3367,7 @@ class _SlidableChatTile extends StatefulWidget {
 class _SlidableChatTileState extends State<_SlidableChatTile> {
   static const _actionsWidth = 168.0; // 3 кнопки по 56.
   double _dx = 0;
+  bool _dragging = false;
 
   void _closeAnd(VoidCallback action) {
     setState(() => _dx = 0);
@@ -3380,18 +3381,26 @@ class _SlidableChatTileState extends State<_SlidableChatTile> {
       borderRadius: BorderRadius.circular(18),
       child: Stack(
         children: [
-          // Кнопки действий под плиткой (справа): проявляются плавно, в такт
-          // сдвигу (GlassCard полупрозрачный — при 0 их не видно совсем).
-          Positioned.fill(
-            child: IgnorePointer(
-              ignoring: _dx == 0,
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 120),
-                opacity: (-_dx / _actionsWidth).clamp(0.0, 1.0),
-                child: Align(
-              alignment: Alignment.centerRight,
+          // Кнопки действий (справа): выезжают из-за края в такт пальцу —
+          // ширина панели равна сдвигу плитки.
+          Positioned(
+            top: 0,
+            bottom: 0,
+            right: 0,
+            child: AnimatedContainer(
+              duration: _dragging
+                  ? Duration.zero
+                  : const Duration(milliseconds: 160),
+              curve: Curves.easeOutCubic,
+              width: (-_dx).clamp(0.0, _actionsWidth),
+              child: ClipRect(
+                child: OverflowBox(
+                  minWidth: _actionsWidth,
+                  maxWidth: _actionsWidth,
+                  alignment: Alignment.centerRight,
               child: SizedBox(
                 width: _actionsWidth,
+                height: double.infinity,
                 child: Row(
                   children: [
                     _action(
@@ -3424,15 +3433,22 @@ class _SlidableChatTileState extends State<_SlidableChatTile> {
             ),
           ),
           AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
+            // Во время драга — строго за пальцем (без анимации), доводка
+            // после отпускания — плавная.
+            duration:
+                _dragging ? Duration.zero : const Duration(milliseconds: 160),
             curve: Curves.easeOutCubic,
             transform: Matrix4.translationValues(_dx, 0, 0),
             child: GestureDetector(
               behavior: HitTestBehavior.translucent,
+              onHorizontalDragStart: (_) =>
+                  setState(() => _dragging = true),
               onHorizontalDragUpdate: (d) => setState(() =>
                   _dx = (_dx + d.delta.dx).clamp(-_actionsWidth, 0.0)),
-              onHorizontalDragEnd: (_) => setState(
-                  () => _dx = _dx < -_actionsWidth / 2 ? -_actionsWidth : 0),
+              onHorizontalDragEnd: (_) => setState(() {
+                _dragging = false;
+                _dx = _dx < -_actionsWidth / 2 ? -_actionsWidth : 0;
+              }),
               onTap: _dx != 0 ? () => setState(() => _dx = 0) : null,
               child: widget.child,
             ),

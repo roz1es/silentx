@@ -377,6 +377,7 @@ class Message {
     this.editedAt,
     this.replyToMessageId,
     this.reactions = const {},
+    this.pending = false,
   });
 
   final String id;
@@ -390,6 +391,10 @@ class Message {
   final int? editedAt;
   final String? replyToMessageId;
   final Map<String, List<String>> reactions;
+
+  /// Локальное сообщение из очереди офлайн-отправки («часики»): ещё не
+  /// подтверждено сервером. На сервер это поле не уходит.
+  final bool pending;
 
   /// Возвращает копию сообщения с заменой отдельных полей.
   Message copyWith({
@@ -410,6 +415,7 @@ class Message {
       editedAt: editedAt ?? this.editedAt,
       replyToMessageId: replyToMessageId,
       reactions: reactions ?? this.reactions,
+      pending: pending,
     );
   }
 

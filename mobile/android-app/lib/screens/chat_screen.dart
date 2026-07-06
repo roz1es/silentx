@@ -680,6 +680,60 @@ class _ChatScreenState extends State<ChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => settle());
   }
 
+  /// Сообщения группируются: один отправитель, тот же день, до 4 минут.
+  bool _sameGroup(Message a, Message b) =>
+      a.senderId == b.senderId &&
+      !a.deleted &&
+      !b.deleted &&
+      (b.createdAt - a.createdAt).abs() < 4 * 60 * 1000 &&
+      _sameDay(a.createdAt, b.createdAt);
+
+  static bool _sameDay(int aMs, int bMs) {
+    final a = DateTime.fromMillisecondsSinceEpoch(aMs);
+    final b = DateTime.fromMillisecondsSinceEpoch(bMs);
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  static const _months = [
+    'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+    'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
+  ];
+
+  String _dateLabel(int ms) {
+    final d = DateTime.fromMillisecondsSinceEpoch(ms);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(d.year, d.month, d.day);
+    final diff = today.difference(day).inDays;
+    if (diff == 0) return 'Сегодня';
+    if (diff == 1) return 'Вчера';
+    final base = '${d.day} ${_months[d.month - 1]}';
+    return d.year == now.year ? base : '$base ${d.year}';
+  }
+
+  /// Чип даты между днями («Сегодня», «Вчера», «5 июля»).
+  Widget _dateChip(int ms, bool isLight) {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        decoration: BoxDecoration(
+          color: (isLight ? Colors.white : panelSoft)
+              .withValues(alpha: isLight ? 0.8 : 0.85),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          _dateLabel(ms),
+          style: TextStyle(
+            color: isLight ? lightMuted : muted,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Полоса «Непрочитанные сообщения» перед первым непрочитанным
   /// (как в Telegram — заметная плашка на всю ширину).
   Widget _unreadDivider(bool isLight) {
@@ -882,6 +936,17 @@ class _ChatScreenState extends State<ChatScreen> {
                               final message = messages[index];
                               final isOwn = message.senderId ==
                                   _controller.currentUser.id;
+                              // Группировка подряд идущих сообщений одного
+                              // отправителя (в пределах 4 минут одного дня).
+                              final prev =
+                                  index > 0 ? messages[index - 1] : null;
+                              final next = index < messages.length - 1
+                                  ? messages[index + 1]
+                                  : null;
+                              final groupedWithNext = next != null &&
+                                  _sameGroup(message, next);
+                              final groupedWithPrev = prev != null &&
+                                  _sameGroup(prev, message);
                               final bubble = KeyedSubtree(
                                 key: GlobalObjectKey(message),
                                 // Изолируем перерисовку пузыря от соседей.
@@ -893,7 +958,11 @@ class _ChatScreenState extends State<ChatScreen> {
                                   read: isOwn &&
                                       _controller.isMessageRead(message),
                                   currentUserId: _controller.currentUser.id,
-                                  senderName: _senderName(chat, message),
+                                  // Имя — только у первого сообщения группы.
+                                  senderName: groupedWithPrev
+                                      ? null
+                                      : _senderName(chat, message),
+                                  dense: groupedWithNext,
                                   replyPreview: _replyPreview(message),
                                   highlighted: message.id == _highlightId,
                                   onReplyTap: () =>
@@ -941,20 +1010,28 @@ class _ChatScreenState extends State<ChatScreen> {
                                   ),
                                 );
                               }
-                              // Разделитель перед первым непрочитанным.
-                              if (message.id == _firstUnreadId) {
-                                return Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    _unreadDivider(
-                                        Theme.of(context).brightness ==
-                                            Brightness.light),
-                                    item,
-                                  ],
-                                );
+                              // Чип даты при смене дня + полоса непрочитанных.
+                              final isLightNow =
+                                  Theme.of(context).brightness ==
+                                      Brightness.light;
+                              final showDate = prev == null ||
+                                  !_sameDay(
+                                      prev.createdAt, message.createdAt);
+                              if (!showDate &&
+                                  message.id != _firstUnreadId) {
+                                return item;
                               }
-                              return item;
+                              return Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.stretch,
+                                children: [
+                                  if (showDate)
+                                    _dateChip(message.createdAt, isLightNow),
+                                  if (message.id == _firstUnreadId)
+                                    _unreadDivider(isLightNow),
+                                  item,
+                                ],
+                              );
                             },
                           ),
                           ),

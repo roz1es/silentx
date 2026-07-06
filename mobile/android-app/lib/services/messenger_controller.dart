@@ -45,8 +45,13 @@ class MessengerController extends ChangeNotifier {
 
   String? _activeChatId;
   List<Message> _messages = const [];
-  Map<String, String> _typingNames = const {};
-  Map<String, String> _typingActions = const {};
+
+  /// Кто что делает по ВСЕМ чатам: chatId → userId → (имя, действие).
+  /// Используется и шапкой чата, и плитками списка («печатает…»).
+  Map<String, Map<String, (String, String)>> _typingByChat = const {};
+
+  /// Очередь сообщений, набранных без сети — уйдут при переподключении.
+  final List<Message> _outbox = [];
   bool _loadingMessages = false;
   String? _messagesError;
 
@@ -70,11 +75,31 @@ class MessengerController extends ChangeNotifier {
 
   String? get activeChatId => _activeChatId;
   List<Message> get messages => _messages;
-  List<String> get typingNames => _typingNames.values.toList(growable: false);
+  List<String> get typingNames => [
+        for (final e in (_typingByChat[_activeChatId] ?? const {}).values) e.$1,
+      ];
 
-  /// Действие первого «печатающего»: 'text' | 'voice' | 'video'.
-  String get typingAction =>
-      _typingActions.values.isNotEmpty ? _typingActions.values.first : 'text';
+  /// Действие первого «печатающего» в активном чате: 'text'|'voice'|'video'.
+  String get typingAction {
+    final entries = _typingByChat[_activeChatId];
+    return (entries == null || entries.isEmpty)
+        ? 'text'
+        : entries.values.first.$2;
+  }
+
+  /// Подпись для плитки чата в списке («печатает…», «записывает голосовое…»)
+  /// либо null, если в чате сейчас никто не печатает.
+  String? typingLabelFor(Chat chat) {
+    final entries = _typingByChat[chat.id];
+    if (entries == null || entries.isEmpty) return null;
+    final first = entries.values.first;
+    final verb = switch (first.$2) {
+      'voice' => 'записывает голосовое…',
+      'video' => 'записывает видео…',
+      _ => 'печатает…',
+    };
+    return chat.type == ChatType.direct ? verb : '${first.$1} $verb';
+  }
   bool get loadingMessages => _loadingMessages;
   String? get messagesError => _messagesError;
   int get incomingMessageTick => _incomingMessageTick;
@@ -189,7 +214,10 @@ class MessengerController extends ChangeNotifier {
     socket.connect(
       onConnectionChanged: (connected) {
         _socketConnected = connected;
-        if (connected) _joinAllChats();
+        if (connected) {
+          _joinAllChats();
+          _flushOutbox();
+        }
         notifyListeners();
       },
       onMessage: (message) {
@@ -245,18 +273,20 @@ class MessengerController extends ChangeNotifier {
         required isTyping,
         action,
       }) {
-        if (chatId != _activeChatId || userId == currentUser.id) return;
-        final next = {..._typingNames};
-        final acts = {..._typingActions};
+        if (userId == currentUser.id) return;
+        final byChat = {..._typingByChat};
+        final entries = {...(byChat[chatId] ?? const {})};
         if (isTyping) {
-          next[userId] = username;
-          acts[userId] = action ?? 'text';
+          entries[userId] = (username, action ?? 'text');
         } else {
-          next.remove(userId);
-          acts.remove(userId);
+          entries.remove(userId);
         }
-        _typingNames = next;
-        _typingActions = acts;
+        if (entries.isEmpty) {
+          byChat.remove(chatId);
+        } else {
+          byChat[chatId] = entries;
+        }
+        _typingByChat = byChat;
         notifyListeners();
       },
       onCallSignal: (payload) => call.handleSignal(payload),
@@ -324,8 +354,6 @@ class MessengerController extends ChangeNotifier {
   Future<void> openChat(String chatId) async {
     _activeChatId = chatId;
     _messages = const [];
-    _typingNames = const {};
-    _typingActions = const {};
     _loadingMessages = true;
     _messagesError = null;
     notifyListeners();
@@ -353,8 +381,6 @@ class MessengerController extends ChangeNotifier {
   void closeActiveChat() {
     _activeChatId = null;
     _messages = const [];
-    _typingNames = const {};
-    _typingActions = const {};
   }
 
   /// Отметить чат прочитанным без его открытия (для «прочитать всё» в папке).
@@ -379,12 +405,50 @@ class MessengerController extends ChangeNotifier {
   }) {
     final chatId = _activeChatId;
     if (chatId == null) return;
+    if (!_socketConnected) {
+      // Нет сети: в очередь + локальное сообщение с «часиками» в ленту.
+      final local = Message(
+        id: 'outbox_${DateTime.now().microsecondsSinceEpoch}',
+        chatId: chatId,
+        senderId: currentUser.id,
+        text: text ?? '',
+        createdAt: DateTime.now().millisecondsSinceEpoch,
+        media: media,
+        replyToMessageId: replyToMessageId,
+        pending: true,
+      );
+      _outbox.add(local);
+      _messages = [..._messages, local];
+      _incomingMessageTick++;
+      notifyListeners();
+      return;
+    }
     _socket?.sendMessage(
       chatId: chatId,
       text: text ?? '',
       media: media,
       replyToMessageId: replyToMessageId,
     );
+  }
+
+  /// Отправляет накопленное без сети и убирает локальные «часики» из ленты
+  /// (сервер пришлёт настоящие сообщения событием onMessage).
+  void _flushOutbox() {
+    if (_outbox.isEmpty) return;
+    final queued = List<Message>.of(_outbox);
+    _outbox.clear();
+    _messages = _messages
+        .where((m) => !queued.any((q) => q.id == m.id))
+        .toList(growable: false);
+    for (final m in queued) {
+      _socket?.sendMessage(
+        chatId: m.chatId,
+        text: m.text,
+        media: m.media,
+        replyToMessageId: m.replyToMessageId,
+      );
+    }
+    notifyListeners();
   }
 
   void editMessage(String messageId, String text) {

@@ -17,6 +17,7 @@ class ChatTile extends StatelessWidget {
     required this.onLongPress,
     this.avatarUrl,
     this.compact = false,
+    this.typingLabel,
   });
 
   final Chat chat;
@@ -29,6 +30,9 @@ class ChatTile extends StatelessWidget {
   /// Долгое нажатие с позицией касания (для привязки контекстного меню).
   final void Function(Offset globalPosition) onLongPress;
   final bool compact;
+
+  /// «печатает…»/«записывает…» — показывается вместо последнего сообщения.
+  final String? typingLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -129,10 +133,14 @@ class ChatTile extends StatelessWidget {
                         ],
                         Expanded(
                           child: Text(
-                            lastMessageLabel(chat.lastMessage?.text),
+                            typingLabel ??
+                                lastMessageLabel(chat.lastMessage?.text),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: mutedColor, fontSize: subSize),
+                            style: TextStyle(
+                                color:
+                                    typingLabel != null ? accent : mutedColor,
+                                fontSize: subSize),
                           ),
                         ),
                         if (unread > 0) ...[

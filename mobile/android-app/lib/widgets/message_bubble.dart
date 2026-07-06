@@ -47,6 +47,7 @@ class MessageBubble extends StatelessWidget {
     this.read = false,
     this.highlighted = false,
     this.fontScale = 1.0,
+    this.dense = false,
   });
 
   final Message message;
@@ -67,6 +68,12 @@ class MessageBubble extends StatelessWidget {
   final VoidCallback? onReplyTap;
   final bool highlighted;
   final double fontScale;
+
+  /// Сообщение продолжается следующим от того же отправителя — уменьшенный
+  /// нижний отступ (группировка, как в Telegram).
+  final bool dense;
+
+  double get _bottomGap => dense ? 2.0 : 10.0;
 
   @override
   Widget build(BuildContext context) {
@@ -121,7 +128,7 @@ class MessageBubble extends StatelessWidget {
       return Align(
         alignment: own ? Alignment.centerRight : Alignment.centerLeft,
         child: Padding(
-          padding: const EdgeInsets.only(bottom: 10),
+          padding: EdgeInsets.only(bottom: _bottomGap),
           child: Column(
             crossAxisAlignment:
                 own ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -167,7 +174,7 @@ class MessageBubble extends StatelessWidget {
           constraints: BoxConstraints(
             maxWidth: MediaQuery.of(context).size.width * 0.82,
           ),
-          margin: const EdgeInsets.only(bottom: 10),
+          margin: EdgeInsets.only(bottom: _bottomGap),
           child: Column(
             crossAxisAlignment:
                 own ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -215,7 +222,7 @@ class MessageBubble extends StatelessWidget {
           constraints: BoxConstraints(
             maxWidth: MediaQuery.of(context).size.width * 0.82,
           ),
-          margin: const EdgeInsets.only(bottom: 10),
+          margin: EdgeInsets.only(bottom: _bottomGap),
           child: Column(
             crossAxisAlignment:
                 own ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -391,7 +398,10 @@ class MessageBubble extends StatelessWidget {
         if (own && !message.deleted) ...[
           const SizedBox(width: 3),
           Icon(
-            read ? Icons.done_all_rounded : Icons.done_rounded,
+            // «Часики» — сообщение в очереди офлайн-отправки.
+            message.pending
+                ? Icons.schedule_rounded
+                : (read ? Icons.done_all_rounded : Icons.done_rounded),
             size: 13,
             color: read ? (isLight ? lightAccent : softGold) : timeColor,
           ),

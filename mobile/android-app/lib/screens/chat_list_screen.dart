@@ -3380,7 +3380,9 @@ class _SlidableChatTileState extends State<_SlidableChatTile> {
       borderRadius: BorderRadius.circular(18),
       child: Stack(
         children: [
-          // Кнопки действий под плиткой (справа).
+          // Кнопки действий под плиткой (справа). Показываем только когда
+          // плитка сдвинута — GlassCard полупрозрачный, иначе просвечивают.
+          if (_dx != 0)
           Positioned.fill(
             child: Align(
               alignment: Alignment.centerRight,

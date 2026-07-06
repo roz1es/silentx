@@ -261,6 +261,10 @@ class _ChatScreenState extends State<ChatScreen> {
       builder: (_) => const AttachSheet(),
     );
     if (!mounted || result == null) return;
+    // Даём листу доиграть анимацию закрытия: открывать диалог/экран во время
+    // закрытия sheet нельзя (краш _dependents.isEmpty).
+    await Future<void>.delayed(const Duration(milliseconds: 260));
+    if (!mounted) return;
     if (result.images != null) {
       // Мульти-выбор: отправляем каждое фото отдельным сообщением.
       for (final (bytes, name) in result.images!) {
@@ -374,7 +378,10 @@ class _ChatScreenState extends State<ChatScreen> {
       await _sendMediaBytes(bytes, name,
           caption: captionController.text.trim(), asFile: asFile);
     }
-    captionController.dispose();
+    // Диалог ещё доигрывает анимацию закрытия — его TextField слушает
+    // контроллер, синхронный dispose роняет кадр.
+    Future<void>.delayed(
+        const Duration(milliseconds: 400), captionController.dispose);
   }
 
   Future<void> _sendMediaBytes(Uint8List bytes, String name,

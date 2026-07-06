@@ -40,6 +40,7 @@ class MessageComposer extends StatefulWidget {
     required this.onCancelMode,
     required this.onTyping,
     required this.onStartVideoCircle,
+    required this.onInsertImage,
   });
 
   final TextEditingController controller;
@@ -57,6 +58,9 @@ class MessageComposer extends StatefulWidget {
   final VoidCallback onCancelMode;
   final ValueChanged<bool> onTyping;
   final VoidCallback onStartVideoCircle;
+
+  /// Стикер/гифка из клавиатуры (commitContent): байты + mime.
+  final void Function(Uint8List bytes, String mimeType) onInsertImage;
 
   @override
   State<MessageComposer> createState() => _MessageComposerState();
@@ -197,6 +201,21 @@ class _MessageComposerState extends State<MessageComposer> {
                 keyboardType: TextInputType.multiline,
                 textInputAction: TextInputAction.newline,
                 cursorColor: accent,
+                // Приём стикеров/гифок прямо из клавиатуры (Gboard и др.).
+                contentInsertionConfiguration: ContentInsertionConfiguration(
+                  allowedMimeTypes: const [
+                    'image/png',
+                    'image/gif',
+                    'image/webp',
+                    'image/jpeg',
+                  ],
+                  onContentInserted: (content) {
+                    final data = content.data;
+                    if (data != null && data.isNotEmpty) {
+                      widget.onInsertImage(data, content.mimeType);
+                    }
+                  },
+                ),
                 style: TextStyle(
                     color: isLight ? const Color(0xFF17202B) : text,
                     fontSize: 16),

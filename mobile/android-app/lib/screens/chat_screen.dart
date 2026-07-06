@@ -258,7 +258,12 @@ class _ChatScreenState extends State<ChatScreen> {
       builder: (_) => const AttachSheet(),
     );
     if (!mounted || result == null) return;
-    if (result.isFile) {
+    if (result.images != null) {
+      // Мульти-выбор: отправляем каждое фото отдельным сообщением.
+      for (final (bytes, name) in result.images!) {
+        await _sendMediaBytes(bytes, name);
+      }
+    } else if (result.isFile) {
       await _attach();
     } else if (result.isCamera) {
       // Экран съёмки открываем уже ПОСЛЕ закрытия листа (его pop вернул
@@ -391,6 +396,16 @@ class _ChatScreenState extends State<ChatScreen> {
     } finally {
       if (mounted) setState(() => _sendingMedia = false);
     }
+  }
+
+  /// Стикер/GIF из клавиатуры (commitContent) — отправляем сразу картинкой.
+  void _sendInsertedImage(Uint8List bytes, String mimeType) {
+    final ext = mimeType.contains('gif')
+        ? 'gif'
+        : mimeType.contains('webp')
+            ? 'webp'
+            : 'png';
+    unawaited(_sendMediaBytes(bytes, 'sticker.$ext'));
   }
 
   Future<void> _attach() async {
@@ -851,6 +866,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         onCancelVoice: _cancelVoice,
                         onCancelMode: _cancelComposerMode,
                         onTyping: _controller.notifyTyping,
+                        onInsertImage: _sendInsertedImage,
                         onStartVideoCircle: () {
                           FocusScope.of(context).unfocus();
                           setState(() => _recordingCircle = true);

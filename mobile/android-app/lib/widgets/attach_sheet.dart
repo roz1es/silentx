@@ -10,22 +10,33 @@ import '../theme/app_theme.dart';
 class AttachResult {
   const AttachResult.image(this.bytes, this.name)
       : isFile = false,
+        isCamera = false,
+        images = null;
+
+  /// Несколько фото за раз (мульти-выбор в галерее).
+  const AttachResult.images(this.images)
+      : bytes = null,
+        name = null,
+        isFile = false,
         isCamera = false;
   const AttachResult.file()
       : bytes = null,
         name = null,
         isFile = true,
-        isCamera = false;
+        isCamera = false,
+        images = null;
   const AttachResult.camera()
       : bytes = null,
         name = null,
         isFile = false,
-        isCamera = true;
+        isCamera = true,
+        images = null;
 
   final Uint8List? bytes;
   final String? name;
   final bool isFile;
   final bool isCamera;
+  final List<(Uint8List, String)>? images;
 }
 
 /// Telegram-стиль шторка вложений: заголовок «Недавние» со стрелкой, крестик
@@ -49,6 +60,9 @@ class _AttachSheetState extends State<AttachSheet> {
   bool _loading = true;
   bool _denied = false;
   bool _picking = false;
+
+  /// Мульти-выбор: long-press включает режим, тап добавляет/убирает.
+  final List<AssetEntity> _selected = [];
 
   static const _pageSize = 80;
 
@@ -111,6 +125,48 @@ class _AttachSheetState extends State<AttachSheet> {
       final name = title.isNotEmpty ? title : 'photo.jpg';
       if (!mounted) return;
       Navigator.of(context).pop(AttachResult.image(bytes, name));
+    } on Object {
+      if (mounted) setState(() => _picking = false);
+    }
+  }
+
+  void _toggleSelect(AssetEntity asset) {
+    setState(() {
+      final i = _selected.indexWhere((e) => e.id == asset.id);
+      if (i >= 0) {
+        _selected.removeAt(i);
+      } else {
+        _selected.add(asset);
+      }
+    });
+  }
+
+  void _onThumbTap(AssetEntity asset) {
+    if (_selected.isNotEmpty) {
+      _toggleSelect(asset);
+    } else {
+      _pickAsset(asset);
+    }
+  }
+
+  Future<void> _sendSelected() async {
+    if (_picking || _selected.isEmpty) return;
+    setState(() => _picking = true);
+    try {
+      final items = <(Uint8List, String)>[];
+      for (final asset in _selected) {
+        final file = await asset.originFile;
+        final bytes = await file?.readAsBytes();
+        if (bytes == null || bytes.isEmpty) continue;
+        final title = await asset.titleAsync;
+        items.add((bytes, title.isNotEmpty ? title : 'photo.jpg'));
+      }
+      if (!mounted) return;
+      if (items.isEmpty) {
+        setState(() => _picking = false);
+        return;
+      }
+      Navigator.of(context).pop(AttachResult.images(items));
     } on Object {
       if (mounted) setState(() => _picking = false);
     }
@@ -211,13 +267,36 @@ class _AttachSheetState extends State<AttachSheet> {
           itemCount: _assets.length + 1,
           itemBuilder: (context, index) {
             if (index == 0) return _cameraCell(titleColor);
+            final asset = _assets[index - 1];
+            final selIdx = _selected.indexWhere((e) => e.id == asset.id);
             return _AssetThumb(
-              asset: _assets[index - 1],
+              asset: asset,
               cache: _thumbCache,
-              onTap: _pickAsset,
+              onTap: _onThumbTap,
+              onLongPress: _toggleSelect,
+              selectedIndex: selIdx >= 0 ? selIdx + 1 : null,
             );
           },
         ),
+        // Кнопка отправки выбранных фото.
+        if (_selected.isNotEmpty)
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: bottomInset + 12,
+            child: FilledButton(
+              onPressed: _sendSelected,
+              style: FilledButton.styleFrom(
+                backgroundColor: accent,
+                foregroundColor: const Color(0xFF08131A),
+                minimumSize: const Size.fromHeight(48),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+              ),
+              child: Text('Отправить (${_selected.length})',
+                  style: const TextStyle(fontWeight: FontWeight.w800)),
+            ),
+          ),
         if (_picking)
           Positioned.fill(
             child: ColoredBox(
@@ -331,11 +410,17 @@ class _AssetThumb extends StatefulWidget {
     required this.asset,
     required this.cache,
     required this.onTap,
+    required this.onLongPress,
+    this.selectedIndex,
   });
 
   final AssetEntity asset;
   final Map<String, Uint8List> cache;
   final void Function(AssetEntity asset) onTap;
+  final void Function(AssetEntity asset) onLongPress;
+
+  /// Номер в мульти-выборе (1..N) либо null, если не выбран.
+  final int? selectedIndex;
 
   @override
   State<_AssetThumb> createState() => _AssetThumbState();
@@ -366,17 +451,54 @@ class _AssetThumbState extends State<_AssetThumb> {
   @override
   Widget build(BuildContext context) {
     final bytes = _bytes;
+    final sel = widget.selectedIndex;
     return GestureDetector(
       onTap: () => widget.onTap(widget.asset),
-      child: Container(
-        color: panelSoft,
-        child: bytes == null
-            ? null
-            : Image.memory(
-                bytes,
-                fit: BoxFit.cover,
-                gaplessPlayback: true,
+      onLongPress: () => widget.onLongPress(widget.asset),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Container(
+            color: panelSoft,
+            child: bytes == null
+                ? null
+                : Image.memory(
+                    bytes,
+                    fit: BoxFit.cover,
+                    gaplessPlayback: true,
+                  ),
+          ),
+          if (sel != null) ...[
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.25),
+                border: Border.all(color: accent, width: 2.5),
               ),
+            ),
+            Positioned(
+              top: 6,
+              right: 6,
+              child: Container(
+                width: 24,
+                height: 24,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: accent,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 1.5),
+                ),
+                child: Text(
+                  '$sel',
+                  style: const TextStyle(
+                    color: Color(0xFF08131A),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

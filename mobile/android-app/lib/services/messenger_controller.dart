@@ -238,8 +238,9 @@ class MessengerController extends ChangeNotifier {
       },
       onMessageDeleted: (chatId, messageId) {
         if (chatId != _activeChatId) return;
+        // Удалённое исчезает из ленты сразу (без плашки-надгробия).
         _messages = _messages
-            .map((m) => m.id == messageId ? m.copyWith(deleted: true) : m)
+            .where((m) => m.id != messageId)
             .toList(growable: false);
         notifyListeners();
       },
@@ -491,6 +492,11 @@ class MessengerController extends ChangeNotifier {
     final chatId = _activeChatId;
     if (chatId == null) return;
     _socket?.deleteMessage(chatId: chatId, messageId: messageId);
+    // Оптимистично убираем сразу — без плашки «Сообщение удалено»
+    // (сервер при перезагрузке чата удалённые всё равно не отдаёт).
+    _messages =
+        _messages.where((m) => m.id != messageId).toList(growable: false);
+    notifyListeners();
   }
 
   void toggleReaction(String messageId, String emoji) {

@@ -1010,6 +1010,15 @@ class _ChatScreenState extends State<ChatScreen> {
                                   ),
                                 );
                               }
+                              // Свежее сообщение (отправка/приход) въезжает
+                              // снизу с проявлением.
+                              item = _AppearAnimation(
+                                enabled: DateTime.now()
+                                            .millisecondsSinceEpoch -
+                                        message.createdAt <
+                                    3000,
+                                child: item,
+                              );
                               // Чип даты при смене дня + полоса непрочитанных.
                               final isLightNow =
                                   Theme.of(context).brightness ==
@@ -1665,6 +1674,32 @@ class _ChatScreenState extends State<ChatScreen> {
             icon: const Icon(Icons.close_rounded, size: 18),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Появление свежего сообщения: лёгкий подъём снизу + проявление.
+class _AppearAnimation extends StatelessWidget {
+  const _AppearAnimation({required this.enabled, required this.child});
+
+  final bool enabled;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!enabled) return child;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      child: child,
+      builder: (context, t, child) => Opacity(
+        opacity: t,
+        child: Transform.translate(
+          offset: Offset(0, 14 * (1 - t)),
+          child: child,
+        ),
       ),
     );
   }

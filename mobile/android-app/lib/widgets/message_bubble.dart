@@ -13,6 +13,18 @@ import 'media_preview.dart';
 
 const quickReactions = ['👍', '❤️', '😂', '🔥', '😮', '😢'];
 
+/// Префикс-маркер пересылки: первая строка текста «↪ Переслано от X» —
+/// клиент рендерит её плашкой (сервер и контракт не меняются).
+const kForwardPrefix = '↪ Переслано от ';
+
+/// Разбирает текст: (имя отправителя оригинала | null, остальной текст).
+(String?, String) _splitForward(String body) {
+  if (!body.startsWith(kForwardPrefix)) return (null, body);
+  final nl = body.indexOf('\n');
+  if (nl < 0) return (body.substring(kForwardPrefix.length), '');
+  return (body.substring(kForwardPrefix.length, nl), body.substring(nl + 1));
+}
+
 /// Пузырь сообщения с мобильным контекстным меню (long-press).
 class MessageBubble extends StatelessWidget {
   const MessageBubble({
@@ -274,20 +286,48 @@ class MessageBubble extends StatelessWidget {
       ];
     }
 
+    final (fwdFrom, rest) = _splitForward(body);
     return [
+      if (fwdFrom != null) _forwardChip(fwdFrom),
       if (media != null)
         MediaPreview(
             media: media, serverUrl: serverUrl, onPlayVoice: onPlayVoice),
       if (message.imageUrl?.isNotEmpty == true && media?.kind != 'video_note')
         ImagePreview(source: message.imageUrl!, serverUrl: serverUrl),
-      if (body.isNotEmpty) ...[
+      if (rest.isNotEmpty) ...[
         const SizedBox(height: 6),
-        Text(body,
+        Text(rest,
             style: TextStyle(color: textColor, fontSize: 15 * fontScale)),
       ],
       const SizedBox(height: 3),
       Align(alignment: Alignment.centerRight, child: _meta(timeColor, isLight)),
     ];
+  }
+
+  /// Плашка «Переслано от X» над содержимым (как в Telegram).
+  Widget _forwardChip(String from) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.forward_rounded, size: 14, color: accent),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              'Переслано от $from',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: accent,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Текст с временем, наложенным в правый нижний угол. В конце текста —
@@ -298,17 +338,25 @@ class MessageBubble extends StatelessWidget {
     final hasEdited = message.editedAt != null && !message.deleted;
     final reserve = (own && !message.deleted ? 54.0 : 38.0) +
         (hasEdited ? 30.0 : 0.0);
+    final (fwdFrom, rest) = _splitForward(body);
     return Stack(
       children: [
-        _LinkText(
-          body: body,
-          reserve: reserve,
-          style: TextStyle(
-            color: textColor,
-            fontSize: 15 * fontScale,
-            fontStyle:
-                message.deleted ? FontStyle.italic : FontStyle.normal,
-          ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (fwdFrom != null) _forwardChip(fwdFrom),
+            _LinkText(
+              body: fwdFrom == null ? body : (rest.isEmpty ? ' ' : rest),
+              reserve: reserve,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 15 * fontScale,
+                fontStyle:
+                    message.deleted ? FontStyle.italic : FontStyle.normal,
+              ),
+            ),
+          ],
         ),
         Positioned(
           right: 0,

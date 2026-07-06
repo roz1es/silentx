@@ -162,9 +162,12 @@ class _ChatScreenState extends State<ChatScreen> {
       final msgs = _controller.messages;
       if (firstSync) {
         // Первая загрузка: если были непрочитанные — открываемся на первом
-        // из них (с разделителем), иначе как раньше — в конец.
-        if (_initialUnread > 0 && msgs.length > _initialUnread) {
-          _firstUnreadId = msgs[msgs.length - _initialUnread].id;
+        // из них (с разделителем), иначе как раньше — в конец. Работает и
+        // когда непрочитано ВСЁ (clamp на первый элемент).
+        if (_initialUnread > 0 && msgs.isNotEmpty) {
+          final idx =
+              (msgs.length - _initialUnread).clamp(0, msgs.length - 1);
+          _firstUnreadId = msgs[idx].id;
           _revealFirstUnread();
         } else {
           _scrollToBottom(instant: true);
@@ -620,11 +623,13 @@ class _ChatScreenState extends State<ChatScreen> {
   /// (грубый прыжок по доле индекса, затем точное наведение по ключу).
   void _revealFirstUnread() {
     final messages = _controller.messages;
-    final idx = messages.length - _initialUnread;
-    if (idx <= 0 || idx >= messages.length) {
+    final idx = messages.indexWhere((m) => m.id == _firstUnreadId);
+    if (idx < 0) {
       _scrollToBottom(instant: true);
       return;
     }
+    // Непрочитано всё — лента и так открыта сверху, остаёмся на месте.
+    if (idx == 0) return;
     final target = messages[idx];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
@@ -642,27 +647,26 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  /// Разделитель «Новые сообщения» перед первым непрочитанным.
+  /// Полоса «Непрочитанные сообщения» перед первым непрочитанным
+  /// (как в Telegram — заметная плашка на всю ширину).
   Widget _unreadDivider(bool isLight) {
-    final line = (isLight ? lightMuted : muted).withValues(alpha: 0.35);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Expanded(child: Container(height: 1, color: line)),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Text(
-              'Новые сообщения',
-              style: TextStyle(
-                color: isLight ? lightMuted : muted,
-                fontSize: 11.5,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          Expanded(child: Container(height: 1, color: line)),
-        ],
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(
+        color: (isLight ? Colors.white : panelSoft)
+            .withValues(alpha: isLight ? 0.8 : 0.85),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        'Непрочитанные сообщения',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: isLight ? lightMuted : muted,
+          fontSize: 12.5,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -998,11 +1002,26 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  /// Имя автора сообщения (для плашки «Переслано от»).
+  String _senderNameOf(Message m) {
+    if (m.senderId == _controller.currentUser.id) {
+      return _controller.currentUser.title;
+    }
+    for (final c in _controller.chats) {
+      if (c.id != m.chatId) continue;
+      for (final p in c.participants) {
+        if (p.id == m.senderId) return p.title;
+      }
+    }
+    return 'пользователя';
+  }
+
   /// Пересылка одного сообщения.
   Future<void> _forwardMessage(Message message) async {
     final target = await _pickForwardTarget();
     if (target == null || !mounted) return;
-    _controller.forwardMessage(target.id, message);
+    _controller.forwardMessage(target.id, message,
+        fromName: _senderNameOf(message));
     showAppToast(context, 'Переслано в «${target.title}»');
   }
 
@@ -1023,7 +1042,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final target = await _pickForwardTarget();
     if (target == null || !mounted) return;
     for (final m in msgs) {
-      _controller.forwardMessage(target.id, m);
+      _controller.forwardMessage(target.id, m, fromName: _senderNameOf(m));
     }
     setState(() => _selectedIds.clear());
     showAppToast(context, 'Переслано в «${target.title}» (${msgs.length})');

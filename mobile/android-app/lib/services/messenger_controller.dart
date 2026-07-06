@@ -402,11 +402,17 @@ class MessengerController extends ChangeNotifier {
   }
 
   /// Переслать сообщение в другой чат — обычная отправка копии (текст+медиа),
-  /// сервер и контракт не меняются.
-  void forwardMessage(String chatId, Message message) {
+  /// сервер и контракт не меняются. [fromName] добавляет первой строкой
+  /// маркер «↪ Переслано от X», который клиент рендерит плашкой.
+  void forwardMessage(String chatId, Message message, {String? fromName}) {
+    final body = message.text.trim();
+    final header = fromName == null ? '' : '↪ Переслано от $fromName';
+    final text = header.isEmpty
+        ? body
+        : (body.isEmpty ? header : '$header\n$body');
     _socket?.sendMessage(
       chatId: chatId,
-      text: message.text,
+      text: text,
       media: message.media,
     );
   }

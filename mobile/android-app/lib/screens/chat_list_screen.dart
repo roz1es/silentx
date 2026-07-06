@@ -3418,31 +3418,33 @@ class _SlidableChatTileState extends State<_SlidableChatTile> {
               child: SizedBox(
                 width: _actionsWidth,
                 height: double.infinity,
-                child: Row(
-                  children: [
-                    _action(
-                      widget.muted
-                          ? Icons.notifications_active_rounded
-                          : Icons.notifications_off_rounded,
-                      isLight ? const Color(0xFFE7EBF2) : panelSoft,
-                      isLight ? lightText : text,
-                      () => _closeAnd(widget.onMute),
-                    ),
-                    _action(
-                      widget.pinned
-                          ? Icons.push_pin_outlined
-                          : Icons.push_pin_rounded,
-                      accent.withValues(alpha: 0.85),
-                      const Color(0xFF08131A),
-                      () => _closeAnd(widget.onPin),
-                    ),
-                    _action(
-                      Icons.delete_outline_rounded,
-                      danger.withValues(alpha: 0.85),
-                      Colors.white,
-                      () => _closeAnd(widget.onDelete),
-                    ),
-                  ],
+                // Фон панели — фон мессенджера (меняется с темой), иконки
+                // цветные: сливается с фоном, без чужеродных углов.
+                child: ColoredBox(
+                  color: isLight ? lightBg : bg,
+                  child: Row(
+                    children: [
+                      _action(
+                        widget.muted
+                            ? Icons.notifications_active_rounded
+                            : Icons.notifications_off_rounded,
+                        isLight ? lightText : text,
+                        () => _closeAnd(widget.onMute),
+                      ),
+                      _action(
+                        widget.pinned
+                            ? Icons.push_pin_outlined
+                            : Icons.push_pin_rounded,
+                        accent,
+                        () => _closeAnd(widget.onPin),
+                      ),
+                      _action(
+                        Icons.delete_outline_rounded,
+                        danger,
+                        () => _closeAnd(widget.onDelete),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -3490,17 +3492,12 @@ class _SlidableChatTileState extends State<_SlidableChatTile> {
     );
   }
 
-  Widget _action(
-      IconData icon, Color bg, Color fg, VoidCallback onTap) {
+  Widget _action(IconData icon, Color color, VoidCallback onTap) {
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: Container(
-          color: bg,
-          height: double.infinity,
-          child: Icon(icon, color: fg, size: 22),
-        ),
+        child: Center(child: Icon(icon, color: color, size: 22)),
       ),
     );
   }

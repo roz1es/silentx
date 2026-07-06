@@ -3450,9 +3450,13 @@ class _SlidableChatTileState extends State<_SlidableChatTile> {
                     _ZonedHDragRecognizer>(
                   () => _ZonedHDragRecognizer(
                     debugOwner: this,
-                    canStart: (local) =>
-                        _dx != 0 ||
-                        local.dx > ((context.size?.width ?? 360) - 96),
+                    canStart: (local) {
+                      if (_dx != 0) return true;
+                      final w = context.size?.width ?? 360;
+                      // Правая треть плитки (мин. 130px) — зона свайпа
+                      // кнопок; из середины списка листаются папки.
+                      return local.dx > w - math.max(130.0, w * 0.33);
+                    },
                   ),
                   (r) => r
                     ..onStart = ((_) => setState(() => _dragging = true))
@@ -3463,7 +3467,14 @@ class _SlidableChatTileState extends State<_SlidableChatTile> {
                           _dx =
                               _dx < -_actionsWidth / 2 ? -_actionsWidth : 0;
                         }))
-                    ..onCancel = (() => setState(() => _dragging = false)),
+                    // Отменённый жест (его перехватил вертикальный скролл)
+                    // тоже доводим — иначе плитка застревала полусдвинутой
+                    // («обрезок»), а кнопки оставались недоступными.
+                    ..onCancel = (() => setState(() {
+                          _dragging = false;
+                          _dx =
+                              _dx < -_actionsWidth / 2 ? -_actionsWidth : 0;
+                        })),
                 ),
               },
               child: GestureDetector(

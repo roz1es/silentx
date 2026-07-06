@@ -127,12 +127,14 @@ class BrenksSocket {
     required String chatId,
     String? text,
     MessageMedia? media,
+    String? imageUrl,
     String? replyToMessageId,
   }) {
     _socket?.emit('send_message', {
       'chatId': chatId,
       'text': text ?? '',
       if (media != null) 'media': media.toJson(),
+      if (imageUrl != null && imageUrl.isNotEmpty) 'imageUrl': imageUrl,
       if (replyToMessageId != null) 'replyToMessageId': replyToMessageId,
     });
   }

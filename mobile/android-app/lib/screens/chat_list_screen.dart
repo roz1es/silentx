@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
@@ -3439,18 +3440,37 @@ class _SlidableChatTileState extends State<_SlidableChatTile> {
                 _dragging ? Duration.zero : const Duration(milliseconds: 160),
             curve: Curves.easeOutCubic,
             transform: Matrix4.translationValues(_dx, 0, 0),
-            child: GestureDetector(
+            // Свайп плитки стартует только из ПРАВОЙ зоны (где время) либо
+            // когда панель уже открыта — свайп из середины списка уходит
+            // переключению папок.
+            child: RawGestureDetector(
               behavior: HitTestBehavior.translucent,
-              onHorizontalDragStart: (_) =>
-                  setState(() => _dragging = true),
-              onHorizontalDragUpdate: (d) => setState(() =>
-                  _dx = (_dx + d.delta.dx).clamp(-_actionsWidth, 0.0)),
-              onHorizontalDragEnd: (_) => setState(() {
-                _dragging = false;
-                _dx = _dx < -_actionsWidth / 2 ? -_actionsWidth : 0;
-              }),
-              onTap: _dx != 0 ? () => setState(() => _dx = 0) : null,
-              child: widget.child,
+              gestures: {
+                _ZonedHDragRecognizer: GestureRecognizerFactoryWithHandlers<
+                    _ZonedHDragRecognizer>(
+                  () => _ZonedHDragRecognizer(
+                    debugOwner: this,
+                    canStart: (local) =>
+                        _dx != 0 ||
+                        local.dx > ((context.size?.width ?? 360) - 96),
+                  ),
+                  (r) => r
+                    ..onStart = ((_) => setState(() => _dragging = true))
+                    ..onUpdate = ((d) => setState(() =>
+                        _dx = (_dx + d.delta.dx).clamp(-_actionsWidth, 0.0)))
+                    ..onEnd = ((_) => setState(() {
+                          _dragging = false;
+                          _dx =
+                              _dx < -_actionsWidth / 2 ? -_actionsWidth : 0;
+                        }))
+                    ..onCancel = (() => setState(() => _dragging = false)),
+                ),
+              },
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: _dx != 0 ? () => setState(() => _dx = 0) : null,
+                child: widget.child,
+              ),
             ),
           ),
         ],
@@ -3471,5 +3491,19 @@ class _SlidableChatTileState extends State<_SlidableChatTile> {
         ),
       ),
     );
+  }
+}
+
+/// Горизонтальный drag, стартующий только из разрешённой зоны (правый край
+/// плитки чата) — свайп из середины списка уходит переключению папок.
+class _ZonedHDragRecognizer extends HorizontalDragGestureRecognizer {
+  _ZonedHDragRecognizer({required this.canStart, super.debugOwner});
+
+  final bool Function(Offset localPosition) canStart;
+
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    if (!canStart(event.localPosition)) return;
+    super.addAllowedPointer(event);
   }
 }

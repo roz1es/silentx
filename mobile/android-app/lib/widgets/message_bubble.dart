@@ -339,23 +339,31 @@ class MessageBubble extends StatelessWidget {
     final reserve = (own && !message.deleted ? 54.0 : 38.0) +
         (hasEdited ? 30.0 : 0.0);
     final (fwdFrom, rest) = _splitForward(body);
+    // Пересылка без текста (медиа/фото): рендерим только плашку, без пустой
+    // строки-заглушки; отступ справа — под инлайн-время.
+    final onlyChip = fwdFrom != null && rest.isEmpty;
     return Stack(
       children: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (fwdFrom != null) _forwardChip(fwdFrom),
-            _LinkText(
-              body: fwdFrom == null ? body : (rest.isEmpty ? ' ' : rest),
-              reserve: reserve,
-              style: TextStyle(
-                color: textColor,
-                fontSize: 15 * fontScale,
-                fontStyle:
-                    message.deleted ? FontStyle.italic : FontStyle.normal,
+            if (fwdFrom != null)
+              Padding(
+                padding: EdgeInsets.only(right: onlyChip ? 58 : 0),
+                child: _forwardChip(fwdFrom),
               ),
-            ),
+            if (!onlyChip)
+              _LinkText(
+                body: fwdFrom == null ? body : rest,
+                reserve: reserve,
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 15 * fontScale,
+                  fontStyle:
+                      message.deleted ? FontStyle.italic : FontStyle.normal,
+                ),
+              ),
           ],
         ),
         Positioned(

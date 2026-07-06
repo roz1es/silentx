@@ -401,12 +401,16 @@ class MessengerController extends ChangeNotifier {
     return chat.id;
   }
 
-  /// Переслать сообщение в другой чат — обычная отправка копии (текст+медиа),
-  /// сервер и контракт не меняются. [fromName] добавляет первой строкой
-  /// маркер «↪ Переслано от X», который клиент рендерит плашкой.
+  /// Переслать сообщение в другой чат — обычная отправка копии (текст+медиа+
+  /// imageUrl), сервер и контракт не меняются. [fromName] добавляет первой
+  /// строкой маркер «↪ Переслано от X», который клиент рендерит плашкой.
   void forwardMessage(String chatId, Message message, {String? fromName}) {
     final body = message.text.trim();
-    final header = fromName == null ? '' : '↪ Переслано от $fromName';
+    // Кружок пересылаем без текстового заголовка: с непустым текстом он
+    // перестаёт рендериться кружком.
+    final isCircle = message.media?.kind == 'video_note';
+    final header =
+        (fromName == null || isCircle) ? '' : '↪ Переслано от $fromName';
     final text = header.isEmpty
         ? body
         : (body.isEmpty ? header : '$header\n$body');
@@ -414,6 +418,8 @@ class MessengerController extends ChangeNotifier {
       chatId: chatId,
       text: text,
       media: message.media,
+      imageUrl:
+          (message.imageUrl?.isNotEmpty ?? false) ? message.imageUrl : null,
     );
   }
 

@@ -18,6 +18,7 @@ class ChatTile extends StatelessWidget {
     this.avatarUrl,
     this.compact = false,
     this.typingLabel,
+    this.draft,
   });
 
   final Chat chat;
@@ -33,6 +34,9 @@ class ChatTile extends StatelessWidget {
 
   /// «печатает…»/«записывает…» — показывается вместо последнего сообщения.
   final String? typingLabel;
+
+  /// Недописанный текст чата — метка «Черновик:» вместо последнего сообщения.
+  final String? draft;
 
   @override
   Widget build(BuildContext context) {
@@ -132,16 +136,35 @@ class ChatTile extends StatelessWidget {
                           const SizedBox(width: 4),
                         ],
                         Expanded(
-                          child: Text(
-                            typingLabel ??
-                                lastMessageLabel(chat.lastMessage?.text),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                color:
-                                    typingLabel != null ? accent : mutedColor,
-                                fontSize: subSize),
-                          ),
+                          child: typingLabel == null &&
+                                  (draft?.trim().isNotEmpty ?? false)
+                              ? Text.rich(
+                                  TextSpan(children: [
+                                    const TextSpan(
+                                      text: 'Черновик: ',
+                                      style: TextStyle(
+                                          color: danger,
+                                          fontWeight: FontWeight.w600),
+                                    ),
+                                    TextSpan(text: draft!.trim()),
+                                  ]),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      color: mutedColor, fontSize: subSize),
+                                )
+                              : Text(
+                                  typingLabel ??
+                                      lastMessageLabel(
+                                          chat.lastMessage?.text),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      color: typingLabel != null
+                                          ? accent
+                                          : mutedColor,
+                                      fontSize: subSize),
+                                ),
                         ),
                         if (unread > 0) ...[
                           const SizedBox(width: 8),

@@ -458,6 +458,20 @@ class MessengerController extends ChangeNotifier {
     _socket?.editMessage(chatId: chatId, messageId: messageId, text: text);
   }
 
+  /// Сбросить непрочитанные во всех чатах. Возвращает число затронутых.
+  int markAllRead() {
+    var count = 0;
+    final me = currentUser.id;
+    _chats = _chats.map((c) {
+      if ((c.unread[me] ?? 0) == 0) return c;
+      count++;
+      _socket?.markRead(c.id);
+      return c.copyWith(unread: {...c.unread, me: 0});
+    }).toList(growable: false);
+    if (count > 0) notifyListeners();
+    return count;
+  }
+
   /// Открыть (создав при необходимости) чат «Избранное». Возвращает его id.
   Future<String> ensureSavedChat() async {
     final chat = await api.ensureSavedChat();

@@ -11,7 +11,9 @@ import 'package:video_player/video_player.dart';
 import '../format.dart';
 import '../models.dart';
 import '../services/audio_message_service.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
+import 'glass.dart';
 
 /// Отрисовка вложения сообщения: фото, голосовое, видеокружок или файл.
 class MediaPreview extends StatelessWidget {
@@ -699,40 +701,117 @@ class _ImagePreviewState extends State<ImagePreview> {
     showDialog<void>(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.85),
-      builder: (context) => Dialog.fullscreen(
-        backgroundColor: Colors.transparent,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: GestureDetector(
-                onVerticalDragEnd: (d) {
-                  if ((d.primaryVelocity ?? 0).abs() > 250) {
-                    Navigator.pop(context);
-                  }
-                },
-                child: InteractiveViewer(
-                  minScale: 0.6,
-                  maxScale: 5,
-                  child: Center(
-                    child: bytes != null
-                        ? Image.memory(bytes, fit: BoxFit.contain)
-                        : Image.network(url!, fit: BoxFit.contain),
+      builder: (context) => _PhotoViewer(bytes: bytes, url: url),
+    );
+  }
+}
+
+/// Полноэкранный просмотр фото: pinch-zoom, двойной тап — зум/сброс,
+/// свайп по вертикали — закрыть, кнопка — сохранить в галерею.
+class _PhotoViewer extends StatefulWidget {
+  const _PhotoViewer({required this.bytes, required this.url});
+
+  final Uint8List? bytes;
+  final String? url;
+
+  @override
+  State<_PhotoViewer> createState() => _PhotoViewerState();
+}
+
+class _PhotoViewerState extends State<_PhotoViewer> {
+  final TransformationController _transform = TransformationController();
+  Offset _doubleTapPos = Offset.zero;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _transform.dispose();
+    super.dispose();
+  }
+
+  void _onDoubleTap() {
+    if (_transform.value != Matrix4.identity()) {
+      _transform.value = Matrix4.identity();
+      return;
+    }
+    const s = 2.5;
+    final p = _doubleTapPos;
+    _transform.value = Matrix4.translationValues(
+        -p.dx * (s - 1), -p.dy * (s - 1), 0)
+      ..multiply(Matrix4.diagonal3Values(s, s, 1));
+  }
+
+  Future<void> _save() async {
+    final bytes = widget.bytes;
+    if (bytes == null || _saving) return;
+    setState(() => _saving = true);
+    final name = 'brenks_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final ok = await saveImageToGallery(bytes, name);
+    if (!mounted) return;
+    setState(() => _saving = false);
+    showAppToast(
+      context,
+      ok ? 'Сохранено в галерею' : 'Не удалось сохранить',
+      error: !ok,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bytes = widget.bytes;
+    return Dialog.fullscreen(
+      backgroundColor: Colors.transparent,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              onVerticalDragEnd: (d) {
+                if ((d.primaryVelocity ?? 0).abs() > 250) {
+                  Navigator.pop(context);
+                }
+              },
+              onDoubleTapDown: (d) => _doubleTapPos = d.localPosition,
+              onDoubleTap: _onDoubleTap,
+              child: InteractiveViewer(
+                transformationController: _transform,
+                minScale: 0.6,
+                maxScale: 5,
+                child: Center(
+                  child: bytes != null
+                      ? Image.memory(bytes, fit: BoxFit.contain)
+                      : Image.network(widget.url!, fit: BoxFit.contain),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 16,
+            top: 16,
+            child: SafeArea(
+              child: Row(
+                children: [
+                  if (bytes != null)
+                    IconButton.filledTonal(
+                      onPressed: _save,
+                      icon: _saving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.download_rounded),
+                    ),
+                  const SizedBox(width: 8),
+                  IconButton.filledTonal(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
                   ),
-                ),
+                ],
               ),
             ),
-            Positioned(
-              right: 16,
-              top: 16,
-              child: SafeArea(
-                child: IconButton.filledTonal(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close_rounded),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

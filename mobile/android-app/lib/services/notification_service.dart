@@ -1,6 +1,21 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+/// Сохранить картинку в галерею устройства (Pictures/BrenksChat).
+/// Возвращает true при успехе.
+Future<bool> saveImageToGallery(Uint8List bytes, String name,
+    {String mime = 'image/jpeg'}) async {
+  try {
+    final ok = await NotificationService._channel.invokeMethod<bool>(
+      'saveImage',
+      {'bytes': bytes, 'name': name, 'mime': mime},
+    );
+    return ok == true;
+  } on Object {
+    return false;
+  }
+}
+
 /// Открыть http(s)-ссылку во внешнем браузере через натив (без url_launcher).
 Future<void> openExternalUrl(String url) async {
   try {

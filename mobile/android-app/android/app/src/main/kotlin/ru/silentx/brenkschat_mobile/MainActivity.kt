@@ -45,6 +45,13 @@ class MainActivity : FlutterActivity() {
                         getSystemService(NotificationManager::class.java)?.cancelAll()
                         result.success(true)
                     }
+                    "saveImage" -> {
+                        val data = call.argument<ByteArray>("bytes")
+                        val name = call.argument<String>("name")
+                            ?: "brenks_${System.currentTimeMillis()}.jpg"
+                        val mime = call.argument<String>("mime") ?: "image/jpeg"
+                        result.success(data != null && saveImageToGallery(data, name, mime))
+                    }
                     "openUrl" -> {
                         val url = call.argument<String>("url")
                         if (url != null &&
@@ -66,6 +73,55 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    // Сохранение картинки в галерею: MediaStore (API 29+) либо публичная
+    // папка Pictures со сканированием (старые Android, включая BlueStacks).
+    private fun saveImageToGallery(data: ByteArray, name: String, mime: String): Boolean {
+        return try {
+            if (Build.VERSION.SDK_INT >= 29) {
+                val values = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, name)
+                    put(android.provider.MediaStore.Images.Media.MIME_TYPE, mime)
+                    put(
+                        android.provider.MediaStore.Images.Media.RELATIVE_PATH,
+                        android.os.Environment.DIRECTORY_PICTURES + "/BrenksChat",
+                    )
+                }
+                val uri = contentResolver.insert(
+                    android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    values,
+                ) ?: return false
+                contentResolver.openOutputStream(uri)?.use { it.write(data) }
+                    ?: return false
+                true
+            } else {
+                if (checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+                    PackageManager.PERMISSION_GRANTED
+                ) {
+                    requestPermissions(
+                        arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                        7002,
+                    )
+                    return false
+                }
+                val dir = java.io.File(
+                    android.os.Environment.getExternalStoragePublicDirectory(
+                        android.os.Environment.DIRECTORY_PICTURES,
+                    ),
+                    "BrenksChat",
+                )
+                dir.mkdirs()
+                val file = java.io.File(dir, name)
+                file.outputStream().use { it.write(data) }
+                android.media.MediaScannerConnection.scanFile(
+                    this, arrayOf(file.absolutePath), arrayOf(mime), null,
+                )
+                true
+            }
+        } catch (_: Throwable) {
+            false
+        }
     }
 
     private fun ensureNotificationPermission() {

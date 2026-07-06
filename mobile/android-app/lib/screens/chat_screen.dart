@@ -14,6 +14,7 @@ import '../format.dart';
 import '../models.dart';
 import '../services/app_settings.dart';
 import '../services/audio_message_service.dart';
+import '../services/drafts_store.dart';
 import '../services/messenger_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/attach_sheet.dart';
@@ -104,16 +105,11 @@ class _ChatScreenState extends State<ChatScreen> {
         break;
       }
     }
-    // Черновик: восстанавливаем недописанный текст.
-    unawaited(SharedPreferences.getInstance().then((p) {
-      final draft = p.getString('draft_${widget.chatId}');
-      if (draft != null &&
-          draft.isNotEmpty &&
-          mounted &&
-          _messageController.text.isEmpty) {
-        _messageController.text = draft;
-      }
-    }));
+    // Черновик: восстанавливаем недописанный текст (кеш синхронный).
+    final draft = DraftsStore.instance.draftFor(widget.chatId);
+    if (draft != null && draft.isNotEmpty) {
+      _messageController.text = draft;
+    }
     // Открываем чат после первого кадра, чтобы синхронный notifyListeners
     // внутри openChat не вызвал setState во время инициализации.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -125,10 +121,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     // Черновик: сохраняем недописанное (пустое — удаляем).
-    final draft = _messageController.text;
-    unawaited(SharedPreferences.getInstance().then((p) => draft.trim().isEmpty
-        ? p.remove('draft_${widget.chatId}')
-        : p.setString('draft_${widget.chatId}', draft)));
+    unawaited(DraftsStore.instance.save(widget.chatId, _messageController.text));
     _controller.removeListener(_onControllerChanged);
     AppSettings.instance.removeListener(_onAppSettings);
     _controller.closeActiveChat();
@@ -982,6 +975,8 @@ class _ChatScreenState extends State<ChatScreen> {
                                   onReaction: (emoji) => _controller
                                       .toggleReaction(message.id, emoji),
                                   onPlayVoice: _playVoice,
+                                  resolveUserName: (id) =>
+                                      _resolveUserName(chat, id),
                                   fontScale: AppSettings.instance.msgFontScale,
                                 ),
                                 ),
@@ -1122,6 +1117,15 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       ),
     );
+  }
+
+  /// Имя пользователя по id (для списка «кто поставил реакцию»).
+  String _resolveUserName(Chat chat, String userId) {
+    if (userId == _controller.currentUser.id) return 'Вы';
+    for (final p in chat.participants) {
+      if (p.id == userId) return p.title;
+    }
+    return 'Пользователь';
   }
 
   /// Имя автора сообщения (для плашки «Переслано от»).

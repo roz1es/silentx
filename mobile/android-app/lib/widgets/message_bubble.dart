@@ -41,6 +41,7 @@ class MessageBubble extends StatelessWidget {
     required this.onSelect,
     required this.onReaction,
     required this.onPlayVoice,
+    required this.resolveUserName,
     this.senderName,
     this.replyPreview,
     this.onReplyTap,
@@ -63,6 +64,9 @@ class MessageBubble extends StatelessWidget {
   final VoidCallback onSelect;
   final ValueChanged<String> onReaction;
   final ValueChanged<MessageMedia> onPlayVoice;
+
+  /// Имя пользователя по id (для списка «кто поставил реакцию»).
+  final String Function(String userId) resolveUserName;
   final String? senderName;
   final String? replyPreview;
   final VoidCallback? onReplyTap;
@@ -209,7 +213,7 @@ class MessageBubble extends StatelessWidget {
                   read: read,
                   own: own,
                 ),
-              if (message.reactions.isNotEmpty) _reactions(isLight),
+              if (message.reactions.isNotEmpty) _reactions(context, isLight),
             ],
           ),
         ),
@@ -267,7 +271,7 @@ class MessageBubble extends StatelessWidget {
                 ),
                 ),
               ),
-              if (message.reactions.isNotEmpty) _reactions(isLight),
+              if (message.reactions.isNotEmpty) _reactions(context, isLight),
             ],
           ),
         ),
@@ -303,8 +307,12 @@ class MessageBubble extends StatelessWidget {
         ImagePreview(source: message.imageUrl!, serverUrl: serverUrl),
       if (rest.isNotEmpty) ...[
         const SizedBox(height: 6),
-        Text(rest,
-            style: TextStyle(color: textColor, fontSize: 15 * fontScale)),
+        // Через _LinkText: подпись тоже получает ссылки и **стили**.
+        _LinkText(
+          body: rest,
+          reserve: 0,
+          style: TextStyle(color: textColor, fontSize: 15 * fontScale),
+        ),
       ],
       const SizedBox(height: 3),
       Align(alignment: Alignment.centerRight, child: _meta(timeColor, isLight)),
@@ -410,7 +418,61 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _reactions(bool isLight) {
+  /// Лист «кто поставил реакции» (по долгому нажатию на чип).
+  void _showReactionViewers(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    HapticFeedback.lightImpact();
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: isLight ? Colors.white : panel,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Реакции',
+                    style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        color: isLight ? lightText : text)),
+                const SizedBox(height: 10),
+                for (final e in message.reactions.entries)
+                  for (final uid in e.value)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        children: [
+                          Text(e.key, style: const TextStyle(fontSize: 18)),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              resolveUserName(uid),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: isLight ? lightText : text),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _reactions(BuildContext context, bool isLight) {
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: Wrap(
@@ -425,6 +487,8 @@ class MessageBubble extends StatelessWidget {
           final reactText = isLight ? const Color(0xFF17202B) : text;
           return GestureDetector(
             onTap: () => onReaction(entry.key),
+            // Долгое нажатие — кто поставил реакции.
+            onLongPress: () => _showReactionViewers(context),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
@@ -947,6 +1011,35 @@ class _LinkTextState extends State<_LinkText> {
     super.dispose();
   }
 
+  // Разметка стиля в обычном тексте: **жирный** и __курсив__.
+  static final _styleRe = RegExp(r'\*\*(.+?)\*\*|__(.+?)__', dotAll: true);
+
+  List<InlineSpan> _styleChunk(String chunk) {
+    final spans = <InlineSpan>[];
+    var last = 0;
+    for (final m in _styleRe.allMatches(chunk)) {
+      if (m.start > last) {
+        spans.add(TextSpan(text: chunk.substring(last, m.start)));
+      }
+      if (m.group(1) != null) {
+        spans.add(TextSpan(
+          text: m.group(1),
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ));
+      } else {
+        spans.add(TextSpan(
+          text: m.group(2),
+          style: const TextStyle(fontStyle: FontStyle.italic),
+        ));
+      }
+      last = m.end;
+    }
+    if (last < chunk.length) {
+      spans.add(TextSpan(text: chunk.substring(last)));
+    }
+    return spans;
+  }
+
   List<InlineSpan> _spans() {
     // Пересоздаём распознаватели на каждый build, старые освобождаем.
     for (final r in _recognizers) {
@@ -957,7 +1050,7 @@ class _LinkTextState extends State<_LinkText> {
     var last = 0;
     for (final m in _urlRe.allMatches(widget.body)) {
       if (m.start > last) {
-        spans.add(TextSpan(text: widget.body.substring(last, m.start)));
+        spans.addAll(_styleChunk(widget.body.substring(last, m.start)));
       }
       final url = m.group(0)!;
       final rec = TapGestureRecognizer()..onTap = () => openExternalUrl(url);
@@ -974,7 +1067,7 @@ class _LinkTextState extends State<_LinkText> {
       last = m.end;
     }
     if (last < widget.body.length) {
-      spans.add(TextSpan(text: widget.body.substring(last)));
+      spans.addAll(_styleChunk(widget.body.substring(last)));
     }
     return spans;
   }

@@ -14,6 +14,7 @@ import '../config.dart';
 import '../format.dart';
 import '../models.dart';
 import '../services/app_settings.dart';
+import '../services/drafts_store.dart';
 import '../services/folders_store.dart';
 import '../services/messenger_controller.dart';
 import '../theme/app_theme.dart';
@@ -187,6 +188,7 @@ class _ChatListScreenState extends State<ChatListScreen>
     super.initState();
     _controller.addListener(_onChanged);
     AppSettings.instance.addListener(_onChanged);
+    DraftsStore.instance.addListener(_onChanged);
     _loadOrder();
     _loadFolders();
   }
@@ -195,6 +197,7 @@ class _ChatListScreenState extends State<ChatListScreen>
   void dispose() {
     _controller.removeListener(_onChanged);
     AppSettings.instance.removeListener(_onChanged);
+    DraftsStore.instance.removeListener(_onChanged);
     _userSearchDebounce?.cancel();
     _searchController.dispose();
     _searchFocus.dispose();
@@ -1309,6 +1312,7 @@ class _ChatListScreenState extends State<ChatListScreen>
                   unread: _controller.unreadFor(chat),
                   peerOnline: _controller.isPeerOnline(chat),
                   typingLabel: _controller.typingLabelFor(chat),
+                  draft: DraftsStore.instance.draftFor(chat.id),
                   onTap: () => _openChat(chat),
                   onLongPress: (_) => _chatOptions(chat),
                   compact: AppSettings.instance.compactList,
@@ -1546,6 +1550,7 @@ class _ChatListScreenState extends State<ChatListScreen>
                 unread: _controller.unreadFor(chat),
                 peerOnline: _controller.isPeerOnline(chat),
                 typingLabel: _controller.typingLabelFor(chat),
+                draft: DraftsStore.instance.draftFor(chat.id),
                 onTap: () => _openChat(chat),
                 onLongPress: (_) => _chatOptions(chat),
                 compact: AppSettings.instance.compactList,
@@ -1996,6 +2001,12 @@ class _SettingsViewState extends State<_SettingsView>
     if (picked == null || !mounted) return;
     await AppSettings.instance.setAccent(id: 'custom', color: picked);
     if (mounted) setState(() {});
+  }
+
+  void _markAllRead() {
+    final n = _ctrl.markAllRead();
+    showAppToast(
+        context, n == 0 ? 'Непрочитанных нет' : 'Прочитано чатов: $n');
   }
 
   /// «Избранное» — личный чат-заметки: создаётся сервером при первом входе.
@@ -2571,6 +2582,9 @@ class _SettingsViewState extends State<_SettingsView>
                     const SizedBox(height: 8),
                     _settingsRow(
                         Icons.bookmark_rounded, 'Избранное', _openSaved),
+                    const SizedBox(height: 8),
+                    _settingsRow(Icons.mark_chat_read_rounded,
+                        'Прочитать все чаты', _markAllRead),
                     const SizedBox(height: 20),
                     _sectionLabel('ОФОРМЛЕНИЕ'),
                     const SizedBox(height: 8),

@@ -45,6 +45,11 @@ class MainActivity : FlutterActivity() {
                         getSystemService(NotificationManager::class.java)?.cancelAll()
                         result.success(true)
                     }
+                    "shareImage" -> {
+                        val data = call.argument<ByteArray>("bytes")
+                        val name = call.argument<String>("name") ?: "photo.jpg"
+                        result.success(data != null && shareImage(data, name))
+                    }
                     "saveImage" -> {
                         val data = call.argument<ByteArray>("bytes")
                         val name = call.argument<String>("name")
@@ -73,6 +78,26 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    private fun shareImage(data: ByteArray, name: String): Boolean {
+        return try {
+            val dir = java.io.File(cacheDir, "shared").apply { mkdirs() }
+            val file = java.io.File(dir, name)
+            file.outputStream().use { it.write(data) }
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                this, "$packageName.fileprovider", file,
+            )
+            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = "image/*"
+                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(android.content.Intent.createChooser(intent, "Поделиться"))
+            true
+        } catch (_: Throwable) {
+            false
+        }
     }
 
     // Сохранение картинки в галерею: MediaStore (API 29+) либо публичная

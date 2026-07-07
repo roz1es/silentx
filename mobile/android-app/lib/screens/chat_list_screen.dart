@@ -24,6 +24,7 @@ import '../widgets/chat_tile.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/glass.dart';
 import '../widgets/ios_context_menu.dart';
+import '../widgets/profile_photo_viewer.dart';
 import '../widgets/new_chat_sheet.dart';
 import '../widgets/styled_qr.dart';
 import 'chat_profile_screen.dart';
@@ -2100,6 +2101,23 @@ class _SettingsViewState extends State<_SettingsView>
     return 'осталось ${(ms / 3600000).floor()} ч.';
   }
 
+  /// Тап по своему аватару — просмотрщик своих фото (текущий + история).
+  void _openOwnPhotos() {
+    final current = _ctrl.currentUser.avatarUrl;
+    final photos = <String>[
+      if (current != null && current.isNotEmpty) current,
+      ..._avatarHistory,
+    ];
+    if (photos.isEmpty) {
+      _openAvatarGallery();
+      return;
+    }
+    showProfilePhotos(context,
+        title: _ctrl.currentUser.title,
+        photos: photos,
+        serverUrl: _ctrl.serverUrl);
+  }
+
   Future<void> _loadAvatarHistory() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getStringList(_historyKey);
@@ -2245,7 +2263,8 @@ class _SettingsViewState extends State<_SettingsView>
                       child: Column(
                         children: [
                           GestureDetector(
-                            onTap: _openAvatarGallery,
+                            onTap: _openOwnPhotos,
+                            onLongPress: _openAvatarGallery,
                             child: Container(
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(

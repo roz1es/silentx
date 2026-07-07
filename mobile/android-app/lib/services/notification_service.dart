@@ -16,6 +16,17 @@ Future<bool> saveImageToGallery(Uint8List bytes, String name,
   }
 }
 
+/// Поделиться картинкой через системный лист (ACTION_SEND, FileProvider).
+Future<bool> shareImageBytes(Uint8List bytes, String name) async {
+  try {
+    final ok = await NotificationService._channel
+        .invokeMethod<bool>('shareImage', {'bytes': bytes, 'name': name});
+    return ok == true;
+  } on Object {
+    return false;
+  }
+}
+
 /// Открыть http(s)-ссылку во внешнем браузере через натив (без url_launcher).
 Future<void> openExternalUrl(String url) async {
   try {

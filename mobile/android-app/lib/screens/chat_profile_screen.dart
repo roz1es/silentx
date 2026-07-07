@@ -8,6 +8,7 @@ import '../services/messenger_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/brenks_avatar.dart';
 import '../widgets/glass.dart';
+import '../widgets/profile_photo_viewer.dart';
 import 'channel_settings_screen.dart';
 
 /// Профиль собеседника: инфо (ID / телефон / дата рождения / описание),
@@ -198,7 +199,17 @@ class _ChatProfileScreenState extends State<ChatProfileScreen> {
                                       colors: [softGold, goldDark],
                                     ),
                                   ),
-                                  child: Container(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      final a = _ctrl.displayAvatar(chat);
+                                      if (a != null && a.isNotEmpty) {
+                                        showProfilePhotos(context,
+                                            title: chat.title,
+                                            photos: [a],
+                                            serverUrl: _ctrl.serverUrl);
+                                      }
+                                    },
+                                    child: Container(
                                     padding: const EdgeInsets.all(3),
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
@@ -210,6 +221,7 @@ class _ChatProfileScreenState extends State<ChatProfileScreen> {
                                       baseUrl: _ctrl.serverUrl,
                                       size: 84,
                                     ),
+                                  ),
                                   ),
                                 ),
                                 if (online)

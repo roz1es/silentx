@@ -2126,7 +2126,7 @@ class _SettingsViewState extends State<_SettingsView>
 
   Future<void> _pushAvatarHistory(String dataUrl) async {
     final next = [dataUrl, ..._avatarHistory.where((a) => a != dataUrl)]
-        .take(12)
+        .take(100)
         .toList();
     setState(() => _avatarHistory = next);
     final prefs = await SharedPreferences.getInstance();
